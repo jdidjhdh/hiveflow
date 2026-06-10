@@ -1,0 +1,62 @@
+{
+  "nodes": [
+    {
+      "id": "node_1",
+      "type": "taskNode",
+      "position": { "x": 50, "y": 50 },
+      "data": {
+        "label": "文本预处理",
+        "task": "text_preprocess",
+        "skills": ["nlp", "text_analysis"],
+        "status": "idle",
+        "retry_policy": { "max_attempts": 3, "backoff_type": "exponential", "backoff_base": 1, "max_backoff": 30 },
+        "on_failure": "abort",
+        "expectation": { "state_key": "preprocessed_text", "expected_schema": {}, "validation": "", "deadline": 30, "use_json_schema": false }
+      }
+    },
+    {
+      "id": "node_2",
+      "type": "taskNode",
+      "position": { "x": 270, "y": 50 },
+      "data": {
+        "label": "情感分析",
+        "task": "sentiment_analysis",
+        "skills": ["nlp", "text_analysis"],
+        "status": "idle",
+        "depends_on": ["node_1"],
+        "on_failure": "skip"
+      }
+    },
+    {
+      "id": "node_3",
+      "type": "taskNode",
+      "position": { "x": 270, "y": 180 },
+      "data": {
+        "label": "关键实体提取",
+        "task": "entity_extraction",
+        "skills": ["nlp", "data_analysis"],
+        "status": "idle",
+        "depends_on": ["node_1"]
+      }
+    },
+    {
+      "id": "node_4",
+      "type": "taskNode",
+      "position": { "x": 500, "y": 110 },
+      "data": {
+        "label": "汇总报告",
+        "task": "generate_report",
+        "skills": ["reporting", "data_analysis"],
+        "status": "idle",
+        "depends_on": ["node_2", "node_3"],
+        "expectation": { "state_key": "final_report", "expected_schema": {}, "validation": "", "deadline": 60, "use_json_schema": false }
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e-node_1-node_2", "source": "node_1", "target": "node_2", "type": "smoothstep" },
+    { "id": "e-node_1-node_3", "source": "node_1", "target": "node_3", "type": "smoothstep" },
+    { "id": "e-node_2-node_4", "source": "node_2", "target": "node_4", "type": "smoothstep" },
+    { "id": "e-node_3-node_4", "source": "node_3", "target": "node_4", "type": "smoothstep" }
+  ]
+}

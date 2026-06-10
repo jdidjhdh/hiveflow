@@ -1,0 +1,83 @@
+{
+  "name": "分层规划执行",
+  "description": "规划 Agent 将复杂任务拆解为子任务 → 多个执行 Agent 并行处理各自任务 → 验证 Agent 检查结果质量。适用于软件开发、内容创作、复杂项目等场景。",
+  "nodes": [
+    {
+      "id": "planner",
+      "type": "taskNode",
+      "position": { "x": 250, "y": 20 },
+      "data": {
+        "label": "任务规划",
+        "task": "task_planning",
+        "skills": ["planning", "decomposition"],
+        "status": "idle",
+        "on_failure": "abort",
+        "expectation": { "state_key": "task_plan", "expected_schema": {}, "validation": "", "deadline": 20, "use_json_schema": false }
+      }
+    },
+    {
+      "id": "exec_1",
+      "type": "taskNode",
+      "position": { "x": 50, "y": 150 },
+      "data": {
+        "label": "执行 Agent 1 (数据采集)",
+        "task": "data_collection",
+        "skills": ["crawling", "data_processing"],
+        "status": "idle",
+        "retry_policy": { "max_attempts": 3, "backoff_type": "exponential", "backoff_base": 1, "max_backoff": 30 },
+        "on_failure": "skip",
+        "expectation": { "state_key": "collected_data", "expected_schema": {}, "validation": "", "deadline": 60, "use_json_schema": false }
+      }
+    },
+    {
+      "id": "exec_2",
+      "type": "taskNode",
+      "position": { "x": 250, "y": 150 },
+      "data": {
+        "label": "执行 Agent 2 (模型训练)",
+        "task": "model_training",
+        "skills": ["ml", "training"],
+        "status": "idle",
+        "retry_policy": { "max_attempts": 2, "backoff_type": "exponential", "backoff_base": 2, "max_backoff": 60 },
+        "on_failure": "abort",
+        "expectation": { "state_key": "trained_model", "expected_schema": {}, "validation": "", "deadline": 300, "use_json_schema": false }
+      }
+    },
+    {
+      "id": "exec_3",
+      "type": "taskNode",
+      "position": { "x": 450, "y": 150 },
+      "data": {
+        "label": "执行 Agent 3 (特征工程)",
+        "task": "feature_engineering",
+        "skills": ["data_analysis", "preprocessing"],
+        "status": "idle",
+        "retry_policy": { "max_attempts": 2, "backoff_type": "constant", "backoff_base": 1, "max_backoff": 15 },
+        "on_failure": "skip",
+        "expectation": { "state_key": "features", "expected_schema": {}, "validation": "", "deadline": 45, "use_json_schema": false }
+      }
+    },
+    {
+      "id": "validator",
+      "type": "taskNode",
+      "position": { "x": 250, "y": 280 },
+      "data": {
+        "label": "结果验证",
+        "task": "result_validation",
+        "skills": ["testing", "evaluation"],
+        "status": "idle",
+        "retry_policy": { "max_attempts": 2, "backoff_type": "constant", "backoff_base": 1, "max_backoff": 10 },
+        "on_failure": "abort",
+        "expectation": { "state_key": "validation_report", "expected_schema": {}, "validation": "", "deadline": 30, "use_json_schema": false }
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e-planner-exec1", "source": "planner", "target": "exec_1", "type": "smoothstep" },
+    { "id": "e-planner-exec2", "source": "planner", "target": "exec_2", "type": "smoothstep" },
+    { "id": "e-planner-exec3", "source": "planner", "target": "exec_3", "type": "smoothstep" },
+    { "id": "e-exec1-validator", "source": "exec_1", "target": "validator", "type": "smoothstep" },
+    { "id": "e-exec2-validator", "source": "exec_2", "target": "validator", "type": "smoothstep" },
+    { "id": "e-exec3-validator", "source": "exec_3", "target": "validator", "type": "smoothstep" }
+  ]
+}

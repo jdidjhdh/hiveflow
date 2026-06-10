@@ -1,0 +1,83 @@
+{
+  "name": "辩论式决策",
+  "description": "多个 Agent 并行分析同一问题发表观点 → 汇总 Agent 综合各方意见生成最终结论。适用于风险评估、投资决策、方案评审等场景。",
+  "nodes": [
+    {
+      "id": "issue",
+      "type": "taskNode",
+      "position": { "x": 250, "y": 20 },
+      "data": {
+        "label": "问题拆解",
+        "task": "issue_decomposition",
+        "skills": ["planning", "analysis"],
+        "status": "idle",
+        "on_failure": "abort",
+        "expectation": { "state_key": "decomposed_issue", "expected_schema": {}, "validation": "", "deadline": 15, "use_json_schema": false }
+      }
+    },
+    {
+      "id": "analyst_a",
+      "type": "taskNode",
+      "position": { "x": 50, "y": 140 },
+      "data": {
+        "label": "分析师 A (乐观视角)",
+        "task": "optimistic_analysis",
+        "skills": ["analysis", "reasoning"],
+        "status": "idle",
+        "retry_policy": { "max_attempts": 2, "backoff_type": "constant", "backoff_base": 1, "max_backoff": 10 },
+        "on_failure": "skip",
+        "expectation": { "state_key": "opinion_a", "expected_schema": {}, "validation": "", "deadline": 30, "use_json_schema": false }
+      }
+    },
+    {
+      "id": "analyst_b",
+      "type": "taskNode",
+      "position": { "x": 250, "y": 140 },
+      "data": {
+        "label": "分析师 B (悲观视角)",
+        "task": "pessimistic_analysis",
+        "skills": ["analysis", "reasoning"],
+        "status": "idle",
+        "retry_policy": { "max_attempts": 2, "backoff_type": "constant", "backoff_base": 1, "max_backoff": 10 },
+        "on_failure": "skip",
+        "expectation": { "state_key": "opinion_b", "expected_schema": {}, "validation": "", "deadline": 30, "use_json_schema": false }
+      }
+    },
+    {
+      "id": "analyst_c",
+      "type": "taskNode",
+      "position": { "x": 450, "y": 140 },
+      "data": {
+        "label": "分析师 C (中立视角)",
+        "task": "neutral_analysis",
+        "skills": ["analysis", "reasoning"],
+        "status": "idle",
+        "retry_policy": { "max_attempts": 2, "backoff_type": "constant", "backoff_base": 1, "max_backoff": 10 },
+        "on_failure": "skip",
+        "expectation": { "state_key": "opinion_c", "expected_schema": {}, "validation": "", "deadline": 30, "use_json_schema": false }
+      }
+    },
+    {
+      "id": "summary",
+      "type": "taskNode",
+      "position": { "x": 250, "y": 270 },
+      "data": {
+        "label": "汇总结论",
+        "task": "conclusion_synthesis",
+        "skills": ["summarization", "decision"],
+        "status": "idle",
+        "retry_policy": { "max_attempts": 3, "backoff_type": "exponential", "backoff_base": 1, "max_backoff": 30 },
+        "on_failure": "abort",
+        "expectation": { "state_key": "final_decision", "expected_schema": {}, "validation": "", "deadline": 45, "use_json_schema": false }
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e-issue-a", "source": "issue", "target": "analyst_a", "type": "smoothstep" },
+    { "id": "e-issue-b", "source": "issue", "target": "analyst_b", "type": "smoothstep" },
+    { "id": "e-issue-c", "source": "issue", "target": "analyst_c", "type": "smoothstep" },
+    { "id": "e-a-summary", "source": "analyst_a", "target": "summary", "type": "smoothstep" },
+    { "id": "e-b-summary", "source": "analyst_b", "target": "summary", "type": "smoothstep" },
+    { "id": "e-c-summary", "source": "analyst_c", "target": "summary", "type": "smoothstep" }
+  ]
+}

@@ -1,0 +1,114 @@
+# ==============================================
+# HiveFlow - Docker Compose 开发环境
+# ==============================================
+# 用于本地开发和测试
+# ==============================================
+
+version: "3.8"
+
+services:
+  # ==============================================
+  # Redis - 缓存/黑板后端
+  # ==============================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==============================================
+  # PostgreSQL - 数据库
+  # ==============================================
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: hiveflow
+      POSTGRES_PASSWORD: hiveflow
+      POSTGRES_DB: hiveflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "hiveflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==============================================
+  # HiveFlow Studio 后端
+  # ==============================================
+  studio:
+    build:
+      context: ./packages/studio/backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DB_URL=postgresql://hiveflow:hiveflow@postgres:5432/hiveflow
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./packages/studio/backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ==============================================
+  # HiveFlow Studio 前端
+  # ==============================================
+  frontend:
+    build:
+      context: ./packages/studio/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+    depends_on:
+      - studio
+
+  # ==============================================
+  # HiveFlow Agent
+  # ==============================================
+  agent:
+    build:
+      context: ./packages/agent
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ==============================================
+  # HiveFlow Core
+  # ==============================================
+  core:
+    build:
+      context: ./packages/core
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DB_URL=postgresql://hiveflow:hiveflow@postgres:5432/hiveflow
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+volumes:
+  redis_data:
+  postgres_data:

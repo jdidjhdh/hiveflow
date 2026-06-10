@@ -1,0 +1,52 @@
+{
+  "name": "RAG 流水线",
+  "description": "检索增强生成：文档检索 → 结果重排 → 生成最终回答。适用于知识库问答、文档搜索等场景。",
+  "nodes": [
+    {
+      "id": "retrieve",
+      "type": "taskNode",
+      "position": { "x": 50, "y": 100 },
+      "data": {
+        "label": "文档检索",
+        "task": "document_retrieval",
+        "skills": ["search", "embedding"],
+        "status": "idle",
+        "retry_policy": { "max_attempts": 2, "backoff_type": "constant", "backoff_base": 1, "max_backoff": 10 },
+        "on_failure": "abort",
+        "expectation": { "state_key": "retrieved_docs", "expected_schema": {}, "validation": "", "deadline": 30, "use_json_schema": false }
+      }
+    },
+    {
+      "id": "rerank",
+      "type": "taskNode",
+      "position": { "x": 270, "y": 100 },
+      "data": {
+        "label": "结果重排",
+        "task": "result_reranking",
+        "skills": ["nlp", "ranking"],
+        "status": "idle",
+        "retry_policy": { "max_attempts": 2, "backoff_type": "constant", "backoff_base": 1, "max_backoff": 10 },
+        "on_failure": "abort",
+        "expectation": { "state_key": "ranked_docs", "expected_schema": {}, "validation": "", "deadline": 20, "use_json_schema": false }
+      }
+    },
+    {
+      "id": "generate",
+      "type": "taskNode",
+      "position": { "x": 490, "y": 100 },
+      "data": {
+        "label": "生成回答",
+        "task": "answer_generation",
+        "skills": ["llm", "summarization"],
+        "status": "idle",
+        "retry_policy": { "max_attempts": 3, "backoff_type": "exponential", "backoff_base": 1, "max_backoff": 30 },
+        "on_failure": "abort",
+        "expectation": { "state_key": "final_answer", "expected_schema": {}, "validation": "", "deadline": 60, "use_json_schema": false }
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e-retrieve-rerank", "source": "retrieve", "target": "rerank", "type": "smoothstep" },
+    { "id": "e-rerank-generate", "source": "rerank", "target": "generate", "type": "smoothstep" }
+  ]
+}
