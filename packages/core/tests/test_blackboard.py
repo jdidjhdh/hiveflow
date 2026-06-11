@@ -1,5 +1,7 @@
-import pytest
 import asyncio
+
+import pytest
+
 from hiveflow import MemoryBlackboard, TTLMemoryBlackboard
 
 
@@ -40,9 +42,10 @@ async def test_wait_for_key(blackboard):
         await asyncio.sleep(0.05)
         await blackboard.put("key2", "value2")
 
-    asyncio.create_task(setter())
+    task = asyncio.create_task(setter())
     result = await blackboard.wait_for_key("key2", timeout=1.0)
     assert result == "value2"
+    await task
 
 
 @pytest.mark.asyncio

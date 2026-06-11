@@ -46,12 +46,12 @@ jobs:
       - name: Run MyPy type checker
         run: |
           cd packages/core
-          mypy hiveflow/ || true
+          mypy
 
       - name: Run tests with coverage
         run: |
           cd packages/core
-          python -m pytest --cov=hiveflow --cov-report=xml --cov-report=term-missing
+          python -m pytest --cov=hiveflow --cov-report=xml --cov-report=term-missing --cov-fail-under=60
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -82,11 +82,22 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run tests (excluding polluting test file)
+        env:
+          HIVEFLOW_AGENT_ECHO_LLM: "true"
         run: |
           cd packages/studio/backend
           python -m pytest tests/ --ignore=tests/test_api_comprehensive.py -v
 
+      - name: Run Agent API integration tests
+        env:
+          HIVEFLOW_AGENT_ECHO_LLM: "true"
+        run: |
+          cd packages/studio/backend
+          python -m pytest tests/test_agent_api.py -v
+
       - name: Run comprehensive tests separately
+        env:
+          HIVEFLOW_AGENT_ECHO_LLM: "true"
         run: |
           cd packages/studio/backend
           python -m pytest tests/test_api_comprehensive.py -v
@@ -117,6 +128,49 @@ jobs:
           cd packages/agent
           python -m pytest tests/ --ignore=tests/test_real_llm.py --ignore=tests/test_llm_connection.py -v
 
+  test-examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          cd packages/core
+          python -m pip install --upgrade pip
+          pip install -e ".[all]"
+
+      - name: Run example smoke tests
+        run: python examples/run_smoke_tests.py
+
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install hiveflow core
+        run: |
+          cd packages/core
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run orchestration benchmarks (quick)
+        run: python benchmarks/run_orchestration_latency.py --quick --json benchmarks/last-run-ci.json
+
+      - name: LangGraph adapter tests
+        run: |
+          cd packages/core
+          python -m pytest tests/test_langgraph_adapter.py tests/test_benchmark_sanity.py -v
+
   test-frontend:
     runs-on: ubuntu-latest
     steps:
@@ -146,9 +200,51 @@ jobs:
       - name: Lint
         run: |
           cd packages/studio/frontend
-          npm run lint || true
+          npm run lint
+
+      - name: Unit tests
+        run: |
+          cd packages/studio/frontend
+          npm run test:unit
 
       - name: Build
         run: |
           cd packages/studio/frontend
           npm run build
+
+  test-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Studio backend
+        run: |
+          cd packages/studio/backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        run: |
+          cd packages/studio/frontend
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        env:
+          CI: true
+          HIVEFLOW_RUNTIME: agent
+          HIVEFLOW_AGENT_ECHO_LLM: "true"
+        run: |
+          cd packages/studio/frontend
+          npm run test:e2e

@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import {
-  Table, Button, Modal, Form, Input, Select, Space, Tag, Popconfirm, message,
-  Descriptions, Typography, Empty, Alert,
+  Table, Button, Modal, Form, Input, Select, Space, Tag, Popconfirm, message, Typography, Empty, Alert,
 } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, InfoCircleOutlined,
@@ -208,6 +207,8 @@ export default function VariablesPage() {
         columns={columns}
         dataSource={variables}
         rowKey="id"
+        pagination={{ pageSize: 10, showSizeChanger: true, showTotal: t => `共 ${t} 个变量` }}
+        scroll={{ x: 800 }}
         locale={{
           emptyText: (
             <Empty

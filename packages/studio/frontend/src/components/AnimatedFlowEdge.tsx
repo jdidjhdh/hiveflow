@@ -1,6 +1,5 @@
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from 'reactflow';
 import { CloseOutlined, PlayCircleOutlined } from '@ant-design/icons';
-import { App } from 'antd';
 
 interface AnimatedEdgeProps extends EdgeProps {
   data?: {

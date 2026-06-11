@@ -9,12 +9,13 @@ Features:
 - Branching: fork execution from any checkpoint
 - Multiple backends (Memory, SQLite)
 """
+
 import json
 import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,41 +23,38 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Checkpoint:
     """A saved workflow state snapshot."""
+
     checkpoint_id: str
     workflow_id: str
     timestamp: float
-    state: Dict[str, Any]
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    parent_id: Optional[str] = None  # For branching
-    branch_name: Optional[str] = None
+    state: dict[str, Any]
+    metadata: dict[str, Any] = field(default_factory=dict)
+    parent_id: str | None = None  # For branching
+    branch_name: str | None = None
 
 
 class CheckpointBackend(ABC):
     """Abstract base class for checkpoint storage."""
 
     @abstractmethod
-    async def save(self, checkpoint: Checkpoint) -> str:
-        ...
+    async def save(self, checkpoint: Checkpoint) -> str: ...
 
     @abstractmethod
-    async def load(self, checkpoint_id: str) -> Optional[Checkpoint]:
-        ...
+    async def load(self, checkpoint_id: str) -> Checkpoint | None: ...
 
     @abstractmethod
-    async def list_checkpoints(self, workflow_id: str) -> List[Checkpoint]:
-        ...
+    async def list_checkpoints(self, workflow_id: str) -> list[Checkpoint]: ...
 
     @abstractmethod
-    async def delete(self, checkpoint_id: str) -> bool:
-        ...
+    async def delete(self, checkpoint_id: str) -> bool: ...
 
 
 class MemoryCheckpointBackend(CheckpointBackend):
     """In-memory checkpoint storage (for testing/development)."""
 
     def __init__(self):
-        self._store: Dict[str, Checkpoint] = {}
-        self._index: Dict[str, List[str]] = {}  # workflow_id -> [checkpoint_id]
+        self._store: dict[str, Checkpoint] = {}
+        self._index: dict[str, list[str]] = {}  # workflow_id -> [checkpoint_id]
 
     async def save(self, checkpoint: Checkpoint) -> str:
         self._store[checkpoint.checkpoint_id] = checkpoint
@@ -66,10 +64,10 @@ class MemoryCheckpointBackend(CheckpointBackend):
         self._index[wf_id].append(checkpoint.checkpoint_id)
         return checkpoint.checkpoint_id
 
-    async def load(self, checkpoint_id: str) -> Optional[Checkpoint]:
+    async def load(self, checkpoint_id: str) -> Checkpoint | None:
         return self._store.get(checkpoint_id)
 
-    async def list_checkpoints(self, workflow_id: str) -> List[Checkpoint]:
+    async def list_checkpoints(self, workflow_id: str) -> list[Checkpoint]:
         ids = self._index.get(workflow_id, [])
         return [self._store[cid] for cid in ids if cid in self._store]
 
@@ -133,7 +131,7 @@ try:
                 await db.commit()
             return checkpoint.checkpoint_id
 
-        async def load(self, checkpoint_id: str) -> Optional[Checkpoint]:
+        async def load(self, checkpoint_id: str) -> Checkpoint | None:
             await self._ensure_db()
             async with aiosqlite.connect(self.db_path) as db:
                 async with db.execute(
@@ -153,7 +151,7 @@ try:
                 branch_name=row[6],
             )
 
-        async def list_checkpoints(self, workflow_id: str) -> List[Checkpoint]:
+        async def list_checkpoints(self, workflow_id: str) -> list[Checkpoint]:
             await self._ensure_db()
             async with aiosqlite.connect(self.db_path) as db:
                 async with db.execute(
@@ -182,7 +180,7 @@ try:
                     (checkpoint_id,),
                 )
                 await db.commit()
-            return cursor.rowcount > 0
+            return bool(cursor.rowcount > 0)
 except ImportError:
     SQLiteCheckpointBackend = None  # type: ignore
 
@@ -216,18 +214,19 @@ class CheckpointManager:
 
     def __init__(self, backend: CheckpointBackend):
         self.backend = backend
-        self._current_states: Dict[str, Checkpoint] = {}  # workflow_id -> current checkpoint
+        self._current_states: dict[str, Checkpoint] = {}  # workflow_id -> current checkpoint
 
     async def save_checkpoint(
         self,
         workflow_id: str,
-        state: Dict[str, Any],
-        metadata: Optional[Dict[str, Any]] = None,
-        parent_id: Optional[str] = None,
-        branch_name: Optional[str] = None,
+        state: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
+        parent_id: str | None = None,
+        branch_name: str | None = None,
     ) -> str:
         """Save the current workflow state as a checkpoint."""
         import uuid
+
         cp = Checkpoint(
             checkpoint_id=str(uuid.uuid4())[:12],
             workflow_id=workflow_id,
@@ -242,7 +241,7 @@ class CheckpointManager:
         logger.info(f"Checkpoint saved: {cp.checkpoint_id} for workflow {workflow_id}")
         return cp.checkpoint_id
 
-    async def restore_checkpoint(self, checkpoint_id: str) -> Optional[Checkpoint]:
+    async def restore_checkpoint(self, checkpoint_id: str) -> Checkpoint | None:
         """Restore workflow state from a checkpoint."""
         cp = await self.backend.load(checkpoint_id)
         if cp:
@@ -250,7 +249,7 @@ class CheckpointManager:
             logger.info(f"Restored to checkpoint: {checkpoint_id}")
         return cp
 
-    async def list_checkpoints(self, workflow_id: str) -> List[Checkpoint]:
+    async def list_checkpoints(self, workflow_id: str) -> list[Checkpoint]:
         """List all checkpoints for a workflow, ordered by timestamp."""
         return await self.backend.list_checkpoints(workflow_id)
 
@@ -262,13 +261,14 @@ class CheckpointManager:
         self,
         parent_checkpoint_id: str,
         branch_name: str = "",
-    ) -> Optional[str]:
+    ) -> str | None:
         """Fork execution from a checkpoint, creating a new branch."""
         parent = await self.backend.load(parent_checkpoint_id)
         if not parent:
             return None
 
         import uuid
+
         fork_cp = Checkpoint(
             checkpoint_id=str(uuid.uuid4())[:12],
             workflow_id=parent.workflow_id,
@@ -287,7 +287,7 @@ class CheckpointManager:
         logger.info(f"Forked from {parent_checkpoint_id} -> {fork_cp.checkpoint_id}")
         return fork_cp.checkpoint_id
 
-    async def get_checkpoint_timeline(self, workflow_id: str) -> List[Dict[str, Any]]:
+    async def get_checkpoint_timeline(self, workflow_id: str) -> list[dict[str, Any]]:
         """Get a timeline of checkpoints with parent/branch relationships."""
         checkpoints = await self.list_checkpoints(workflow_id)
         return [
@@ -302,7 +302,7 @@ class CheckpointManager:
             for cp in checkpoints
         ]
 
-    def get_current_state(self, workflow_id: str) -> Optional[Dict[str, Any]]:
+    def get_current_state(self, workflow_id: str) -> dict[str, Any] | None:
         """Get the current active state for a workflow."""
         cp = self._current_states.get(workflow_id)
         return cp.state if cp else None

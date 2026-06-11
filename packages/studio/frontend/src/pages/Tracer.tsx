@@ -1,18 +1,44 @@
-import { useState } from 'react';
-import { Input, List, Timeline, Tag, Empty, Card } from 'antd';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Input, List, Timeline, Tag, Empty, Card, Row, Col, Alert } from 'antd';
 import { SearchOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined } from '@ant-design/icons';
 import { useEventStore } from '@/store/useEventStore';
+import { useEngineStore } from '@/store/useEngineStore';
+import { apiFetch } from '@/utils/api';
 import type { EventRecord } from '@/types';
+
+interface AuditEntry {
+  agent: string;
+  action: string;
+  key: string;
+  timestamp: number;
+}
 
 export default function TracerPage() {
   const events = useEventStore(s => s.events);
+  const engineMode = useEngineStore(s => s.mode);
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [selectedTrace, setSelectedTrace] = useState<string | null>(null);
+  const [selectedTrace, setSelectedTrace] = useState<string | null>(searchParams.get('intent_id'));
+  const [auditEvents, setAuditEvents] = useState<AuditEntry[]>([]);
 
-  // 提取所有唯一的 trace_id，按意图分组
+  useEffect(() => {
+    if (engineMode !== 'real') {
+      setAuditEvents([]);
+      return;
+    }
+    const intentId = selectedTrace || '';
+    const url = intentId
+      ? `/api/replay/audit?intent_id=${encodeURIComponent(intentId)}&limit=50`
+      : '/api/replay/audit?limit=50';
+    apiFetch(url)
+      .then(data => setAuditEvents(data.events || data.entries || []))
+      .catch(() => setAuditEvents([]));
+  }, [engineMode, selectedTrace]);
+
   const traceMap = new Map<string, EventRecord[]>();
   events.forEach(evt => {
-    const traceId = evt.data?.trace_id || evt.topic;
+    const traceId = evt.data?.intent_id || evt.data?.trace_id || evt.topic;
     if (!traceMap.has(traceId)) traceMap.set(traceId, []);
     traceMap.get(traceId)!.push(evt);
   });
@@ -30,17 +56,16 @@ export default function TracerPage() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 16 }}>
-      {/* 左侧意图列表 */}
-      <div style={{ width: 320, flexShrink: 0 }}>
+    <Row gutter={[16, 16]} style={{ height: '100%' }}>
+      <Col xs={24} sm={24} md={10} lg={8} xl={7}>
         <Card title="意图列表" size="small" extra={
           <Input
-            placeholder="搜索 trace_id"
+            placeholder="搜索 intent_id / trace_id"
             prefix={<SearchOutlined />}
             size="small"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ width: 180 }}
+            style={{ width: '100%' }}
           />
         }>
           {filteredTraces.length === 0 ? (
@@ -81,38 +106,66 @@ export default function TracerPage() {
             />
           )}
         </Card>
-      </div>
+      </Col>
 
-      {/* 右侧时间线 */}
-      <div style={{ flex: 1 }}>
-        <Card title={selectedTrace ? `追踪详情: ${selectedTrace}` : '选择一个意图查看详情'} size="small">
+      <Col xs={24} sm={24} md={14} lg={16} xl={17}>
+        {engineMode === 'real' && auditEvents.length > 0 && (
+          <Alert
+            type="success"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message={`已加载 ${auditEvents.length} 条真实 audit 记录`}
+          />
+        )}
+        <Card title={selectedTrace ? `追踪详情: ${selectedTrace}` : '选择一个意图查看详情'} size="small"
+          extra={selectedTrace ? <Link to={`/replay?intent_id=${encodeURIComponent(selectedTrace)}`}>Replay 回放</Link> : null}
+        >
           {!selectedTrace ? (
             <Empty description="请从左侧列表选择意图" />
           ) : (
-            <Timeline
-              items={selectedEvents.map((evt, i) => ({
-                key: i,
-                color: evt.topic.includes('completed') ? 'green'
-                  : evt.topic.includes('failed') ? 'red'
-                  : evt.topic.includes('running') ? 'blue'
-                  : 'gray',
-                dot: topicIcon(evt.topic),
-                children: (
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{evt.topic}</div>
-                    <div style={{ fontSize: 11, color: '#888' }}>
-                      {new Date(evt.timestamp * 1000).toLocaleTimeString()}
+            <>
+              <Timeline
+                items={selectedEvents.map((evt, i) => ({
+                  key: i,
+                  color: evt.topic.includes('completed') ? 'green'
+                    : evt.topic.includes('failed') ? 'red'
+                    : evt.topic.includes('running') ? 'blue'
+                    : 'gray',
+                  dot: topicIcon(evt.topic),
+                  children: (
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{evt.topic}</div>
+                      <div style={{ fontSize: 11, color: '#888' }}>
+                        {new Date(evt.timestamp * 1000).toLocaleTimeString()}
+                      </div>
+                      <pre style={{ fontSize: 11, maxHeight: 100, overflow: 'auto', background: '#fafafa', padding: 4, borderRadius: 4 }}>
+                        {JSON.stringify(evt.data?.payload ?? evt.data, null, 2).slice(0, 300)}
+                      </pre>
                     </div>
-                    <pre style={{ fontSize: 11, maxHeight: 100, overflow: 'auto', background: '#fafafa', padding: 4, borderRadius: 4 }}>
-                      {JSON.stringify(evt.data?.payload ?? evt.data, null, 2).slice(0, 300)}
-                    </pre>
-                  </div>
-                ),
-              }))}
-            />
+                  ),
+                }))}
+              />
+              {engineMode === 'real' && auditEvents.length > 0 && (
+                <Card title="Audit 时间线 (Replay)" size="small" style={{ marginTop: 16 }}>
+                  <Timeline
+                    items={auditEvents.map((e, i) => ({
+                      key: `audit-${i}`,
+                      children: (
+                        <div style={{ fontSize: 12 }}>
+                          <Tag>{e.action}</Tag> {e.agent} → {e.key}
+                          <div style={{ color: '#888', fontSize: 11 }}>
+                            {new Date(e.timestamp * 1000).toLocaleTimeString()}
+                          </div>
+                        </div>
+                      ),
+                    }))}
+                  />
+                </Card>
+              )}
+            </>
           )}
         </Card>
-      </div>
-    </div>
+      </Col>
+    </Row>
   );
 }

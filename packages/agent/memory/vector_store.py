@@ -2,7 +2,6 @@ import asyncio
 import uuid
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from chromadb import PersistentClient
 
 
 class MemoryItem:
@@ -26,6 +25,13 @@ class VectorStore(ABC):
 
 class ChromaVectorStore(VectorStore):
     def __init__(self, path="./chroma_db", embedding_fn=None):
+        try:
+            from chromadb import PersistentClient
+        except ImportError as e:
+            raise ImportError(
+                "chromadb is required for ChromaVectorStore. "
+                "Install with: pip install chromadb"
+            ) from e
         self.client = PersistentClient(path=path)
         self.collection = self.client.get_or_create_collection("hivemind_memory")
         self.embed = embedding_fn

@@ -104,6 +104,13 @@ export interface TaskNodeDef {
   dynamic?: boolean;
   expectation?: Expectation;
   required_skills?: string[];
+  variant?: string;
+  hitl_config?: {
+    prompt?: string;
+    action?: 'approval' | 'review' | 'input' | 'confirmation';
+    timeout_seconds?: number;
+    on_timeout?: 'fail' | 'approve' | 'skip';
+  };
 }
 
 export interface TaskGraph {
@@ -136,7 +143,8 @@ export interface WorkflowNodeData {
   label: string;
   task: string;
   skills: string[];
-  variant?: 'task' | 'dynamic' | 'subgraph' | 'condition' | 'loop' | 'code' | 'http' | 'trigger';
+  variant?: 'task' | 'dynamic' | 'subgraph' | 'condition' | 'loop' | 'code' | 'http' | 'trigger' | 'hitl';
+  hitl_config?: TaskNodeDef['hitl_config'];
   expectation?: Expectation;
   retry_policy?: TaskNodeDef['retry_policy'];
   on_failure?: 'abort' | 'skip';
@@ -227,6 +235,7 @@ export interface KnowledgeBase {
   chunk_overlap: number;
   created_at: number;
   updated_at: number;
+  doc_count?: number;
 }
 
 export interface DocumentDef {
@@ -236,6 +245,7 @@ export interface DocumentDef {
   size: number;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   chunks_count?: number;
+  content?: string;
   created_at: number;
 }
 

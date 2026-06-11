@@ -57,7 +57,7 @@ export default function ExecutionSummaryPanel({
       dataIndex: 'result',
       key: 'result',
       ellipsis: true,
-      render: (result?: Record<string, unknown>, record: ExecutionResult) => {
+      render: (result: Record<string, unknown> | undefined, record: ExecutionResult) => {
         if (record.error) {
           return <Typography.Text type="danger" ellipsis>{record.error}</Typography.Text>;
         }

@@ -32,17 +32,18 @@
     OTEL_TRACES_SAMPLER_ARG: 采样率 (0.0-1.0, 默认: 1.0)
 """
 
+import functools
 import os
 import time
-import functools
-from typing import Any, Dict, Optional, Callable
+from collections.abc import Callable
 from contextlib import contextmanager
+from typing import Any, Optional
 
 
 class Span:
     """简化的 Span 实现 (不依赖 OpenTelemetry SDK)"""
 
-    def __init__(self, name: str, parent: Optional['Span'] = None, attributes: Dict[str, Any] = None):
+    def __init__(self, name: str, parent: Optional["Span"] = None, attributes: dict[str, Any] | None = None):
         self.name = name
         self.parent = parent
         self.attributes = attributes or {}
@@ -53,6 +54,7 @@ class Span:
 
         # 生成 trace_id 和 span_id
         import uuid
+
         if parent and parent.trace_id:
             self.trace_id = parent.trace_id
         else:
@@ -78,17 +80,19 @@ class Span:
             return time.perf_counter() - self.start_time
         return self.end_time - self.start_time
 
-    def add_event(self, name: str, attributes: Dict[str, Any] = None):
-        self.events.append({
-            "name": name,
-            "timestamp": time.perf_counter(),
-            "attributes": attributes or {},
-        })
+    def add_event(self, name: str, attributes: dict[str, Any] | None = None):
+        self.events.append(
+            {
+                "name": name,
+                "timestamp": time.perf_counter(),
+                "attributes": attributes or {},
+            }
+        )
 
     def set_attribute(self, key: str, value: Any):
         self.attributes[key] = value
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
@@ -120,10 +124,11 @@ class Tracer:
     def should_sample(self) -> bool:
         """根据采样率决定是否记录"""
         import random
+
         return random.random() < self.sampling_rate
 
     @contextmanager
-    def start_as_current_span(self, name: str, attributes: Dict[str, Any] = None):
+    def start_as_current_span(self, name: str, attributes: dict[str, Any] | None = None):
         """创建并设置当前 span"""
         if not self.should_sample():
             yield None
@@ -145,6 +150,7 @@ class Tracer:
 
     def trace(self, name: str, **default_attributes):
         """装饰器，自动追踪函数调用"""
+
         def decorator(func: Callable) -> Callable:
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
@@ -163,9 +169,11 @@ class Tracer:
                     return await func(*args, **kwargs)
 
             import asyncio
+
             if asyncio.iscoroutinefunction(func):
                 return async_wrapper
             return sync_wrapper
+
         return decorator
 
     def get_spans(self) -> list:
@@ -193,10 +201,10 @@ class OpenTelemetryTracer:
         # 尝试初始化 OpenTelemetry
         try:
             from opentelemetry import trace
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+            from opentelemetry.sdk.resources import Resource
             from opentelemetry.sdk.trace import TracerProvider
             from opentelemetry.sdk.trace.export import BatchSpanProcessor
-            from opentelemetry.sdk.resources import Resource
-            from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
             resource = Resource.create({"service.name": service_name})
             provider = TracerProvider(resource=resource)
@@ -211,7 +219,7 @@ class OpenTelemetryTracer:
         except ImportError:
             pass  # 使用 fallback 实现
 
-    def start_as_current_span(self, name: str, attributes: Dict[str, Any] = None):
+    def start_as_current_span(self, name: str, attributes: dict[str, Any] | None = None):
         """创建 span"""
         if self._tracer:
             return self._tracer.start_as_current_span(name, attributes=attributes or {})
@@ -226,9 +234,9 @@ class OpenTelemetryTracer:
 
 
 def setup_tracing(
-    service_name: str = None,
-    sampling_rate: float = None,
-    exporter_endpoint: str = None,
+    service_name: str | None = None,
+    sampling_rate: float | None = None,
+    exporter_endpoint: str | None = None,
 ) -> OpenTelemetryTracer:
     """配置分布式追踪
 
@@ -247,7 +255,7 @@ def setup_tracing(
     return OpenTelemetryTracer(service_name, sampling_rate)
 
 
-def create_span(tracer, name: str, attributes: Dict[str, Any] = None):
+def create_span(tracer, name: str, attributes: dict[str, Any] | None = None):
     """创建 span 的便捷函数"""
     return tracer.start_as_current_span(name, attributes=attributes)
 
@@ -260,5 +268,5 @@ def trace_workflow_execution(tracer, workflow_id: str, graph: dict):
             "workflow.id": workflow_id,
             "workflow.graph_nodes": len(graph),
             "workflow.graph_edges": sum(len(v.get("depends_on", [])) for v in graph.values()),
-        }
+        },
     )

@@ -1,279 +1,209 @@
-# HiveFlow
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="HiveFlow" width="80"/>
+</p>
 
-[![PyPI version](https://img.shields.io/pypi/v/hiveflow.svg)](https://pypi.org/project/hiveflow/)
-[![Python](https://img.shields.io/pypi/pyversions/hiveflow.svg)](https://pypi.org/project/hiveflow/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://github.com/hiveflow/hiveflow/actions/workflows/test.yml/badge.svg)](https://github.com/hiveflow/hiveflow/actions/workflows/test.yml)
-[![Downloads](https://pepy.tech/badge/hiveflow)](https://pepy.tech/project/hiveflow)
+<h1 align="center">HiveFlow</h1>
 
-**Lightweight multi-agent orchestration engine** with human-in-the-loop, RAG, MCP protocol support, and cognitive planning.
+<p align="center">
+  <strong>Multi-agent orchestration with Human-in-the-Loop, visual Studio, and MCP tools.</strong>
+</p>
 
-> HiveFlow transforms how you build, manage, and scale AI agent workflows — from simple tasks to complex multi-agent collaborations with full human oversight.
+<p align="center">
+  <a href="https://pypi.org/project/hiveflow/"><img src="https://img.shields.io/pypi/v/hiveflow.svg" alt="PyPI"/></a>
+  <a href="https://pypi.org/project/hiveflow/"><img src="https://img.shields.io/pypi/pyversions/hiveflow.svg" alt="Python"/></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"/></a>
+  <a href="https://github.com/hiveflow/hiveflow/actions/workflows/test.yml"><img src="https://github.com/hiveflow/hiveflow/actions/workflows/test.yml/badge.svg" alt="Tests"/></a>
+  <a href="https://hiveflow.github.io/hiveflow/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-blue" alt="Docs"/></a>
+</p>
+
+> **0.1.x Alpha** — See [versioning policy](docs/versioning.md) and [OSS launch checklist](OSS_LAUNCH.md).
+
+HiveFlow helps teams build **multi-agent workflows** with native **human approval**, **encrypted shared state**, and a **visual Studio** for planning and operations — without locking observability or HITL behind a paid tier.
+
+### Why HiveFlow?
+
+| Differentiator | What you get |
+|----------------|--------------|
+| **Human-in-the-Loop** | Plan and action gates with Studio Approvals + timeout policies |
+| **Visual Studio** | Orchestrator, Chatflow, Analytics, Replay, HITL — self-hosted |
+| **Security** | Dual input/output guards + audited, encryptable blackboard |
+| **MCP-native** | Unified tool protocol and plugin marketplace hooks |
 
 ---
 
-## ✨ Features
+## Quick Start
 
-| Feature | Description |
-|---------|-------------|
-| 🧠 **Cognitive Orchestration** | Dynamic DAG execution with runtime plan generation and adaptive routing |
-| 🤝 **Multi-Agent Collaboration** | Event-driven architecture with smart scheduling (least-loaded, auction, load-aware) |
-| 👤 **Human-in-the-Loop** | Complete approval workflows with timeout strategies and manual intervention |
-| 🔒 **Security First** | Dual guards (input/output), encrypted blackboard, audit logging |
-| 📚 **RAG Pipeline** | Multi-source document processing, chunking strategies, vector store integration |
-| 🔌 **MCP Protocol** | Model Context Protocol for unified tool integration and plugin marketplace |
-| ⏱️ **Time Travel** | Checkpoint snapshots with full state restoration and history replay |
-| 📊 **Evaluation** | Built-in benchmarking, A/B testing, and multi-dimensional scoring |
-| 🎨 **Studio UI** | Visual workflow builder, analytics dashboard, and plugin marketplace |
-| 🔌 **Streaming** | SSE streaming responses with rich event types for real-time feedback |
-
----
-
-## 🚀 Quick Start
-
-### Installation
+### Install
 
 ```bash
-# Basic installation (core only)
-pip install hiveflow
-
-# With security features
-pip install "hiveflow[security]"
-
-# With LLM providers
-pip install "hiveflow[llm]"
-
-# With RAG capabilities
-pip install "hiveflow[rag]"
-
-# Full installation
-pip install "hiveflow[all]"
+pip install hiveflow                  # core engine
+pip install hiveflow-agent            # NL planning + cognitive orchestration
+pip install "hiveflow[all]"           # optional: security, llm, rag, redis
 ```
 
-### 5-Minute Tutorial
+### Path A — Core engine (embedded)
+
+Low-level control: register agents, schedule `ECM` tasks, read the blackboard.
 
 ```python
-from hiveflow import HiveFlow, HiveFlowConfig
+import asyncio
+from hiveflow import HiveFlow, HiveFlowConfig, ECM
 
-# 1. Create the engine
-config = HiveFlowConfig(llm_api_key="sk-...")
-hf = HiveFlow(config)
+async def main():
+    hf = HiveFlow(HiveFlowConfig())
+    await hf.start()
+    try:
+        async def handler(ecm, view):
+            await view.put("result", f"Done: {ecm.intent}")
+            return {"status": "ok"}
 
-# 2. Define a simple workflow
-result = await hf.execute_workflow(
-    agents=[
-        {"id": "researcher", "skills": {"search", "analyze"}},
-        {"id": "writer", "skills": {"write", "edit"}},
-    ],
-    task="Research and write a summary about AI trends in 2025"
-)
+        await hf.create_agent(
+            agent_id="worker",
+            skills={"process"},
+            read_keys=set(),
+            write_keys={"result"},
+            task_handler=handler,
+        )
+        await hf.scheduler.schedule(ECM(
+            trace_id="demo-1",
+            intent="Research AI trends",
+            intent_id="task-1",
+            emitter="user",
+            required_skills=["process"],
+        ))
+        await asyncio.sleep(0.5)
+        print(await hf.blackboard.sys_get("result"))
+    finally:
+        await hf.shutdown()
 
-print(result)
+asyncio.run(main())
 ```
 
-### With Human Approval
+→ [`examples/01_hello_hiveflow.py`](examples/01_hello_hiveflow.py)
 
-```python
-from hiveflow import HITLGate, HITLStatus
+### Path B — Agent runtime (NL orchestration)
 
-# Create a gate that requires human approval
-gate = HITLGate(
-    gate_id="content-review",
-    description="Review generated content before publishing",
-    timeout=300,  # 5 minutes timeout
-)
+High-level cognitive planning via `hiveflow-agent` or Studio:
 
-# Agent submits for approval
-await gate.request_approval(agent_id="writer", data={"content": "..."})
-
-# Human approves (via UI or API)
-await gate.approve(gate_id="content-review", reviewer="admin")
+```bash
+export HIVEFLOW_RUNTIME=agent HIVEFLOW_AGENT_ECHO_LLM=true
+cd packages/studio/backend && uvicorn app.main:app --port 8000
 ```
+
+Studio APIs: `POST /api/agent/query` · `plan-only` · `execute-plan` — see [Studio Agent cookbook](docs/cookbook/studio-agent-mode.md).
 
 ---
 
-## 🏗️ Architecture
+## Features
+
+| Area | Capabilities |
+|------|----------------|
+| Orchestration | Static/dynamic DAG, cognitive planning, 3 scheduler strategies |
+| Collaboration | Event bus, skill-based routing, multi-agent blackboard |
+| HITL | Approval gates, plan review, Studio + WebSocket notifications |
+| Data | RAG pipeline, checkpoints (time travel), streaming SSE |
+| Tools | MCP protocol, plugin marketplace, ReAct workers |
+| Ops | Studio UI, Prometheus analytics, trace replay |
+
+---
+
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    HiveFlow Studio (Web UI)                 │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐  │
-│  │Workflow  │ │Capability│ │Analytics │ │Plugin Market │  │
-│  │Builder   │ │Market    │ │Dashboard │ │              │  │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────────┘  │
 └─────────────────────────────┬───────────────────────────────┘
-                              │ REST API + WebSocket
+                              │ REST + WebSocket
 ┌─────────────────────────────▼───────────────────────────────┐
-│                   HiveFlow Agent Runtime                    │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐  │
-│  │ReAct     │ │Intent    │ │Memory    │ │Tools (MCP)   │  │
-│  │Worker    │ │Parser    │ │Manager   │ │              │  │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────────┘  │
+│                   HiveFlow Agent Runtime                     │
 └─────────────────────────────┬───────────────────────────────┘
                               │
 ┌─────────────────────────────▼───────────────────────────────┐
-│                    HiveFlow Core Engine                     │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐  │
-│  │Cognitive │ │Scheduler │ │Blackboard│ │Checkpoints   │  │
-│  │Orchestr. │ │(3 modes) │ │(encrypted│ │(time travel) │  │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────────┘  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐  │
-│  │EventBus  │ │HITL      │ │Guards    │ │Evaluation    │  │
-│  │(pub/sub) │ │Manager   │ │(dual)    │ │(A/B testing) │  │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────────┘  │
+│              HiveFlow Core (scheduler, HITL, RAG, MCP)       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## 📖 Documentation
-
-| Resource | Description |
-|----------|-------------|
-| [Getting Started](docs/getting-started.md) | Installation and first workflow |
-| [Core Concepts](docs/concepts.md) | Cell, Agent, Blackboard, Checkpoint |
-| [API Reference](docs/api-reference.md) | Complete API documentation |
-| [Architecture](docs/architecture.md) | Deep dive into the design |
-| [Deployment](docs/deployment.md) | Docker, Kubernetes, and production setup |
-| [Contributing](CONTRIBUTING.md) | How to contribute to HiveFlow |
+Details: [Architecture docs](docs/architecture.md)
 
 ---
 
-## 📦 Project Structure
+## Documentation
+
+| Resource | Link |
+|----------|------|
+| Getting Started | [docs/getting-started.md](docs/getting-started.md) |
+| **Documentation site** | [hiveflow.github.io/hiveflow](https://hiveflow.github.io/hiveflow/) |
+| Cookbook | [docs/cookbook/](docs/cookbook/) |
+| API (auto-generated) | [docs/api/](docs/api/index.md) |
+| Migrate from LangGraph | [docs/guides/migrate-from-langgraph.md](docs/guides/migrate-from-langgraph.md) |
+| Benchmarks | [docs/benchmarks/orchestration-latency.md](docs/benchmarks/orchestration-latency.md) |
+| Studio ops | [docs/studio-agent-ops.md](docs/studio-agent-ops.md) |
+| OSS launch checklist | [OSS_LAUNCH.md](OSS_LAUNCH.md) |
+
+---
+
+## Project structure
 
 ```
 HiveFlow/
-├── packages/
-│   ├── core/                 # Core engine (PyPI: hiveflow)
-│   │   ├── hiveflow/         # Main package
-│   │   │   ├── __init__.py   # Public API exports
-│   │   │   ├── app.py        # Top-level HiveFlow API
-│   │   │   ├── orchestrator.py
-│   │   │   ├── cognitive_orchestrator.py
-│   │   │   ├── scheduler.py
-│   │   │   ├── blackboard.py
-│   │   │   ├── cell.py
-│   │   │   ├── bus.py
-│   │   │   ├── checkpoint.py
-│   │   │   ├── hitl.py
-│   │   │   ├── guards.py
-│   │   │   ├── evaluation.py
-│   │   │   ├── streaming.py
-│   │   │   ├── validation.py
-│   │   │   ├── llm_client.py
-│   │   │   ├── memory_manager.py
-│   │   │   ├── react_worker.py
-│   │   │   ├── intent_parser.py
-│   │   │   ├── mcp.py
-│   │   │   ├── multimodal.py
-│   │   │   ├── rag.py
-│   │   │   ├── plugin_marketplace.py
-│   │   │   ├── observability/
-│   │   │   └── ...
-│   │   ├── tests/            # Test suite
-│   │   └── pyproject.toml    # Package configuration
-│   │
-│   ├── agent/                # Agent runtime
-│   │   ├── worker/           # Agent workers (ReAct, etc.)
-│   │   ├── memory/           # Short/long-term memory
-│   │   ├── tools/            # Tool integrations
-│   │   ├── tests/            # Test suite
-│   │   └── requirements.txt
-│   │
-│   └── studio/               # Visual orchestration platform
-│       ├── frontend/         # React + TypeScript UI
-│       └── backend/          # FastAPI backend
-│
-├── kubernetes/               # Production deployment configs
-├── docker-compose.yml        # Development environment
-├── examples/                 # Cookbook examples
-└── docs/                     # Documentation
+├── packages/core/          # PyPI: hiveflow
+├── packages/agent/         # PyPI: hiveflow-agent
+├── packages/studio/        # FastAPI + React Studio
+├── examples/               # 15 smoke-tested examples
+└── docs/                   # MkDocs site
 ```
 
 ---
 
-## 🔧 Configuration
-
-### Environment Variables
+## Development
 
 ```bash
-# LLM Configuration
-HIVEFLOW_LLM_PROVIDER=openai        # openai, anthropic, mock
-HIVEFLOW_LLM_MODEL=gpt-4o
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
+# Core tests
+cd packages/core && pip install -e ".[dev]" && pytest
 
-# Redis (optional, for distributed blackboard)
-REDIS_URL=redis://localhost:6379
+# Studio backend
+cd packages/studio/backend && pip install -r requirements.txt -r requirements-dev.txt
+HIVEFLOW_AGENT_ECHO_LLM=true pytest tests/
 
-# Database (optional, for Studio persistence)
-DB_URL=postgresql://user:pass@localhost:5432/hiveflow
+# Frontend
+cd packages/studio/frontend && npm ci && npm run lint && npm run test:unit && npm run build
+
+# Docs
+pip install mkdocs-material "mkdocstrings[python]" && pip install -e packages/core
+python -m mkdocs build --strict
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [GOVERNANCE.md](GOVERNANCE.md).
 
 ---
 
-## 🧪 Testing
-
-```bash
-# Run all tests
-cd packages/core && python -m pytest
-
-# Run with coverage
-python -m pytest --cov=hiveflow --cov-report=html
-
-# Run specific test file
-python -m pytest tests/test_blackboard.py -v
-```
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
-```bash
-# 1. Fork the repository
-# 2. Create a feature branch
-git checkout -b feature/my-feature
-
-# 3. Install dev dependencies
-pip install "hiveflow[dev]"
-
-# 4. Run tests and linting
-ruff check hiveflow/
-mypy hiveflow/
-pytest
-
-# 5. Submit a Pull Request
-```
-
----
-
-## 📊 Comparison
+## Comparison
 
 | Feature | HiveFlow | LangGraph | CrewAI | AutoGen |
 |---------|:--------:|:---------:|:------:|:-------:|
-| Dynamic Orchestration | ✅ | ⚠️ | ❌ | ⚠️ |
+| Dynamic orchestration | ✅ | ⚠️ | ❌ | ⚠️ |
 | Human-in-the-Loop | ✅ | ⚠️ | ❌ | ⚠️ |
-| Checkpoint/Time Travel | ✅ | ✅ | ❌ | ❌ |
-| Security Guards | ✅ | ❌ | ❌ | ❌ |
-| MCP Protocol | ✅ | ❌ | ❌ | ❌ |
-| Visual UI | ✅ | 💰 | ❌ | ❌ |
-| A/B Testing | ✅ | 💰 | ❌ | ❌ |
-| Plugin Marketplace | ✅ | ❌ | ❌ | ❌ |
+| Checkpoint / replay | ✅ | ✅ | ❌ | ❌ |
+| Security guards | ✅ | ❌ | ❌ | ❌ |
+| MCP protocol | ✅ | ❌ | ❌ | ❌ |
+| Visual ops UI | ✅ | 💰 | ❌ | ❌ |
 
-*✅ Built-in | ⚠️ Requires custom | ❌ Not available | 💰 Paid*
+*✅ Built-in · ⚠️ Custom · ❌ N/A · 💰 Paid product*
 
 ---
 
-## 📄 License
+## Maintainers
 
-MIT License - see [LICENSE](LICENSE) for details.
+HiveFlow is maintained by the core team. Interested in helping? See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+<!-- Add @handles when the public org is created -->
 
 ---
 
-## 🙏 Acknowledgments
+## License
 
-- Inspired by LangGraph, CrewAI, and AutoGen
-- Built on [MCP (Model Context Protocol)](https://github.com/modelcontextprotocol)
-- UI powered by [Ant Design](https://ant.design/) and [React](https://react.dev/)
+MIT — see [LICENSE](LICENSE).
+
+## Acknowledgments
+
+Inspired by LangGraph, CrewAI, and AutoGen · Built on [MCP](https://github.com/modelcontextprotocol) · Studio UI uses [Ant Design](https://ant.design/) and [React](https://react.dev/)

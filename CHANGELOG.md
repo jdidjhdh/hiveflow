@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- OSS launch checklist ([OSS_LAUNCH.md](OSS_LAUNCH.md)), [GOVERNANCE.md](GOVERNANCE.md)
+- Documentation: Studio Agent cookbook, checkpoint recovery, LangGraph migration guide
+- mkdocstrings auto-generated API reference (`docs/api/index.md`)
+- Brand logo (`docs/assets/logo.svg`), README restructure (Core vs Agent paths)
+- CI: Playwright starts Studio backend on `:8000`; Vitest unit tests in frontend job
+
+### Changed
+- `packages/core/README.md` aligned with ECM + handler quick start
+- MkDocs nav reorganized (Studio, Guides, Observability, Versioning)
+- SECURITY.md: GitHub Security Advisories as preferred reporting channel
+
+### Removed
+- Local `sitecustomize.py` pytest hook (use package `conftest.py` instead)
+
+### Added (P2 ecosystem)
+- Orchestration latency benchmarks (`benchmarks/run_orchestration_latency.py`) + CI job
+- LangGraph adapter PoC (`hiveflow.adapters.langgraph`) + `examples/16_langgraph_export.py`
+- Case study: regulated HITL content review
+- Docs: benchmarks, LangGraph integration, case studies nav
+
+### Added (0.1.0 baseline)
 - Cognitive Orchestration with dynamic plan generation
 - Human-in-the-Loop (HITL) complete approval workflow
 - Secure Blackboard system with encryption and audit logging

@@ -1,13 +1,17 @@
-import pytest
 import asyncio
 import time
-from concurrent.futures import ThreadPoolExecutor
+
+import pytest
 
 from hiveflow import (
-    HiveFlow, HiveFlowConfig,
-    SchedulerConfig, InProcessScheduler, LeastLoadedStrategy,
-    InProcessEventBus, SecureBlackboard, MemoryBlackboard, TTLMemoryBlackboard,
-    Capability
+    Capability,
+    InProcessEventBus,
+    InProcessScheduler,
+    LeastLoadedStrategy,
+    MemoryBlackboard,
+    SchedulerConfig,
+    SecureBlackboard,
+    TTLMemoryBlackboard,
 )
 
 

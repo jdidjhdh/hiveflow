@@ -1,4 +1,4 @@
-import type { ECM, Capability, AuditEntry, MetricsSnapshot, TaskGraph, Expectation, ExecutionLog, ConditionNodeData } from '@/types';
+import type { ECM, Capability, AuditEntry, MetricsSnapshot, TaskGraph, TaskNodeDef, ExecutionLog, ConditionNodeData } from '@/types';
 
 // ========== 日志收集器 ==========
 class MockLogCollector {
@@ -311,7 +311,7 @@ class MockOrchestrator {
     results: Record<string, unknown>,
     completed: Set<string>,
     nodeStatus: Map<string, 'pending' | 'running' | 'completed' | 'failed'>,
-    nodeNames: string[]
+    _nodeNames: string[]
   ) {
     this.logCollector.addLog({
       workflow_id: 'mock',
@@ -434,6 +434,22 @@ class MockOrchestrator {
       const tasks = ready.map(async (nodeName) => {
         nodeStatus.set(nodeName, 'running');
         const def = graph[nodeName];
+        const variant = (def as TaskNodeDef & { variant?: string }).variant;
+
+        if (variant === 'hitl') {
+          this.logCollector.addLog({
+            workflow_id: 'mock',
+            node_id: nodeName,
+            level: 'info',
+            message: `HITL 节点 ${nodeName}：模拟自动批准`,
+            timestamp: Date.now(),
+          });
+          await new Promise((r) => setTimeout(r, 400));
+          results[nodeName] = { status: 'approved', mock_hitl: true };
+          nodeStatus.set(nodeName, 'completed');
+          completed.add(nodeName);
+          return;
+        }
 
         // 检查是否为条件分支节点
         const nodeType = (def as unknown as { node_type?: string }).node_type;

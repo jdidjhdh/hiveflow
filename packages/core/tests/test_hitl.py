@@ -1,10 +1,9 @@
 """Tests for hiveflow HITL (Human-in-the-Loop) module."""
-import pytest
 import asyncio
-import time
-from unittest.mock import MagicMock, AsyncMock
 
-from hiveflow import HITLManager, HITLGate, HITLStatus, HITLAction
+import pytest
+
+from hiveflow import HITLAction, HITLGate, HITLManager, HITLStatus
 
 
 class TestHITLStatus:
@@ -356,14 +355,14 @@ class TestHITLManagerWait:
 class TestHITLManagerListGet:
     async def test_list_pending_gates(self):
         mgr = HITLManager()
-        gate1 = await mgr.create_gate(
+        await mgr.create_gate(
             workflow_id="wf_001",
             node_id="node_1",
             action=HITLAction.APPROVAL,
             prompt="Approve 1?",
             context={},
         )
-        gate2 = await mgr.create_gate(
+        await mgr.create_gate(
             workflow_id="wf_001",
             node_id="node_2",
             action=HITLAction.APPROVAL,
@@ -493,7 +492,7 @@ class TestHITLManagerStats:
         gate1 = await mgr.create_gate("wf_001", "n1", HITLAction.APPROVAL, "Approve?", {})
         gate2 = await mgr.create_gate("wf_001", "n2", HITLAction.APPROVAL, "Approve?", {})
         gate3 = await mgr.create_gate("wf_001", "n3", HITLAction.APPROVAL, "Approve?", {})
-        gate4 = await mgr.create_gate("wf_001", "n4", HITLAction.APPROVAL, "Approve?", {})
+        await mgr.create_gate("wf_001", "n4", HITLAction.APPROVAL, "Approve?", {})
 
         await mgr.respond(gate1.gate_id, approved=True)
         await mgr.respond(gate2.gate_id, approved=True)

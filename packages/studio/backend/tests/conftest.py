@@ -13,6 +13,8 @@ from fastapi.testclient import TestClient
 
 # 在导入 app 之前设置环境变量，避免 lifespan 启动引擎
 os.environ["HIVEFLOW_DB_TYPE"] = "sqlite"
+# 设置极高的速率限制，避免测试触发 429
+os.environ["HIVEFLOW_RATE_LIMIT"] = "10000"
 
 from app.main import app
 from app.db.config import init_storage, close_storage, get_storage

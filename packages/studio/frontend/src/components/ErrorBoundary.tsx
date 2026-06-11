@@ -60,6 +60,7 @@ class ErrorBoundaryClass extends Component<Props, State> {
 }
 
 // Hook wrapper for functional components
+// eslint-disable-next-line react-refresh/only-export-components -- hook co-located with ErrorBoundary
 export function useErrorHandler() {
   const [, setError] = React.useState<Error | null>(null);
 

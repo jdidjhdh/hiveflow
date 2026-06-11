@@ -1,0 +1,40 @@
+[project]
+name = "hiveflow-agent"
+version = "0.1.0"
+description = "HiveFlow Agent Runtime — ReAct workers and cognitive orchestration on hiveflow core"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+    "hiveflow>=0.1.0",
+    "aiohttp>=3.8",
+    "aioresponses>=0.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-timeout>=2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/hiveflow/hiveflow"
+Documentation = "https://hiveflow.github.io/hiveflow/"
+Repository = "https://github.com/hiveflow/hiveflow"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["core*", "worker*", "llm*", "memory*", "orchestrator*", "guardrails*"]
+
+[tool.setuptools]
+py-modules = ["app", "demo", "protocol", "intent_parser"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "-v --tb=short"
+asyncio_mode = "auto"

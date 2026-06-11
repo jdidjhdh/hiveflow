@@ -1,9 +1,9 @@
 """Tests for hiveflow guards module (InputGuard and OutputValidator)."""
-import pytest
-import asyncio
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
-from hiveflow import InputGuard, InputGuardResult, OutputValidator, OutputValidationResult
+import pytest
+
+from hiveflow import InputGuard, InputGuardResult, OutputValidationResult, OutputValidator
 
 
 class TestInputGuardResult:

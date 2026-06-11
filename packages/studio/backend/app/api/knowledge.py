@@ -85,7 +85,9 @@ async def delete_knowledge_base(kb_id: str):
     engine = get_engine()
     kb_manager = engine.get_kb_manager()
     try:
-        await kb_manager.delete_kb(kb_id)
+        deleted = await kb_manager.delete_kb(kb_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail=f"Knowledge base '{kb_id}' not found")
         return {"kb_id": kb_id, "status": "deleted"}
     except ValueError:
         raise HTTPException(status_code=404, detail=f"Knowledge base '{kb_id}' not found")
@@ -111,48 +113,57 @@ async def get_knowledge_base(kb_id: str):
 
 @router.post("/{kb_id}/query")
 async def query_knowledge_base(kb_id: str, req: QueryRequest):
-    """查询知识库（生成答案）"""
+    """Query knowledge base (RAG retrieval + answer assembly)."""
     engine = get_engine()
     kb_manager = engine.get_kb_manager()
-    results = await kb_manager.query(
-        kb_id,
-        req.query,
-        top_k=req.top_k,
-        metadata_filter=req.metadata_filter,
-    )
+    try:
+        result = await kb_manager.query(
+            kb_id,
+            req.query,
+            top_k=req.top_k,
+            filters=req.metadata_filter,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return {
         "query": req.query,
+        "answer": result.answer,
+        "context": result.context,
+        "latency_ms": result.latency_ms,
         "results": [
             {
-                "content": r.content,
+                "content": r.chunk.content,
                 "score": r.score,
                 "metadata": r.metadata,
-                "doc_id": r.doc_id,
+                "doc_id": r.chunk.doc_id,
             }
-            for r in results
+            for r in result.sources
         ],
     }
 
 
 @router.post("/{kb_id}/search")
 async def search_knowledge_base(kb_id: str, req: SearchRequest):
-    """搜索知识库（不生成答案）"""
+    """Search knowledge base (retrieval only)."""
     engine = get_engine()
     kb_manager = engine.get_kb_manager()
-    results = await kb_manager.search(
-        kb_id,
-        req.query,
-        top_k=req.top_k,
-        metadata_filter=req.metadata_filter,
-    )
+    try:
+        results = await kb_manager.search(
+            kb_id,
+            req.query,
+            top_k=req.top_k,
+            filters=req.metadata_filter,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return {
         "query": req.query,
         "results": [
             {
-                "content": r.content,
+                "content": r.chunk.content,
                 "score": r.score,
                 "metadata": r.metadata,
-                "doc_id": r.doc_id,
+                "doc_id": r.chunk.doc_id,
             }
             for r in results
         ],

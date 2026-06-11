@@ -12,20 +12,18 @@ HiveFlow Core 生产可用性测试
 8. 并发任务取消
 """
 
-import pytest
 import asyncio
 import time
-from hiveflow import (
-    MISSING, TaskGraph, AbortExecutionException,
-    ECM, Expectation, Capability
-)
+
+import pytest
+
+from hiveflow import ECM, MISSING, AbortExecutionException, Capability
+from hiveflow.blackboard import MemoryBlackboard, SecureBlackboard
 from hiveflow.bus import InProcessEventBus
-from hiveflow.blackboard import SecureBlackboard, MemoryBlackboard
-from hiveflow.orchestrator import DAGOrchestrator, DynamicOrchestrator
 from hiveflow.cell import Cell, Worker
+from hiveflow.orchestrator import DAGOrchestrator, DynamicOrchestrator
 from hiveflow.scheduler import InProcessScheduler, SchedulerConfig
 from hiveflow.validation import ValidationPipeline
-
 
 # ============================================================
 # 1. DynamicOrchestrator - Subgraph Generation
@@ -221,7 +219,7 @@ async def test_worker_drain():
     config = SchedulerConfig()
     scheduler = InProcessScheduler(bus=bus, config=config)
     validation = ValidationPipeline()
-    cell = Cell(bus=bus, blackboard=bb, scheduler=scheduler, validation=validation)
+    Cell(bus=bus, blackboard=bb, scheduler=scheduler, validation=validation)
 
     completed = []
 
@@ -451,7 +449,7 @@ async def test_dynamic_orchestrator_node_abort():
 
 @pytest.mark.asyncio
 async def test_blackboard_prefix_isolation():
-    """测试精确匹配权限隔离 (Core 版 SecureBlackboard 使用精确匹配而非 fnmatch)。"""
+    """测试 fnmatch 前缀模式权限隔离（禁止裸 * 通配符）。"""
     bb = SecureBlackboard(MemoryBlackboard())
 
     cap_a = Capability(
@@ -483,8 +481,41 @@ async def test_blackboard_prefix_isolation():
 
 
 @pytest.mark.asyncio
+async def test_blackboard_fnmatch_prefix_pattern():
+    """测试 prefix:* 通配符模式匹配。"""
+    bb = SecureBlackboard(MemoryBlackboard())
+
+    cap = Capability(
+        agent_id="prefix-agent", skills={"x"},
+        read_keys={"team:*"}, write_keys={"team:*"}
+    )
+    await bb.register_agent("prefix-agent", cap)
+
+    await bb.put_and_audit("prefix-agent", "team:report", {"status": "ok"})
+    assert await bb.get_and_audit("prefix-agent", "team:report") == {"status": "ok"}
+
+    with pytest.raises(PermissionError):
+        await bb.get_and_audit("prefix-agent", "other:report")
+
+
+@pytest.mark.asyncio
+async def test_blackboard_wildcard_star_rejected():
+    """测试裸 * 通配符被拒绝。"""
+    bb = SecureBlackboard(MemoryBlackboard())
+
+    cap = Capability(
+        agent_id="wildcard-agent", skills={"x"},
+        read_keys={"*"}, write_keys={"*"}
+    )
+    await bb.register_agent("wildcard-agent", cap)
+
+    with pytest.raises(PermissionError, match="Wildcard '\\*' is not allowed"):
+        await bb.get_and_audit("wildcard-agent", "any:key")
+
+
+@pytest.mark.asyncio
 async def test_blackboard_non_json_write_rejected():
-    """测试 Core 版 SecureBlackboard 不强制 JSON 校验 (直接写入后端)。"""
+    """测试 SecureBlackboard 拒绝不可 JSON 序列化的写入。"""
     bb = SecureBlackboard(MemoryBlackboard())
 
     cap = Capability(
@@ -493,12 +524,11 @@ async def test_blackboard_non_json_write_rejected():
     )
     await bb.register_agent("json-test", cap)
 
-    # 允许的值
     await bb.put_and_audit("json-test", "test:valid", {"key": "value"})
     assert await bb.get_and_audit("json-test", "test:valid") == {"key": "value"}
 
-    # Core 版不强制 JSON 序列化校验，直接写入后端
-    # 但不可序列化的值会在 Redis 后端失败
+    with pytest.raises(ValueError, match="not JSON-serializable"):
+        await bb.put_and_audit("json-test", "test:bad", object())
 
 
 # ============================================================

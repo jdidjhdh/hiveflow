@@ -7,10 +7,12 @@ Supports:
 - Benchmark suites
 - A/B testing between agent configurations
 """
+
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Awaitable
+from typing import Any
 
 try:
     from . import LLMClient, LLMMessage
@@ -23,6 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EvaluationCriteria:
     """A single evaluation criterion."""
+
     name: str
     description: str
     weight: float = 1.0  # Relative importance
@@ -32,23 +35,25 @@ class EvaluationCriteria:
 @dataclass
 class EvaluationResult:
     """Result of evaluating a single output."""
+
     criteria_name: str
     score: float  # 0.0 to 1.0
     reason: str = ""
     passed: bool = True
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class EvaluationReport:
     """Complete evaluation report for an agent/workflow."""
+
     workflow_id: str
     test_name: str
     total_score: float  # Weighted average (0-1)
     passed: bool
-    results: List[EvaluationResult] = field(default_factory=list)
+    results: list[EvaluationResult] = field(default_factory=list)
     latency_ms: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
 
 
@@ -71,11 +76,11 @@ class Evaluator:
         )
     """
 
-    def __init__(self, llm_client: Optional[LLMClient] = None, model: str = ""):
+    def __init__(self, llm_client: LLMClient | None = None, model: str = ""):
         self.llm_client = llm_client
         self.model = model
-        self.criteria: Dict[str, EvaluationCriteria] = {}
-        self._custom_evaluators: Dict[str, Callable] = {}
+        self.criteria: dict[str, EvaluationCriteria] = {}
+        self._custom_evaluators: dict[str, Callable] = {}
 
     def add_criteria(
         self,
@@ -124,18 +129,18 @@ class Evaluator:
                 # No evaluator available, skip
                 continue
 
-            results.append(EvaluationResult(
-                criteria_name=name,
-                score=score,
-                reason=reason,
-                passed=score >= criterion.threshold,
-            ))
+            results.append(
+                EvaluationResult(
+                    criteria_name=name,
+                    score=score,
+                    reason=reason,
+                    passed=score >= criterion.threshold,
+                )
+            )
 
         # Calculate weighted average
         total_weight = sum(self.criteria[r.criteria_name].weight for r in results) if results else 1
-        weighted_sum = sum(
-            r.score * self.criteria[r.criteria_name].weight for r in results
-        )
+        weighted_sum = sum(r.score * self.criteria[r.criteria_name].weight for r in results)
         total_score = weighted_sum / total_weight if total_weight > 0 else 0
 
         elapsed_ms = (time.monotonic() - start) * 1000
@@ -183,6 +188,7 @@ Respond with ONLY a JSON object: {{"score": 0.85, "reason": "brief explanation"}
                 max_tokens=200,
             )
             import json
+
             content = response.content.strip()
             if content.startswith("```"):
                 content = "\n".join(content.split("\n")[1:-1])
@@ -232,40 +238,39 @@ class BenchmarkSuite:
 
     def __init__(self, name: str):
         self.name = name
-        self.tests: List[Dict[str, Any]] = []
+        self.tests: list[dict[str, Any]] = []
 
     def add_test(
         self,
         name: str,
         input_text: str,
         expected_output: str,
-        criteria: Optional[List[str]] = None,
+        criteria: list[str] | None = None,
         context: str = "",
     ):
         """Add a test case to the benchmark."""
-        self.tests.append({
-            "name": name,
-            "input": input_text,
-            "expected": expected_output,
-            "criteria": criteria or [],
-            "context": context,
-        })
+        self.tests.append(
+            {
+                "name": name,
+                "input": input_text,
+                "expected": expected_output,
+                "criteria": criteria or [],
+                "context": context,
+            }
+        )
 
     async def run(
         self,
         evaluator: Evaluator,
         agent_fn: Callable[[str], Awaitable[str]],
-    ) -> List[EvaluationReport]:
+    ) -> list[EvaluationReport]:
         """Run all tests in the suite."""
         reports = []
         for test in self.tests:
             # Filter criteria if specified
             if test["criteria"]:
                 original_criteria = dict(evaluator.criteria)
-                evaluator.criteria = {
-                    k: v for k, v in original_criteria.items()
-                    if k in test["criteria"]
-                }
+                evaluator.criteria = {k: v for k, v in original_criteria.items() if k in test["criteria"]}
 
             output = await agent_fn(test["input"])
             report = await evaluator.evaluate(
@@ -285,7 +290,7 @@ class BenchmarkSuite:
 
         return reports
 
-    def summary(self, reports: List[EvaluationReport]) -> Dict[str, Any]:
+    def summary(self, reports: list[EvaluationReport]) -> dict[str, Any]:
         """Generate a summary of benchmark results."""
         if not reports:
             return {"tests": 0}
@@ -328,7 +333,7 @@ class ABTester:
         test_name: str,
         expected_output: str = "",
         context: str = "",
-    ) -> Dict[str, EvaluationReport]:
+    ) -> dict[str, EvaluationReport]:
         """Run A/B comparison between two agent configurations."""
         output_a = await agent_a_fn(input_text)
         report_a = await self.evaluator.evaluate(

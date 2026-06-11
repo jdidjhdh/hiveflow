@@ -12,10 +12,16 @@ Thank you for your interest in contributing to HiveFlow! This document provides 
 - [Coding Standards](#coding-standards)
 - [Testing Guidelines](#testing-guidelines)
 - [Documentation](#documentation)
+- [OSS Launch](#oss-launch-checklist)
+
+## OSS Launch Checklist
+
+If you are preparing a public release, see [OSS_LAUNCH.md](../OSS_LAUNCH.md) and [GOVERNANCE.md](../GOVERNANCE.md).
 
 ## Code of Conduct
 
-This project follows a code of conduct. By participating, you are expected to uphold this code. Please be respectful and constructive in all interactions.
+This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
+By participating, you are expected to uphold this code.
 
 ## Getting Started
 

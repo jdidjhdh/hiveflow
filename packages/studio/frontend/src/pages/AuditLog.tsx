@@ -12,17 +12,16 @@ import { useState, useCallback, useEffect } from 'react';
 import {
   Table, Tag, Space, Select, Input, Button, Card, Statistic,
   Row, Col, Typography, Timeline, Badge, Tooltip, Popover,
-  Alert, Divider, DatePicker,
+  Alert,
 } from 'antd';
-import type { RangePickerProps } from 'antd/es/date-picker';
 import type { ColumnsType } from 'antd/es/table';
 import {
-  DatabaseOutlined, FilterOutlined, SearchOutlined,
+  DatabaseOutlined, SearchOutlined,
   WarningOutlined, CheckCircleOutlined, StopOutlined,
   ClockCircleOutlined, UserOutlined, KeyOutlined,
   ReloadOutlined, ExportOutlined,
 } from '@ant-design/icons';
-import { apiFetch, getErrorMessage } from '@/utils/api';
+import { apiFetch } from '@/utils/api';
 
 const { Text } = Typography;
 
@@ -138,8 +137,6 @@ export default function AuditLogPage() {
   const [filterKey, setFilterKey] = useState<string>();
   const [filterAction, setFilterAction] = useState<string>();
   const [searchText, setSearchText] = useState('');
-  const [timeRange, setTimeRange] = useState<RangePickerProps['value']>();
-
   const fetchAuditLog = useCallback(async () => {
     setLoading(true);
     try {
@@ -171,7 +168,7 @@ export default function AuditLogPage() {
       });
 
       setStats(statsData);
-    } catch (err) {
+    } catch {
       // If API not available, show mock data
       setEntries([]);
       setStats(null);

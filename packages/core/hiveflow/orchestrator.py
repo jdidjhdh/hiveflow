@@ -1,27 +1,117 @@
-from graphlib import TopologicalSorter
 import asyncio
 import logging
 import time
-from typing import Any, Dict, List, Optional, Set
+from graphlib import TopologicalSorter
+from typing import TYPE_CHECKING, Any, Optional
 
-try:
-    from . import MISSING, TaskGraph, AbortExecutionException
-    from .blackboard import SecureBlackboard, OrchestratorReadonlyView
-except ImportError:
-    from hiveflow import MISSING, TaskGraph, AbortExecutionException
-    from blackboard import SecureBlackboard, OrchestratorReadonlyView
+from . import MISSING, AbortExecutionException, TaskGraph
+from .blackboard import OrchestratorReadonlyView, SecureBlackboard
+from .hitl import HITLAction, HITLStatus
+
+if TYPE_CHECKING:
+    from .checkpoint import CheckpointManager
+    from .hitl import HITLManager
 
 logger = logging.getLogger(__name__)
 
 
+def _resolve_hitl_context(context: Any, deps: dict, all_results: dict) -> dict[str, Any]:
+    if callable(context):
+        resolved = context(deps, all_results)
+        return resolved if isinstance(resolved, dict) else {"value": resolved}
+    return context if isinstance(context, dict) else (context or {})
+
+
+async def _run_hitl_gate(
+    hitl_manager: "HITLManager",
+    workflow_id: str,
+    node_name: str,
+    node: dict,
+    deps: dict,
+    all_results: dict,
+) -> Any:
+    hitl_cfg = node.get("hitl")
+    if not hitl_cfg:
+        return None
+
+    action_raw = hitl_cfg.get("action", HITLAction.APPROVAL)
+    action = HITLAction(action_raw) if isinstance(action_raw, str) else action_raw
+    wf_id = hitl_cfg.get("workflow_id", workflow_id)
+    context = _resolve_hitl_context(hitl_cfg.get("context"), deps, all_results)
+
+    gate = await hitl_manager.create_gate(
+        workflow_id=wf_id,
+        node_id=node_name,
+        action=action,
+        prompt=hitl_cfg.get("prompt", f"Approve node '{node_name}'?"),
+        context=context,
+        timeout_seconds=hitl_cfg.get("timeout_seconds", 300.0),
+        on_timeout=hitl_cfg.get("on_timeout", "fail"),
+    )
+    gate = await hitl_manager.wait_for_response(gate.gate_id)
+
+    if gate.status in (HITLStatus.REJECTED, HITLStatus.TIMED_OUT):
+        raise AbortExecutionException(f"HITL gate rejected or timed out for node '{node_name}' ({gate.status.value})")
+    return gate.human_response
+
+
+async def _save_node_checkpoint(
+    checkpoint_manager: "CheckpointManager",
+    workflow_id: str,
+    node_name: str,
+    node: dict,
+    deps: dict,
+    all_results: dict,
+    result: Any = None,
+    phase: str = "after",
+) -> str | None:
+    cp_cfg = node.get("checkpoint")
+    if not cp_cfg:
+        return None
+    if cp_cfg.get("when", "after") != phase:
+        return None
+
+    wf_id = cp_cfg.get("workflow_id", workflow_id)
+    state = {
+        "node": node_name,
+        "phase": phase,
+        "deps": deps,
+        "completed": dict(all_results),
+    }
+    if result is not MISSING and result is not None:
+        state["result"] = result
+
+    metadata = dict(cp_cfg.get("metadata") or {})
+    metadata.setdefault("node", node_name)
+    metadata.setdefault("phase", phase)
+
+    return await checkpoint_manager.save_checkpoint(
+        workflow_id=wf_id,
+        state=state,
+        metadata=metadata,
+    )
+
+
 class DAGOrchestrator:
-    def __init__(self, blackboard: SecureBlackboard, metrics=None, logger=None, tracer=None):
+    def __init__(
+        self,
+        blackboard: SecureBlackboard,
+        metrics=None,
+        logger=None,
+        tracer=None,
+        hitl_manager: Optional["HITLManager"] = None,
+        checkpoint_manager: Optional["CheckpointManager"] = None,
+        workflow_id: str | None = None,
+    ):
         self.blackboard = blackboard
         self.metrics = metrics
         self.logger = logger
         self.tracer = tracer
+        self.hitl_manager = hitl_manager
+        self.checkpoint_manager = checkpoint_manager
+        self.workflow_id = workflow_id or "default"
 
-    async def execute(self, graph: TaskGraph) -> Dict[str, Any]:
+    async def execute(self, graph: TaskGraph) -> dict[str, Any]:
         start_time = time.monotonic()
         if self.logger:
             self.logger.info("DAG execution started", node_count=len(graph))
@@ -31,9 +121,9 @@ class DAGOrchestrator:
         try:
             sorter = TopologicalSorter({node: data.get("depends_on", []) for node, data in graph.items()})
             sorter.prepare()
-            results: Dict[str, Any] = {}
+            results: dict[str, Any] = {}
             readonly_view = OrchestratorReadonlyView(self.blackboard)
-            active_tasks: List[asyncio.Task] = []
+            active_tasks: list[asyncio.Task] = []
 
             try:
                 while sorter.is_active():
@@ -111,7 +201,32 @@ class DAGOrchestrator:
         for attempt in range(max_attempts):
             node_start = time.monotonic()
             try:
+                if self.hitl_manager:
+                    await _run_hitl_gate(self.hitl_manager, self.workflow_id, node_name, node, deps, all_results)
+                if self.checkpoint_manager:
+                    await _save_node_checkpoint(
+                        self.checkpoint_manager,
+                        self.workflow_id,
+                        node_name,
+                        node,
+                        deps,
+                        all_results,
+                        phase="before",
+                    )
+
                 result = await task_fn(deps, view)
+
+                if self.checkpoint_manager:
+                    await _save_node_checkpoint(
+                        self.checkpoint_manager,
+                        self.workflow_id,
+                        node_name,
+                        node,
+                        deps,
+                        all_results,
+                        result=result,
+                        phase="after",
+                    )
                 elapsed = time.monotonic() - node_start
                 if self.metrics:
                     self.metrics.update_counter("tasks_completed")
@@ -145,20 +260,29 @@ class DAGOrchestrator:
                         raise AbortExecutionException(f"Node '{node_name}' aborted: {e}")
                 if self.logger:
                     self.logger.warning("Node failed, retrying", node=node_name, attempt=attempt + 1, error=str(e))
-                delay = base if backoff_type == "constant" else min(base * (2 ** attempt), max_backoff)
+                delay = base if backoff_type == "constant" else min(base * (2**attempt), max_backoff)
                 await asyncio.sleep(delay)
         return MISSING
 
 
 class DynamicOrchestrator:
-    def __init__(self, blackboard: SecureBlackboard):
+    def __init__(
+        self,
+        blackboard: SecureBlackboard,
+        hitl_manager: Optional["HITLManager"] = None,
+        checkpoint_manager: Optional["CheckpointManager"] = None,
+        workflow_id: str | None = None,
+    ):
         self.blackboard = blackboard
+        self.hitl_manager = hitl_manager
+        self.checkpoint_manager = checkpoint_manager
+        self.workflow_id = workflow_id or "default"
 
-    async def execute(self, initial_graph: TaskGraph, global_timeout: Optional[float] = None) -> Dict[str, Any]:
+    async def execute(self, initial_graph: TaskGraph, global_timeout: float | None = None) -> dict[str, Any]:
         graph = dict(initial_graph)
-        results: Dict[str, Any] = {}
-        in_degree: Dict[str, int] = {}
-        dependents: Dict[str, List[str]] = {node: [] for node in graph}
+        results: dict[str, Any] = {}
+        in_degree: dict[str, int] = {}
+        dependents: dict[str, list[str]] = {node: [] for node in graph}
 
         for node, info in graph.items():
             deps = info.get("depends_on", [])
@@ -166,13 +290,13 @@ class DynamicOrchestrator:
             for dep in deps:
                 dependents.setdefault(dep, []).append(node)
 
-        ready_queue = asyncio.Queue()
+        ready_queue: asyncio.Queue[str] = asyncio.Queue()
         for node, deg in in_degree.items():
             if deg == 0:
                 ready_queue.put_nowait(node)
 
-        completed: Set[str] = set()
-        active_tasks: Set[asyncio.Task] = set()
+        completed: set[str] = set()
+        active_tasks: set[asyncio.Task] = set()
         readonly_view = OrchestratorReadonlyView(self.blackboard)
 
         deadline = time.monotonic() + global_timeout if global_timeout else None
@@ -207,8 +331,7 @@ class DynamicOrchestrator:
                             await cancel_all_active()
                             raise TimeoutError(f"DynamicOrchestrator global timeout after {global_timeout}s")
                         done, _ = await asyncio.wait_for(
-                            asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED),
-                            timeout=remaining
+                            asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED), timeout=remaining
                         )
                     else:
                         done, _ = await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -231,8 +354,7 @@ class DynamicOrchestrator:
                             await cancel_all_active()
                             raise TimeoutError(f"DynamicOrchestrator global timeout after {global_timeout}s")
                         done, _ = await asyncio.wait_for(
-                            asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED),
-                            timeout=remaining
+                            asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED), timeout=remaining
                         )
                     else:
                         done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -321,7 +443,33 @@ class DynamicOrchestrator:
 
         for attempt in range(max_attempts):
             try:
-                return await task_fn(deps, view)
+                if self.hitl_manager:
+                    await _run_hitl_gate(self.hitl_manager, self.workflow_id, node_name, node, deps, all_results)
+                if self.checkpoint_manager:
+                    await _save_node_checkpoint(
+                        self.checkpoint_manager,
+                        self.workflow_id,
+                        node_name,
+                        node,
+                        deps,
+                        all_results,
+                        phase="before",
+                    )
+
+                result = await task_fn(deps, view)
+
+                if self.checkpoint_manager:
+                    await _save_node_checkpoint(
+                        self.checkpoint_manager,
+                        self.workflow_id,
+                        node_name,
+                        node,
+                        deps,
+                        all_results,
+                        result=result,
+                        phase="after",
+                    )
+                return result
             except asyncio.CancelledError:
                 raise
             except AbortExecutionException:
@@ -338,6 +486,6 @@ class DynamicOrchestrator:
                         return MISSING
                     else:
                         raise AbortExecutionException(f"Node '{node_name}' aborted: {e}")
-                delay = base if backoff_type == "constant" else min(base * (2 ** attempt), max_backoff)
+                delay = base if backoff_type == "constant" else min(base * (2**attempt), max_backoff)
                 await asyncio.sleep(delay)
         return MISSING

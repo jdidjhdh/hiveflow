@@ -54,6 +54,9 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - DB_URL=postgresql://hiveflow:hiveflow@postgres:5432/hiveflow
+      - HIVEFLOW_RUNTIME=agent
+      - HIVEFLOW_PLAN_HITL=true
+      - HIVEFLOW_AGENT_ECHO_LLM=true
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     depends_on:
@@ -63,6 +66,7 @@ services:
         condition: service_healthy
     volumes:
       - ./packages/studio/backend:/app
+      - ./packages/agent:/packages/agent
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   # ==============================================

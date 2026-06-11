@@ -1,15 +1,15 @@
 """Tests for hiveflow streaming module."""
-import pytest
-import asyncio
+import importlib.util
 import json
+import os
 from unittest.mock import MagicMock
 
-from hiveflow import StreamEventType, StreamEvent, StreamBuffer, collect_stream
-# Access the streaming module directly for sse_response
-import sys
-import os
+import pytest
+
+from hiveflow import StreamBuffer, StreamEvent, StreamEventType, collect_stream
+
 _hf_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'hiveflow')
-import importlib.util
+
 _spec = importlib.util.spec_from_file_location("streaming_mod", os.path.join(_hf_dir, "streaming.py"))
 streaming_mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(streaming_mod)

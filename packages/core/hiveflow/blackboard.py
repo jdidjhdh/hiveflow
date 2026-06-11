@@ -1,13 +1,14 @@
-import math
-from abc import ABC, abstractmethod
 import asyncio
-import json
-import time
-import os
 import base64
-import zlib
+import json
 import logging
-from typing import Any, Optional, Dict, List
+import math
+import os
+import time
+import zlib
+from abc import ABC, abstractmethod
+from fnmatch import fnmatch
+from typing import Any
 
 try:
     from . import Capability
@@ -18,23 +19,26 @@ logger = logging.getLogger(__name__)
 
 # ========== Backend ABC ==========
 
+
 class BlackboardBackend(ABC):
     @abstractmethod
     async def get(self, key: str) -> Any: ...
     @abstractmethod
-    async def put(self, key: str, value: Any, ttl: Optional[float] = None) -> None: ...
+    async def put(self, key: str, value: Any, ttl: float | None = None) -> None: ...
     @abstractmethod
-    async def wait_for_key(self, key: str, timeout: Optional[float] = None) -> Any: ...
+    async def wait_for_key(self, key: str, timeout: float | None = None) -> Any: ...
     @abstractmethod
     async def delete(self, key: str) -> None: ...
     @abstractmethod
     async def close(self) -> None: ...
 
+
 # ========== Memory Backend ==========
+
 
 class MemoryBlackboard(BlackboardBackend):
     def __init__(self):
-        self._data: Dict[str, Any] = {}
+        self._data: dict[str, Any] = {}
         self._condition = asyncio.Condition()
 
     async def get(self, key: str) -> Any:
@@ -43,12 +47,12 @@ class MemoryBlackboard(BlackboardBackend):
                 raise KeyError(key)
             return self._data[key]
 
-    async def put(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
+    async def put(self, key: str, value: Any, ttl: float | None = None) -> None:
         async with self._condition:
             self._data[key] = value
             self._condition.notify_all()
 
-    async def wait_for_key(self, key: str, timeout: Optional[float] = None) -> Any:
+    async def wait_for_key(self, key: str, timeout: float | None = None) -> Any:
         deadline = time.monotonic() + timeout if timeout else None
         async with self._condition:
             while key not in self._data:
@@ -72,15 +76,17 @@ class MemoryBlackboard(BlackboardBackend):
     async def close(self) -> None:
         pass
 
+
 # ========== TTL Memory Backend ==========
 
+
 class TTLMemoryBlackboard(MemoryBlackboard):
-    def __init__(self, default_ttl: Optional[float] = None):
+    def __init__(self, default_ttl: float | None = None):
         super().__init__()
         self.default_ttl = default_ttl
-        self._expires: Dict[str, float] = {}
+        self._expires: dict[str, float] = {}
 
-    async def put(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
+    async def put(self, key: str, value: Any, ttl: float | None = None) -> None:
         async with self._condition:
             self._data[key] = value
             effective_ttl = ttl if ttl is not None else self.default_ttl
@@ -98,7 +104,7 @@ class TTLMemoryBlackboard(MemoryBlackboard):
                 raise KeyError(key)
             return self._data[key]
 
-    async def wait_for_key(self, key: str, timeout: Optional[float] = None) -> Any:
+    async def wait_for_key(self, key: str, timeout: float | None = None) -> Any:
         deadline = time.monotonic() + timeout if timeout else None
         async with self._condition:
             while True:
@@ -124,23 +130,30 @@ class TTLMemoryBlackboard(MemoryBlackboard):
             self._expires.pop(key, None)
             self._condition.notify_all()
 
+
 # ========== Redis Backend ==========
 
 try:
     import redis.asyncio as aioredis
+
     _REDIS_AVAILABLE = True
 except ImportError:
     _REDIS_AVAILABLE = False
 
 
 class RedisBlackboard(BlackboardBackend):
-    def __init__(self, redis_url="redis://localhost", prefix="blackboard", db=0,
-                 max_connections=10, socket_timeout=5.0, poll_interval=0.05):
+    def __init__(
+        self,
+        redis_url="redis://localhost",
+        prefix="blackboard",
+        db=0,
+        max_connections=10,
+        socket_timeout=5.0,
+        poll_interval=0.05,
+    ):
         if not _REDIS_AVAILABLE:
             raise ImportError("redis required")
-        self.redis = aioredis.from_url(redis_url, db=db,
-                                       max_connections=max_connections,
-                                       socket_timeout=socket_timeout)
+        self.redis = aioredis.from_url(redis_url, db=db, max_connections=max_connections, socket_timeout=socket_timeout)
         self.prefix = prefix
         self.db = db
         self._poll_interval = poll_interval
@@ -154,7 +167,7 @@ class RedisBlackboard(BlackboardBackend):
             raise KeyError(key)
         return json.loads(data)
 
-    async def put(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
+    async def put(self, key: str, value: Any, ttl: float | None = None) -> None:
         k = self._key(key)
         data = json.dumps(value, default=str)
         if ttl is not None:
@@ -162,7 +175,7 @@ class RedisBlackboard(BlackboardBackend):
         else:
             await self.redis.set(k, data)
 
-    async def wait_for_key(self, key: str, timeout: Optional[float] = None) -> Any:
+    async def wait_for_key(self, key: str, timeout: float | None = None) -> Any:
         deadline = time.monotonic() + timeout if timeout else None
         while True:
             try:
@@ -176,18 +189,18 @@ class RedisBlackboard(BlackboardBackend):
         await self.redis.delete(self._key(key))
 
     async def close(self) -> None:
-        await self.redis.close()
+        await self.redis.aclose()
+
 
 # ========== Secure Blackboard ==========
 
-from fnmatch import fnmatch
 
 class SecureBlackboard:
     def __init__(self, backend: BlackboardBackend, max_audit: int = 1000):
         self._backend = backend
-        self._permissions: Dict[str, Capability] = {}
+        self._permissions: dict[str, Capability] = {}
         self._perm_lock = asyncio.Lock()
-        self._audit_log: List[dict] = []
+        self._audit_log: list[dict] = []
         self._max_audit = max_audit
         self._audit_lock = asyncio.Lock()
 
@@ -199,10 +212,10 @@ class SecureBlackboard:
         async with self._perm_lock:
             self._permissions.pop(agent_id, None)
 
-    def view_for(self, agent_id: str) -> 'AuditedBlackboardView':
+    def view_for(self, agent_id: str) -> "AuditedBlackboardView":
         return AuditedBlackboardView(self, agent_id)
 
-    async def sys_put(self, key: str, value: Any, ttl: Optional[float] = None):
+    async def sys_put(self, key: str, value: Any, ttl: float | None = None):
         try:
             json.dumps(value)
         except (TypeError, ValueError) as e:
@@ -212,21 +225,23 @@ class SecureBlackboard:
     async def sys_get(self, key: str) -> Any:
         return await self._backend.get(key)
 
-    async def sys_wait_for_key(self, key: str, timeout: Optional[float] = None) -> Any:
+    async def sys_wait_for_key(self, key: str, timeout: float | None = None) -> Any:
         return await self._backend.wait_for_key(key, timeout)
 
     async def sys_delete(self, key: str) -> None:
         await self._backend.delete(key)
 
     def _check_permission(self, cap: Capability, key: str, read: bool) -> bool:
-        """检查权限，支持 fnmatch 模式匹配"""
+        """检查权限，支持 fnmatch 模式匹配；禁止裸 * 通配符"""
         keys = cap.read_keys if read else cap.write_keys
         for p in keys:
+            if p == "*":
+                raise PermissionError("Wildcard '*' is not allowed. Use 'prefix:*' pattern instead.")
             if fnmatch(key, p):
                 return True
         return False
 
-    async def wait_and_audit(self, agent_id: str, key: str, timeout: Optional[float] = None) -> Any:
+    async def wait_and_audit(self, agent_id: str, key: str, timeout: float | None = None) -> Any:
         async with self._perm_lock:
             cap = self._permissions.get(agent_id)
         if cap is None:
@@ -255,7 +270,7 @@ class SecureBlackboard:
         await self._add_audit("get", agent_id, key)
         return val
 
-    async def put_and_audit(self, agent_id: str, key: str, value: Any, ttl: Optional[float] = None) -> None:
+    async def put_and_audit(self, agent_id: str, key: str, value: Any, ttl: float | None = None) -> None:
         async with self._perm_lock:
             cap = self._permissions.get(agent_id)
         if cap is None:
@@ -271,11 +286,9 @@ class SecureBlackboard:
 
     async def _add_audit(self, action: str, agent_id: str, key: str):
         async with self._audit_lock:
-            self._audit_log.append({
-                "action": action, "agent": agent_id, "key": key, "timestamp": time.time()
-            })
+            self._audit_log.append({"action": action, "agent": agent_id, "key": key, "timestamp": time.time()})
             if len(self._audit_log) > self._max_audit:
-                self._audit_log = self._audit_log[-self._max_audit:]
+                self._audit_log = self._audit_log[-self._max_audit :]
 
     async def close(self) -> None:
         await self._backend.close()
@@ -289,15 +302,16 @@ class AuditedBlackboardView:
     async def get(self, key: str) -> Any:
         return await self._secure.get_and_audit(self.agent_id, key)
 
-    async def put(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
+    async def put(self, key: str, value: Any, ttl: float | None = None) -> None:
         await self._secure.put_and_audit(self.agent_id, key, value, ttl)
 
-    async def wait_for_key(self, key: str, timeout: Optional[float] = None) -> Any:
+    async def wait_for_key(self, key: str, timeout: float | None = None) -> Any:
         return await self._secure.wait_and_audit(self.agent_id, key, timeout)
 
 
 class OrchestratorReadonlyView:
     """编排器内部任务专用的只读黑板视图，防止绕过 Agent 权限写入，并记录审计日志"""
+
     def __init__(self, secure: SecureBlackboard):
         self._secure = secure
 
@@ -306,44 +320,58 @@ class OrchestratorReadonlyView:
         await self._secure._add_audit("sys_get", "__orchestrator__", key)
         return value
 
-    async def wait_for_key(self, key: str, timeout: Optional[float] = None) -> Any:
+    async def wait_for_key(self, key: str, timeout: float | None = None) -> Any:
         value = await self._secure.sys_wait_for_key(key, timeout)
         await self._secure._add_audit("sys_wait", "__orchestrator__", key)
         return value
 
+
 # ========== Encryption ==========
+
 
 class KeyProvider(ABC):
     @abstractmethod
-    def get_key(self, version: Optional[str] = None) -> bytes: ...
+    def get_key(self, version: str | None = None) -> bytes: ...
+
 
 class EnvKeyProvider(KeyProvider):
     def __init__(self, env_var="HIVEFLOW_ENCRYPTION_KEY"):
         self.env_var = env_var
+
     def get_key(self, version=None):
         key = os.environ.get(self.env_var)
         if not key:
             raise RuntimeError(f"Environment variable {self.env_var} not set")
         return key.encode()
 
+
 class FileKeyProvider(KeyProvider):
     def __init__(self, file_path: str):
         self._file_path = file_path
+
     def get_key(self, version=None):
         if not os.path.exists(self._file_path):
             raise RuntimeError(f"Key file not found: {self._file_path}")
-        with open(self._file_path, 'rb') as f:
+        with open(self._file_path, "rb") as f:
             return f.read().strip()
+
 
 try:
     from cryptography.fernet import Fernet
+
     _FERNET_AVAILABLE = True
 except ImportError:
     _FERNET_AVAILABLE = False
 
+
 class EncryptedBlackboard(BlackboardBackend):
-    def __init__(self, base_backend: BlackboardBackend, key_provider: KeyProvider,
-                 key_version: Optional[str] = None, use_compression: bool = False):
+    def __init__(
+        self,
+        base_backend: BlackboardBackend,
+        key_provider: KeyProvider,
+        key_version: str | None = None,
+        use_compression: bool = False,
+    ):
         if not _FERNET_AVAILABLE:
             raise ImportError("cryptography library is required")
         self._backend = base_backend
@@ -351,26 +379,26 @@ class EncryptedBlackboard(BlackboardBackend):
         self._use_compression = use_compression
 
     def _encrypt(self, value: Any) -> str:
-        raw = json.dumps(value, default=str).encode('utf-8')
+        raw = json.dumps(value, default=str).encode("utf-8")
         if self._use_compression:
             raw = zlib.compress(raw)
         encrypted_bytes = self._fernet.encrypt(raw)
-        return base64.b64encode(encrypted_bytes).decode('ascii')
+        return base64.b64encode(encrypted_bytes).decode("ascii")
 
     def _decrypt(self, encrypted_str: str) -> Any:
-        encrypted_bytes = base64.b64decode(encrypted_str.encode('ascii'))
+        encrypted_bytes = base64.b64decode(encrypted_str.encode("ascii"))
         raw = self._fernet.decrypt(encrypted_bytes)
         if self._use_compression:
             raw = zlib.decompress(raw)
-        return json.loads(raw.decode('utf-8'))
+        return json.loads(raw.decode("utf-8"))
 
     async def get(self, key: str) -> Any:
         return self._decrypt(await self._backend.get(key))
 
-    async def put(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
+    async def put(self, key: str, value: Any, ttl: float | None = None) -> None:
         await self._backend.put(key, self._encrypt(value), ttl)
 
-    async def wait_for_key(self, key: str, timeout: Optional[float] = None) -> Any:
+    async def wait_for_key(self, key: str, timeout: float | None = None) -> Any:
         return self._decrypt(await self._backend.wait_for_key(key, timeout))
 
     async def delete(self, key: str) -> None:

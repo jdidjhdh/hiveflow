@@ -47,13 +47,13 @@ async def test_non_json_value_rejected_put_and_audit(blackboard):
     cap = Capability(
         agent_id="agent1",
         skills={"test"},
-        read_keys={"*"},
-        write_keys={"*"},
+        read_keys={"bad.*"},
+        write_keys={"bad.*"},
     )
     await blackboard.register_agent("agent1", cap)
 
     with pytest.raises(ValueError, match="not JSON-serializable"):
-        await blackboard.put_and_audit("agent1", "bad_key", {1, 2, 3})
+        await blackboard.put_and_audit("agent1", "bad.key", {1, 2, 3})
 
 
 @pytest.mark.asyncio
@@ -62,7 +62,7 @@ async def test_valid_value_accepted_put_and_audit(blackboard):
     cap = Capability(
         agent_id="agent2",
         skills={"test"},
-        read_keys={"*"},
+        read_keys={"data.*"},
         write_keys={"data.*"},
     )
     await blackboard.register_agent("agent2", cap)
@@ -113,7 +113,7 @@ async def test_write_permission_check(blackboard):
     cap = Capability(
         agent_id="writer",
         skills={"test"},
-        read_keys={"*"},
+        read_keys={"allowed.*", "forbidden.*"},
         write_keys={"allowed.*"},
     )
     await blackboard.register_agent("writer", cap)
@@ -175,8 +175,8 @@ async def test_ensure_error_writes_catches_exception(blackboard):
     cap = Capability(
         agent_id="test_agent",
         skills={"test"},
-        read_keys={"*"},
-        write_keys={"*"},
+        read_keys={"error.*", "bad.*"},
+        write_keys={"error.*", "bad.*"},
     )
     await blackboard.register_agent("test_agent", cap)
     view = blackboard.view_for("test_agent")
@@ -211,8 +211,8 @@ async def test_ensure_error_writes_passes_on_success(blackboard):
     cap = Capability(
         agent_id="ok_agent",
         skills={"test"},
-        read_keys={"*"},
-        write_keys={"*"},
+        read_keys={"error.*"},
+        write_keys={"error.*"},
     )
     await blackboard.register_agent("ok_agent", cap)
     view = blackboard.view_for("ok_agent")
@@ -244,8 +244,8 @@ async def test_ensure_error_writes_preserves_exception_type(blackboard):
     cap = Capability(
         agent_id="type_agent",
         skills={"test"},
-        read_keys={"*"},
-        write_keys={"*"},
+        read_keys={"error.*"},
+        write_keys={"error.*"},
     )
     await blackboard.register_agent("type_agent", cap)
     view = blackboard.view_for("type_agent")

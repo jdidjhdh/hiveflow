@@ -1,8 +1,9 @@
+
 import pytest
-import asyncio
+
 from hiveflow import ECM, Capability
-from hiveflow.scheduler import InProcessScheduler, LeastLoadedStrategy, SchedulerConfig
 from hiveflow.bus import InProcessEventBus
+from hiveflow.scheduler import InProcessScheduler, LeastLoadedStrategy, SchedulerConfig
 
 
 @pytest.fixture

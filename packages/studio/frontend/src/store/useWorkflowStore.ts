@@ -41,31 +41,24 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
   addNode: (node) => {
     set((s) => ({ nodes: [...s.nodes, node] }));
-    // 自动保存到 IndexedDB
-    setTimeout(() => get().saveToIndexedDB(), 0);
   },
   removeNode: (id) => {
     set((s) => ({
       nodes: s.nodes.filter(n => n.id !== id),
       edges: s.edges.filter(e => e.source !== id && e.target !== id),
     }));
-    setTimeout(() => get().saveToIndexedDB(), 0);
   },
   addEdge: (edge) => {
     set((s) => ({ edges: [...s.edges, edge] }));
-    setTimeout(() => get().saveToIndexedDB(), 0);
   },
   removeEdge: (id) => {
     set((s) => ({ edges: s.edges.filter(e => e.id !== id) }));
-    setTimeout(() => get().saveToIndexedDB(), 0);
   },
   setNodes: (nodes) => {
     set({ nodes });
-    setTimeout(() => get().saveToIndexedDB(), 0);
   },
   setEdges: (edges) => {
     set({ edges });
-    setTimeout(() => get().saveToIndexedDB(), 0);
   },
   setExecutionStatus: (status) => set({ executionStatus: status }),
   setNodeResult: (nodeId, result) => set((s) => ({
@@ -106,6 +99,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         dynamic: n.data.dynamic,
         expectation: n.data.expectation,
         required_skills: n.data.skills,
+        variant: n.data.variant,
+        hitl_config: n.data.hitl_config,
       };
     });
     return { nodes, edges, graph };

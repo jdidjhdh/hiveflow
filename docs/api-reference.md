@@ -1,194 +1,262 @@
 # API Reference
 
-Complete API documentation for HiveFlow.
+Reference for the public `hiveflow` Python API. For tutorials, see [Getting Started](getting-started.md).
 
 ---
 
 ## HiveFlow
 
-### `HiveFlow(config)`
+Top-level orchestration engine.
 
-Top-level entry point for the HiveFlow engine.
+```python
+from hiveflow import HiveFlow, HiveFlowConfig
 
-**Parameters:**
-- `config` (`HiveFlowConfig`): Configuration object
+hf = HiveFlow(HiveFlowConfig())
+await hf.start()
+```
 
-**Methods:**
+### Methods
 
-#### `execute_workflow(agents, task)`
+| Method | Description |
+|--------|-------------|
+| `start()` | Start event bus and scheduler |
+| `shutdown()` | Stop workers, scheduler, bus, and blackboard |
+| `create_agent(agent_id, skills, read_keys, write_keys, task_handler, max_queue_size=None)` | Register and start a worker |
+| `register_agent_handler(agent_id, handler)` | Register handler for state restore |
+| `save_state()` | Persist agent capabilities to blackboard |
+| `restore_state()` | Restore agents from saved state |
+| `set_strategy(strategy)` | Replace scheduler selection strategy (async) |
 
-Execute a multi-agent workflow.
+### Attributes
 
-**Parameters:**
-- `agents` (`list[dict]`): List of agent configurations with `id` and `skills`
-- `task` (`str`): Task description
-
-**Returns:** Workflow result
+| Attribute | Description |
+|-----------|-------------|
+| `config` | `HiveFlowConfig` instance |
+| `blackboard` | `SecureBlackboard` (audited wrapper) |
+| `bus` | `InProcessEventBus` or `RedisEventBus` |
+| `scheduler` | `InProcessScheduler` |
+| `cell` | `Cell` supervision tree |
+| `dag_orchestrator` | Static DAG orchestrator |
+| `dynamic_orchestrator` | Runtime-expanding orchestrator |
 
 ---
 
 ## HiveFlowConfig
 
-Configuration for the HiveFlow engine.
+```python
+@dataclass
+class HiveFlowConfig:
+    scheduler: SchedulerConfig
+    blackboard_type: str = "memory"
+    encryption_key_provider: Optional[KeyProvider] = None
+    redis_url: Optional[str] = None
+    redis_db: int = 0
+    worker_max_queue_size: int = 100
+    log_level: str = "INFO"
+    # ...
+```
 
-**Parameters:**
-- `llm_provider` (`str`): LLM provider name (`openai`, `anthropic`, `mock`)
-- `llm_model` (`str`): Model name
-- `llm_api_key` (`str`): API key
-- `scheduler_strategy` (`str`): Scheduling strategy (`least_loaded`, `auction`, `global_load`)
-- `max_concurrent` (`int`): Maximum concurrent tasks
+| Field | Values / Notes |
+|-------|----------------|
+| `blackboard_type` | `memory`, `ttl_memory`, `redis`, `encrypted` |
+| `redis_url` | Required when using Redis blackboard/bus |
+| `encryption_key_provider` | Required when `blackboard_type="encrypted"` |
+
+**Class method:** `HiveFlowConfig.from_env(prefix="HIVEFLOW")` — load from environment variables.
 
 ---
 
-## Cell
+## ECM
 
-Supervision tree managing a pool of workers.
+Event-Condition-Messaging unit — the task message passed to agents.
 
-**Methods:**
+```python
+ECM(
+    trace_id="trace-1",
+    intent="Process order",
+    intent_id="intent-1",
+    emitter="user",
+    required_skills=["process"],
+    payload={"order_id": "123"},
+    priority="normal",
+)
+```
 
-#### `create_worker(agent_id, skills, read_keys, write_keys, task_handler)`
+---
 
-Create a new worker.
+## Cell & Worker
 
-**Parameters:**
-- `agent_id` (`str`): Unique agent identifier
-- `skills` (`set[str]`): Set of skills
-- `read_keys` (`set[str]`): Blackboard read permissions
-- `write_keys` (`set[str]`): Blackboard write permissions
-- `task_handler` (`callable`): Async function to handle tasks
+`Cell` manages worker lifecycle. Prefer `HiveFlow.create_agent()` in application code.
+
+Task handlers receive `(ecm, view)` where `view` is a scoped blackboard view:
+
+```python
+async def handler(ecm, view):
+    data = await view.get("input_key")
+    await view.put("output_key", {"result": data})
+    return {"ok": True}
+```
 
 ---
 
 ## Blackboard
 
-Shared memory for inter-agent communication.
+| Class | Use case |
+|-------|----------|
+| `MemoryBlackboard` | Local dev, tests |
+| `TTLMemoryBlackboard` | In-memory with TTL |
+| `RedisBlackboard` | Distributed deployments |
+| `EncryptedBlackboard` | AES encryption at rest |
+| `SecureBlackboard` | Audit logging wrapper (used by default in `HiveFlow`) |
 
-### Types
-
-- `MemoryBlackboard` — In-memory, fast, non-persistent
-- `TTLMemoryBlackboard` — In-memory with expiration
-- `RedisBlackboard` — Distributed via Redis
-- `SecureBlackboard` — Encrypted with audit logging
-
-**Methods:**
-
-#### `put(agent_id, key, value)`
-
-Write data to the blackboard.
-
-#### `get(agent_id, key)`
-
-Read data from the blackboard.
-
-#### `wait(agent_id, key, timeout)`
-
-Wait for data to appear (blocking with timeout).
+System-level keys (orchestrator): `await blackboard.sys_get(key)` / `sys_put(key, value)`.
 
 ---
 
 ## Scheduler
 
-Assigns tasks to available workers.
+```python
+SchedulerConfig(
+    selection_strategy="least_loaded",  # least_loaded | auction | global_load
+    default_intent_timeout=60.0,
+    auction_timeout=5.0,
+)
+```
 
-**Strategies:**
-- `least_loaded` — Assign to worker with fewest active tasks
-- `auction` — Workers bid, best bid wins
-- `global_load` — Considers entire system load
+Built-in strategies: `LeastLoadedStrategy`, `AuctionStrategy`, `GlobalLoadAwareStrategy`.
 
----
+Custom strategies subclass `SelectionStrategy` and implement:
 
-## EventBus
-
-Publish/subscribe communication.
-
-**Methods:**
-
-#### `subscribe(event_type, handler)`
-
-Subscribe to events.
-
-#### `publish(event_type, data)`
-
-Publish an event.
+```python
+async def select(self, ecm, capabilities, worker_queues) -> List[str]:
+    ...
+```
 
 ---
 
-## HITLGate
+## HITL (Human-in-the-Loop)
 
-Human-in-the-Loop approval gate.
+| Class | Role |
+|-------|------|
+| `HITLManager` | Create gates, wait for responses, handle timeouts |
+| `HITLGate` | Gate state dataclass |
+| `HITLAction` | `APPROVAL`, `REVIEW`, `INPUT`, `CONFIRMATION` |
+| `HITLStatus` | `PENDING`, `APPROVED`, `REJECTED`, … |
 
-**Parameters:**
-- `gate_id` (`str`): Unique gate identifier
-- `description` (`str`): Gate description
-- `timeout` (`int`): Timeout in seconds
-- `on_timeout` (`str`): Action on timeout (`auto_approve`, `auto_reject`, `cancel`)
-
-**Methods:**
-
-#### `request_approval(agent_id, data)`
-
-Submit for human approval.
-
-#### `approve(gate_id, reviewer)`
-
-Approve the gate.
-
-#### `reject(gate_id, reviewer, reason)`
-
-Reject the gate.
+```python
+mgr = HITLManager()
+gate = await mgr.create_gate(workflow_id="wf", node_id="n1", action=HITLAction.APPROVAL, prompt="Approve?")
+await mgr.respond(gate.gate_id, approved=True)
+resolved = await mgr.wait_for_response(gate.gate_id)
+```
 
 ---
 
 ## CheckpointManager
 
-State snapshots and time travel.
+```python
+mgr = CheckpointManager(MemoryCheckpointBackend())
+cp_id = await mgr.save_checkpoint("wf-1", state={"step": 1})
+cp = await mgr.restore_checkpoint(cp_id)
+timeline = await mgr.get_checkpoint_timeline("wf-1")
+fork_id = await mgr.fork(cp_id, branch_name="experiment")
+```
 
-**Methods:**
+---
 
-#### `save(workflow_id, state)`
+## Streaming
 
-Save workflow state.
+| Class | Description |
+|-------|-------------|
+| `StreamBuffer` | Async producer/consumer event buffer |
+| `StreamEvent` | Single event with `type`, `data`, `node_id` |
+| `StreamEventType` | `TOKEN`, `THOUGHT`, `TOOL_CALL`, `NODE_START`, `DONE`, … |
+| `collect_stream(buffer)` | Drain buffer into a list |
 
-#### `restore(workflow_id)`
-
-Restore workflow state.
-
-#### `list_snapshots(workflow_id)`
-
-List available snapshots.
+`StreamEvent.to_sse()` formats Server-Sent Events payloads.
 
 ---
 
 ## Guards
 
-### InputGuard
+```python
+guard = InputGuard(max_length=10000)
+result = guard.check(user_text)  # InputGuardResult
 
-Validates and sanitizes input.
-
-**Parameters:**
-- `max_length` (`int`): Maximum input length
-- `blocked_patterns` (`list[str]`): Patterns to block
-
-### OutputValidator
-
-Validates output before returning.
-
-**Parameters:**
-- `allowed_patterns` (`list[str]`): Allowed output patterns
-- `max_length` (`int`): Maximum output length
+validator = OutputValidator(max_length=50000)
+result = validator.validate(agent_output)  # OutputValidationResult
+```
 
 ---
 
-## Observability
+## RAG
 
-### StructuredLogger
+```python
+processor = DocumentProcessor()
+doc = processor.parse_text("...", source="manual")
+chunker = TextChunker(chunk_size=500, chunk_overlap=50)
+pipeline = RAGPipeline(
+    vector_store=MemoryVectorStore(),
+    embedding_model=DummyEmbeddingModel(),
+    llm_client=client,  # optional
+)
+await pipeline.add_document(doc, chunker)
+result = await pipeline.query("What is AI?")
+```
 
-JSON-formatted structured logging with trace context.
+---
 
-### MetricsCollector
+## MCP
 
-Prometheus-compatible metrics collection.
+```python
+client = MCPClient(transport="mock")
+client.register_tool("echo", lambda args: {"content": args.get("text", "")})
+await client.initialize()
+tools = await client.list_tools()
+result = await client.call_tool("echo", {"text": "hello"})
+```
 
-### Tracer
+`MCPPluginManager` manages multiple MCP server plugins. `PluginMarketplace` ships built-in plugin specs.
 
-Distributed tracing support with trace/span context propagation.
+---
+
+## Cognitive Orchestrator
+
+```python
+from hiveflow import CognitiveOrchestrator, MockLLMClient
+
+orchestrator = CognitiveOrchestrator(llm_client=MockLLMClient(response='{"plan":[...]}'))
+result = await orchestrator.execute(goal="Research and summarize", task_fn=my_task_fn)
+```
+
+---
+
+## Evaluation
+
+```python
+evaluator = Evaluator()
+evaluator.add_criteria("accuracy", "Is the output correct?")
+evaluator.add_custom_evaluator("accuracy", my_scorer_fn)
+report = await evaluator.evaluate(
+    workflow_id="wf-1",
+    test_name="demo",
+    input_text="...",
+    output_text="...",
+    expected_output="...",
+)
+
+tester = ABTester(evaluator)
+comparison = await tester.compare("input", agent_a_fn, agent_b_fn, "test_name")
+```
+
+---
+
+## Multimodal
+
+```python
+pipeline = MultiModalPipeline()  # defaults to mock processors
+image = MediaContent(media_type=MediaType.IMAGE, data=b"...")
+analysis = await pipeline.analyze_image(image)
+transcript = await pipeline.transcribe_audio(audio)
+summary = await pipeline.summarize_video(video)
+```

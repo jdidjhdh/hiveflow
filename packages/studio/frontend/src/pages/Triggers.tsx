@@ -1,12 +1,12 @@
 import { useState, useCallback } from 'react';
 import {
   Table, Button, Modal, Form, Input, Select, Space, Tag, Popconfirm,
-  message, Switch, Card, Typography, InputNumber, Tooltip, Alert, Divider, Empty,
+  message, Switch, Card, Typography, Tooltip, Alert, Divider, Empty, Row, Col,
 } from 'antd';
 import {
-  PlusOutlined, EditOutlined, DeleteOutlined, PoweroffOutlined,
+  PlusOutlined, EditOutlined, DeleteOutlined,
   ThunderboltOutlined, ClockCircleOutlined, GlobalOutlined,
-  CopyOutlined, SettingOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useTriggerStore } from '@/store/useTriggerStore';
@@ -280,30 +280,34 @@ export default function TriggersPage() {
         </Button>
       </div>
 
-      <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         {typeConfigs.map((tc) => (
-          <Card key={tc.type} size="small" style={{ flex: 1, cursor: 'pointer' }} onClick={() => { form.resetFields(); handleTypeChange(tc.type); handleOpenModal(); }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-              {tc.icon}
-              <div>
-                <div style={{ fontWeight: 600 }}>{tc.title}</div>
-                <div style={{ fontSize: 12, color: '#888' }}>{tc.description}</div>
+          <Col xs={24} sm={12} md={8} key={tc.type}>
+            <Card size="small" style={{ cursor: 'pointer', height: '100%' }} onClick={() => { form.resetFields(); handleTypeChange(tc.type); handleOpenModal(); }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                {tc.icon}
+                <div>
+                  <div style={{ fontWeight: 600 }}>{tc.title}</div>
+                  <div style={{ fontSize: 12, color: '#888' }}>{tc.description}</div>
+                </div>
               </div>
-            </div>
-            <Paragraph
-              copyable={{ text: JSON.stringify(tc.example) }}
-              style={{ fontSize: 12, marginBottom: 0, background: '#fafafa', padding: '4px 8px', borderRadius: 4 }}
-            >
-              <Text code>{JSON.stringify(tc.example)}</Text>
-            </Paragraph>
-          </Card>
+              <Paragraph
+                copyable={{ text: JSON.stringify(tc.example) }}
+                style={{ fontSize: 12, marginBottom: 0, background: '#fafafa', padding: '4px 8px', borderRadius: 4 }}
+              >
+                <Text code>{JSON.stringify(tc.example)}</Text>
+              </Paragraph>
+            </Card>
+          </Col>
         ))}
-      </div>
+      </Row>
 
       <Table<TriggerDef>
         columns={columns}
         dataSource={triggers}
         rowKey="id"
+        pagination={{ pageSize: 10, showSizeChanger: true, showTotal: t => `共 ${t} 条触发规则` }}
+        scroll={{ x: 1100 }}
         locale={{
           emptyText: (
             <Empty

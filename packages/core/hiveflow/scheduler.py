@@ -1,16 +1,17 @@
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 import asyncio
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any
 
 try:
     from . import ECM, Capability
     from .bus import EventBus
 except ImportError:
-    from hiveflow import ECM, Capability
     from bus import EventBus
+
+    from hiveflow import ECM, Capability
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +20,14 @@ PRIORITY_ORDER = {"critical": 0, "high": 1, "normal": 2, "low": 3, "background":
 
 class SelectionStrategy(ABC):
     @abstractmethod
-    async def select(self, ecm: ECM, capabilities: Dict[str, Capability],
-                     worker_queues: Dict[str, Any]) -> List[str]: ...
-    async def start(self) -> None: pass
-    async def stop(self) -> None: pass
+    async def select(
+        self, ecm: ECM, capabilities: dict[str, Capability], worker_queues: dict[str, Any]
+    ) -> list[str]: ...
+    async def start(self) -> None:
+        pass
+
+    async def stop(self) -> None:
+        pass
 
 
 class LeastLoadedStrategy(SelectionStrategy):
@@ -34,7 +39,7 @@ class LeastLoadedStrategy(SelectionStrategy):
                 eligible.append((aid, cap))
         if not eligible:
             return []
-        eligible.sort(key=lambda x: (x[1].load + x[1].pending_tasks) / x[1].weight if x[1].weight > 0 else float('inf'))
+        eligible.sort(key=lambda x: (x[1].load + x[1].pending_tasks) / x[1].weight if x[1].weight > 0 else float("inf"))
         return [aid for aid, _ in eligible]
 
 
@@ -46,20 +51,21 @@ class AuctionStrategy(SelectionStrategy):
     async def select(self, ecm, capabilities, worker_queues):
         required = set(ecm.required_skills)
         eligible = {
-            aid: cap for aid, cap in capabilities.items()
+            aid: cap
+            for aid, cap in capabilities.items()
             if cap.skills & required and cap.state == "running" and aid in worker_queues
         }
         if not eligible:
             return []
 
         auction_topic = f"auction.reply.{ecm.intent_id}"
-        bids: Dict[str, float] = {}
+        bids: dict[str, float] = {}
         bid_event = asyncio.Event()
 
         async def bid_collector(msg: ECM):
             agent_id = msg.emitter
             if agent_id in eligible:
-                bid_value = msg.payload.get("bid", float('inf'))
+                bid_value = msg.payload.get("bid", float("inf"))
                 if agent_id not in bids or bid_value < bids[agent_id]:
                     bids[agent_id] = bid_value
                 if len(bids) >= len(eligible):
@@ -67,10 +73,17 @@ class AuctionStrategy(SelectionStrategy):
 
         sub_id = await self.bus.subscribe(auction_topic, bid_collector)
         try:
-            await self.bus.publish("task.auction", ECM(
-                trace_id=ecm.trace_id, intent="task.auction", intent_id=ecm.intent_id,
-                emitter="scheduler", payload={"required_skills": list(required)}, reply_to=auction_topic
-            ))
+            await self.bus.publish(
+                "task.auction",
+                ECM(
+                    trace_id=ecm.trace_id,
+                    intent="task.auction",
+                    intent_id=ecm.intent_id,
+                    emitter="scheduler",
+                    payload={"required_skills": list(required)},
+                    reply_to=auction_topic,
+                ),
+            )
             try:
                 await asyncio.wait_for(bid_event.wait(), timeout=self.auction_timeout)
             except asyncio.TimeoutError:
@@ -97,9 +110,9 @@ class GlobalLoadAwareStrategy(SelectionStrategy):
         self.local_weight = local_weight
         self.remote_weight = remote_weight
         self.load_freshness = load_freshness
-        self._remote_loads: Dict[str, float] = {}
-        self._last_update: Dict[str, float] = {}
-        self._sub_id: Optional[str] = None
+        self._remote_loads: dict[str, float] = {}
+        self._last_update: dict[str, float] = {}
+        self._sub_id: str | None = None
 
     async def start(self) -> None:
         if self._sub_id is None:
@@ -124,7 +137,7 @@ class GlobalLoadAwareStrategy(SelectionStrategy):
             if cap.skills & required and cap.state == "running" and aid in worker_queues:
                 remote_load = self._remote_loads.get(aid, 0.0)
                 if aid in self._last_update and (now - self._last_update[aid]) > self.load_freshness:
-                    remote_load = float('inf')
+                    remote_load = float("inf")
                 composite = self.local_weight * (cap.load + cap.pending_tasks) + self.remote_weight * remote_load
                 eligible.append((aid, composite))
         if not eligible:
@@ -142,7 +155,7 @@ class SchedulerConfig:
 
 class Scheduler(ABC):
     @abstractmethod
-    async def register_worker(self, worker: Optional[Any], cap: Capability) -> None: ...
+    async def register_worker(self, worker: Any | None, cap: Capability) -> None: ...
     @abstractmethod
     async def bind_worker(self, agent_id: str, worker: Any) -> None: ...
     @abstractmethod
@@ -156,14 +169,14 @@ class Scheduler(ABC):
 
 
 class InProcessScheduler(Scheduler):
-    def __init__(self, bus: EventBus, config: SchedulerConfig, strategy: Optional[SelectionStrategy] = None):
+    def __init__(self, bus: EventBus, config: SchedulerConfig, strategy: SelectionStrategy | None = None):
         self.bus = bus
         self.config = config
         self._lock = asyncio.Lock()
-        self._worker_queues: Dict[str, Any] = {}
-        self._capabilities: Dict[str, Capability] = {}
+        self._worker_queues: dict[str, Any] = {}
+        self._capabilities: dict[str, Capability] = {}
         self.strategy = strategy or self._default_strategy()
-        self._cap_sync_sub_id: Optional[str] = None
+        self._cap_sync_sub_id: str | None = None
         self._strategy_started = False
 
     def _default_strategy(self):
@@ -193,18 +206,25 @@ class InProcessScheduler(Scheduler):
                 async with self._lock:
                     self._capabilities.pop(agent_id, None)
                     self._worker_queues.pop(agent_id, None)
+
         self._cap_sync_sub_id = await self.bus.subscribe("hiveflow:cap_sync", handle)
 
-    async def register_worker(self, worker: Optional[Any], cap: Capability):
+    async def register_worker(self, worker: Any | None, cap: Capability):
         async with self._lock:
             self._capabilities[cap.agent_id] = cap
             if worker is not None:
                 self._worker_queues[cap.agent_id] = worker
         if type(self.bus).__name__ == "RedisEventBus":
-            await self.bus.publish("hiveflow:cap_sync", ECM(
-                trace_id=cap.agent_id, intent="agent.registered", intent_id="", emitter=cap.agent_id,
-                payload={"capability": cap.__dict__}
-            ))
+            await self.bus.publish(
+                "hiveflow:cap_sync",
+                ECM(
+                    trace_id=cap.agent_id,
+                    intent="agent.registered",
+                    intent_id="",
+                    emitter=cap.agent_id,
+                    payload={"capability": cap.__dict__},
+                ),
+            )
 
     async def bind_worker(self, agent_id: str, worker: Any):
         async with self._lock:
@@ -217,10 +237,16 @@ class InProcessScheduler(Scheduler):
             self._worker_queues.pop(agent_id, None)
             self._capabilities.pop(agent_id, None)
         if type(self.bus).__name__ == "RedisEventBus":
-            await self.bus.publish("hiveflow:cap_sync", ECM(
-                trace_id=agent_id, intent="agent.unregistered", intent_id="", emitter=agent_id,
-                payload={"agent_id": agent_id}
-            ))
+            await self.bus.publish(
+                "hiveflow:cap_sync",
+                ECM(
+                    trace_id=agent_id,
+                    intent="agent.unregistered",
+                    intent_id="",
+                    emitter=agent_id,
+                    payload={"agent_id": agent_id},
+                ),
+            )
 
     async def set_strategy(self, new_strategy: SelectionStrategy):
         """安全替换策略，停止旧策略避免资源泄漏"""
@@ -242,7 +268,6 @@ class InProcessScheduler(Scheduler):
             if not candidates:
                 await self.bus.complete_intent(ecm.intent_id, success=False)
                 return False
-            last_error = None
             for agent_id in candidates:
                 worker = workers.get(agent_id)
                 if not worker:
@@ -251,10 +276,10 @@ class InProcessScheduler(Scheduler):
                     await worker.assign_task(ecm)
                     return True
                 except RuntimeError as e:
-                    last_error = e
+                    logger.debug(f"Failed to assign task to {agent_id}: {e}")
                     continue
-                except Exception as e:
-                    last_error = e
+                except Exception:
+                    logger.exception(f"Unexpected error assigning task to {agent_id}")
                     continue
             await self.bus.complete_intent(ecm.intent_id, success=False)
             return False

@@ -13,29 +13,31 @@ Includes:
 - Calendar: Calendar management
 - API Client: REST API integration
 """
-import json
+
 import logging
 import os
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 class PluginCategory(str, Enum):
     """Plugin categories."""
-    DATA = "data"           # Data sources (DB, file, API)
-    TOOLS = "tools"         # Utility tools (code, search, email)
+
+    DATA = "data"  # Data sources (DB, file, API)
+    TOOLS = "tools"  # Utility tools (code, search, email)
     COMMUNICATION = "communication"  # Email, calendar, messaging
     DEVELOPMENT = "development"  # Git, CI/CD, code tools
-    AI = "ai"              # AI services
+    AI = "ai"  # AI services
     CUSTOM = "custom"
 
 
 @dataclass
 class PluginSpec:
     """A complete plugin specification for the marketplace."""
+
     plugin_id: str
     name: str
     description: str
@@ -44,17 +46,17 @@ class PluginSpec:
     author: str = "HiveFlow"
     transport: str = "stdio"
     command: str = ""
-    args: List[str] = field(default_factory=list)
-    env_keys: List[str] = field(default_factory=list)  # Required env vars
-    tools: List[Dict[str, str]] = field(default_factory=list)  # Tool descriptions
+    args: list[str] = field(default_factory=list)
+    env_keys: list[str] = field(default_factory=list)  # Required env vars
+    tools: list[dict[str, str]] = field(default_factory=list)  # Tool descriptions
     icon: str = ""  # Emoji or icon
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     documentation: str = ""
     rating: float = 0.0
     downloads: int = 0
     is_built_in: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "plugin_id": self.plugin_id,
             "name": self.name,
@@ -79,47 +81,49 @@ class PluginSpec:
 class PluginMarketplace:
     """
     Marketplace of pre-built MCP plugins.
-    
+
     Usage:
         marketplace = PluginMarketplace()
-        
+
         # List all plugins
         plugins = marketplace.list_plugins()
-        
+
         # Search plugins
         plugins = marketplace.search_plugins("file")
-        
+
         # Get plugin by ID
         plugin = marketplace.get_plugin("filesystem")
-        
+
         # Install plugin to MCPPluginManager
         await marketplace.install_plugin("filesystem", plugin_manager)
     """
 
     def __init__(self):
-        self._plugins: Dict[str, PluginSpec] = {}
+        self._plugins: dict[str, PluginSpec] = {}
         self._register_built_in_plugins()
 
-    def list_plugins(self, category: Optional[PluginCategory] = None) -> List[PluginSpec]:
+    def list_plugins(self, category: PluginCategory | None = None) -> list[PluginSpec]:
         """List all available plugins, optionally filtered by category."""
         plugins = list(self._plugins.values())
         if category:
             plugins = [p for p in plugins if p.category == category]
         return sorted(plugins, key=lambda p: p.downloads, reverse=True)
 
-    def get_plugin(self, plugin_id: str) -> Optional[PluginSpec]:
+    def get_plugin(self, plugin_id: str) -> PluginSpec | None:
         """Get a plugin by ID."""
         return self._plugins.get(plugin_id)
 
-    def search_plugins(self, query: str) -> List[PluginSpec]:
+    def search_plugins(self, query: str) -> list[PluginSpec]:
         """Search plugins by name, description, tags, or tools."""
         query_lower = query.lower()
         results = []
         for plugin in self._plugins.values():
-            if (query_lower in plugin.name.lower() or
-                query_lower in plugin.description.lower() or
-                any(query_lower in tag.lower() for tag in plugin.tags) or
-                any(query_lower in t.get("name", "").lower() for t in plugin.tools)):
+            if (
+                query_lower in plugin.name.lower()
+                or query_lower in plugin.description.lower()
+                or any(query_lower in tag.lower() for tag in plugin.tags)
+                or any(query_lower in t.get("name", "").lower() for t in plugin.tools)
+            ):
                 results.append(plugin)
         return results
 
@@ -150,14 +154,14 @@ class PluginMarketplace:
         logger.info(f"Plugin installed from marketplace: {plugin_id}")
         return True
 
-    def get_categories(self) -> List[PluginCategory]:
+    def get_categories(self) -> dict[PluginCategory, int]:
         """Get all available categories with plugin counts."""
-        counts = {}
+        counts: dict[PluginCategory, int] = {}
         for plugin in self._plugins.values():
             counts[plugin.category] = counts.get(plugin.category, 0) + 1
         return counts
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get marketplace statistics."""
         return {
             "total_plugins": len(self._plugins),
@@ -206,7 +210,6 @@ class PluginMarketplace:
                 documentation="https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
                 downloads=15000,
             ),
-
             # 2. Web Search Plugin
             PluginSpec(
                 plugin_id="web-search",
@@ -226,7 +229,6 @@ class PluginMarketplace:
                 documentation="https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search",
                 downloads=12000,
             ),
-
             # 3. Database Plugin
             PluginSpec(
                 plugin_id="database",
@@ -247,7 +249,6 @@ class PluginMarketplace:
                 documentation="https://github.com/modelcontextprotocol/servers/tree/main/src/postgres",
                 downloads=8000,
             ),
-
             # 4. Code Execution Plugin
             PluginSpec(
                 plugin_id="code-executor",
@@ -268,7 +269,6 @@ class PluginMarketplace:
                 documentation="Execute code in a secure sandbox",
                 downloads=6000,
             ),
-
             # 5. Git Plugin
             PluginSpec(
                 plugin_id="git",
@@ -290,7 +290,6 @@ class PluginMarketplace:
                 documentation="https://github.com/modelcontextprotocol/servers/tree/main/src/git",
                 downloads=5000,
             ),
-
             # 6. Email Plugin
             PluginSpec(
                 plugin_id="email",
@@ -311,7 +310,6 @@ class PluginMarketplace:
                 documentation="Send and receive emails",
                 downloads=3000,
             ),
-
             # 7. Calendar Plugin
             PluginSpec(
                 plugin_id="calendar",
@@ -332,7 +330,6 @@ class PluginMarketplace:
                 documentation="Google Calendar integration",
                 downloads=2500,
             ),
-
             # 8. REST API Client Plugin
             PluginSpec(
                 plugin_id="api-client",
@@ -354,7 +351,6 @@ class PluginMarketplace:
                 documentation="Make HTTP requests",
                 downloads=7000,
             ),
-
             # 9. Knowledge Base / RAG Plugin (HiveFlow native)
             PluginSpec(
                 plugin_id="hiveflow-rag",
@@ -378,7 +374,6 @@ class PluginMarketplace:
                 downloads=1000,
                 is_built_in=True,
             ),
-
             # 10. Multi-Modal Plugin (HiveFlow native)
             PluginSpec(
                 plugin_id="hiveflow-multimodal",

@@ -56,6 +56,16 @@ async def list_marketplace_plugins(category: Optional[str] = None, q: Optional[s
     }
 
 
+@router.get("/marketplace/categories")
+async def list_categories():
+    """列出所有插件分类"""
+    from hiveflow import PluginMarketplace
+
+    marketplace = PluginMarketplace()
+    categories = marketplace.get_categories()
+    return {"categories": {c.value: n for c, n in categories.items()}}
+
+
 @router.get("/marketplace/{plugin_id}")
 async def get_marketplace_plugin(plugin_id: str):
     """获取插件详情"""
@@ -66,16 +76,6 @@ async def get_marketplace_plugin(plugin_id: str):
     if not plugin:
         raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found")
     return plugin.to_dict()
-
-
-@router.get("/marketplace/categories")
-async def list_categories():
-    """列出所有插件分类"""
-    from hiveflow import PluginMarketplace
-
-    marketplace = PluginMarketplace()
-    categories = marketplace.get_categories()
-    return {"categories": {c.value: n for c, n in categories.items()}}
 
 
 @router.get("/installed")
@@ -112,7 +112,17 @@ async def install_plugin(req: PluginInstallRequest):
     if not success:
         raise HTTPException(status_code=404, detail=f"Plugin '{req.plugin_id}' not found in marketplace")
 
-    return {"plugin_id": req.plugin_id, "status": "installed"}
+    registered_skills: list[str] = []
+    try:
+        registered_skills = await engine.auto_register_mcp_skills(req.plugin_id)
+    except Exception as exc:
+        logger.warning("Auto-register MCP skills failed for %s: %s", req.plugin_id, exc)
+
+    return {
+        "plugin_id": req.plugin_id,
+        "status": "installed",
+        "registered_skills": registered_skills,
+    }
 
 
 @router.post("/uninstall")

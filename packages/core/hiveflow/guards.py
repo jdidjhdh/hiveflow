@@ -7,16 +7,18 @@ Provides:
 These guards prevent prompt injection, XSS, data leakage, and ensure
 output conforms to expected schemas.
 """
+
 import json
 import logging
 import re
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 try:
-    from . import LLMClient, LLMMessage, MISSING
+    from . import LLMClient, LLMMessage
 except ImportError:
-    from hiveflow import LLMClient, LLMMessage, MISSING
+    from hiveflow import LLMClient, LLMMessage
 
 logger = logging.getLogger(__name__)
 
@@ -70,10 +72,10 @@ class InputGuard:
     def __init__(
         self,
         max_length: int = 10000,
-        blocked_patterns: Optional[List[str]] = None,
-        llm_client: Optional[LLMClient] = None,
+        blocked_patterns: list[str] | None = None,
+        llm_client: LLMClient | None = None,
         llm_model: str = "",
-        custom_validators: Optional[List[Callable[[str], InputGuardResult]]] = None,
+        custom_validators: list[Callable[[str], InputGuardResult]] | None = None,
     ):
         self.max_length = max_length
         self.llm_client = llm_client
@@ -82,7 +84,7 @@ class InputGuard:
 
         # Compile regex patterns
         patterns = blocked_patterns if blocked_patterns is not None else DEFAULT_INJECTION_PATTERNS
-        self._compiled_patterns: List[re.Pattern] = []
+        self._compiled_patterns: list[re.Pattern] = []
         for pattern in patterns:
             try:
                 self._compiled_patterns.append(re.compile(pattern))
@@ -207,6 +209,7 @@ class InputGuard:
 
 # ======================== OutputValidator ========================
 
+
 @dataclass
 class OutputValidationResult:
     passed: bool
@@ -234,12 +237,12 @@ class OutputValidator:
     def __init__(
         self,
         max_length: int = 50000,
-        allowed_types: Optional[type] = None,
-        json_schema: Optional[Dict[str, Any]] = None,
-        llm_client: Optional[LLMClient] = None,
+        allowed_types: type | None = None,
+        json_schema: dict[str, Any] | None = None,
+        llm_client: LLMClient | None = None,
         llm_model: str = "",
         sanitize_html: bool = True,
-        custom_validators: Optional[List[Callable[[Any], OutputValidationResult]]] = None,
+        custom_validators: list[Callable[[Any], OutputValidationResult]] | None = None,
     ):
         self.max_length = max_length
         self.allowed_types = allowed_types
@@ -249,7 +252,7 @@ class OutputValidator:
         self.sanitize_html = sanitize_html
         self.custom_validators = custom_validators or []
 
-    def validate(self, output: Any, expected_type: Optional[type] = None) -> OutputValidationResult:
+    def validate(self, output: Any, expected_type: type | None = None) -> OutputValidationResult:
         """Synchronously validate output."""
         allowed = expected_type or self.allowed_types
 
@@ -365,7 +368,7 @@ class OutputValidator:
         return text
 
     @staticmethod
-    def _validate_json_schema(data: Any, schema: Dict[str, Any]) -> bool:
+    def _validate_json_schema(data: Any, schema: dict[str, Any]) -> bool:
         """Basic JSON schema validation (type + required fields)."""
         if schema.get("type") == "object" and isinstance(data, dict):
             required = schema.get("required", [])

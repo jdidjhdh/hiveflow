@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
   Table, Button, Modal, Form, Input, Select, Space, Tag, Popconfirm,
-  message, Tabs, Card, Descriptions, InputNumber, Switch, Alert, Spin,
+  message, Tabs, Card, InputNumber, Alert, Spin,
 } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, ApiOutlined,

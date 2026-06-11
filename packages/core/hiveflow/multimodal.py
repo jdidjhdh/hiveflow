@@ -7,25 +7,26 @@ Provides unified interface for:
 
 Integrates with LLM clients and can be used as MCP tools.
 """
+
 import base64
 import hashlib
 import io
-import json
 import logging
 import os
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 # ======================== Multi-Modal Types ========================
 
+
 class MediaType(str, Enum):
     """Supported media types."""
+
     IMAGE = "image"
     AUDIO = "audio"
     VIDEO = "video"
@@ -35,10 +36,11 @@ class MediaType(str, Enum):
 @dataclass
 class MediaContent:
     """A piece of media content."""
+
     media_type: MediaType
-    data: Union[str, bytes]  # File path or raw bytes
+    data: str | bytes  # File path or raw bytes
     mime_type: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_base64(self) -> str:
         """Convert to base64 string."""
@@ -56,64 +58,65 @@ class MediaContent:
 @dataclass
 class ImageAnalysisResult:
     """Result of image analysis."""
+
     description: str
-    labels: List[str] = field(default_factory=list)
-    objects: List[str] = field(default_factory=list)
+    labels: list[str] = field(default_factory=list)
+    objects: list[str] = field(default_factory=list)
     text: str = ""  # OCR result
     confidence: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class AudioTranscriptResult:
     """Result of audio transcription."""
+
     text: str
     language: str = ""
     duration_seconds: float = 0.0
-    words: List[Dict[str, Any]] = field(default_factory=list)  # Word-level timestamps
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    words: list[dict[str, Any]] = field(default_factory=list)  # Word-level timestamps
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class VideoSummaryResult:
     """Result of video summarization."""
+
     summary: str
-    key_frames: List[int] = field(default_factory=list)  # Frame indices
-    scenes: List[Dict[str, Any]] = field(default_factory=list)
+    key_frames: list[int] = field(default_factory=list)  # Frame indices
+    scenes: list[dict[str, Any]] = field(default_factory=list)
     duration_seconds: float = 0.0
     fps: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class ImageGenerationResult:
     """Result of image generation."""
-    image_data: Optional[bytes] = None
+
+    image_data: bytes | None = None
     image_url: str = ""
     prompt: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # ======================== Image Processor ========================
+
 
 class ImageProcessor(ABC):
     """Abstract base class for image processing."""
 
     @abstractmethod
-    async def analyze(self, image: MediaContent, prompt: str = "") -> ImageAnalysisResult:
-        ...
+    async def analyze(self, image: MediaContent, prompt: str = "") -> ImageAnalysisResult: ...
 
     @abstractmethod
-    async def ocr(self, image: MediaContent) -> str:
-        ...
+    async def ocr(self, image: MediaContent) -> str: ...
 
     @abstractmethod
-    async def generate(self, prompt: str, size: str = "1024x1024") -> ImageGenerationResult:
-        ...
+    async def generate(self, prompt: str, size: str = "1024x1024") -> ImageGenerationResult: ...
 
     @abstractmethod
-    async def embed(self, image: MediaContent) -> List[float]:
-        ...
+    async def embed(self, image: MediaContent) -> list[float]: ...
 
 
 class OpenAIImageProcessor(ImageProcessor):
@@ -121,7 +124,7 @@ class OpenAIImageProcessor(ImageProcessor):
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         vision_model: str = "gpt-4o",
         image_model: str = "dall-e-3",
     ):
@@ -134,6 +137,7 @@ class OpenAIImageProcessor(ImageProcessor):
         if self._client is None:
             try:
                 from openai import AsyncOpenAI
+
                 self._client = AsyncOpenAI(api_key=self.api_key)
             except ImportError:
                 raise ImportError("openai>=1.0.0 is required for OpenAIImageProcessor")
@@ -148,10 +152,13 @@ class OpenAIImageProcessor(ImageProcessor):
         response = await client.chat.completions.create(
             model=self.vision_model,
             messages=[
-                {"role": "user", "content": [
-                    {"type": "text", "text": user_prompt},
-                    {"type": "image_url", "image_url": {"url": data_url}},
-                ]},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_prompt},
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                },
             ],
             max_tokens=1024,
         )
@@ -168,10 +175,12 @@ class OpenAIImageProcessor(ImageProcessor):
 
     async def ocr(self, image: MediaContent) -> str:
         """Extract text from image using vision model."""
-        return (await self.analyze(
-            image,
-            "Extract all text from this image. Return only the text, nothing else.",
-        )).description
+        return (
+            await self.analyze(
+                image,
+                "Extract all text from this image. Return only the text, nothing else.",
+            )
+        ).description
 
     async def generate(self, prompt: str, size: str = "1024x1024") -> ImageGenerationResult:
         """Generate image from text prompt using DALL-E."""
@@ -195,7 +204,7 @@ class OpenAIImageProcessor(ImageProcessor):
             },
         )
 
-    async def embed(self, image: MediaContent) -> List[float]:
+    async def embed(self, image: MediaContent) -> list[float]:
         """Generate image embedding (simulated for now)."""
         # OpenAI doesn't have a dedicated image embedding API yet
         # Use vision model to describe image, then embed the description
@@ -208,7 +217,7 @@ class MockImageProcessor(ImageProcessor):
     """Mock image processor for testing."""
 
     def __init__(self):
-        self._mock_descriptions: Dict[str, str] = {}
+        self._mock_descriptions: dict[str, str] = {}
 
     def set_mock_description(self, image_hash: str, description: str):
         self._mock_descriptions[image_hash] = description
@@ -238,26 +247,24 @@ class MockImageProcessor(ImageProcessor):
             metadata={"mock": True, "size": size},
         )
 
-    async def embed(self, image: MediaContent) -> List[float]:
+    async def embed(self, image: MediaContent) -> list[float]:
         return [0.1] * 128
 
 
 # ======================== Audio Processor ========================
 
+
 class AudioProcessor(ABC):
     """Abstract base class for audio processing."""
 
     @abstractmethod
-    async def transcribe(self, audio: MediaContent, language: str = "") -> AudioTranscriptResult:
-        ...
+    async def transcribe(self, audio: MediaContent, language: str = "") -> AudioTranscriptResult: ...
 
     @abstractmethod
-    async def translate(self, audio: MediaContent, target_language: str = "en") -> AudioTranscriptResult:
-        ...
+    async def translate(self, audio: MediaContent, target_language: str = "en") -> AudioTranscriptResult: ...
 
     @abstractmethod
-    async def text_to_speech(self, text: str, voice: str = "") -> bytes:
-        ...
+    async def text_to_speech(self, text: str, voice: str = "") -> bytes: ...
 
 
 class OpenAIAudioProcessor(AudioProcessor):
@@ -265,7 +272,7 @@ class OpenAIAudioProcessor(AudioProcessor):
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         stt_model: str = "whisper-1",
         tts_model: str = "tts-1",
         tts_voice: str = "alloy",
@@ -280,6 +287,7 @@ class OpenAIAudioProcessor(AudioProcessor):
         if self._client is None:
             try:
                 from openai import AsyncOpenAI
+
                 self._client = AsyncOpenAI(api_key=self.api_key)
             except ImportError:
                 raise ImportError("openai>=1.0.0 is required for OpenAIAudioProcessor")
@@ -296,7 +304,7 @@ class OpenAIAudioProcessor(AudioProcessor):
         else:
             audio_file = open(audio.data, "rb")
 
-        kwargs: Dict[str, Any] = {
+        kwargs: dict[str, Any] = {
             "model": self.stt_model,
             "file": audio_file,
             "response_format": "verbose_json",
@@ -309,7 +317,7 @@ class OpenAIAudioProcessor(AudioProcessor):
         return AudioTranscriptResult(
             text=response.text,
             language=language or response.language or "",
-            duration_seconds=response.duration if hasattr(response, 'duration') else 0,
+            duration_seconds=response.duration if hasattr(response, "duration") else 0,
             metadata={"model": self.stt_model},
         )
 
@@ -369,15 +377,16 @@ class MockAudioProcessor(AudioProcessor):
 
 # ======================== Video Processor ========================
 
+
 class VideoProcessor(ABC):
     """Abstract base class for video processing."""
 
     @abstractmethod
-    async def extract_frames(self, video: MediaContent, max_frames: int = 10) -> List[bytes]:
-        ...
+    async def extract_frames(self, video: MediaContent, max_frames: int = 10) -> list[bytes]: ...
 
-    async def summarize(self, video: MediaContent, image_processor: Optional[ImageProcessor] = None) -> VideoSummaryResult:
-        ...
+    async def summarize(
+        self, video: MediaContent, image_processor: ImageProcessor | None = None
+    ) -> VideoSummaryResult: ...
 
 
 class OpenAIVideoProcessor(VideoProcessor):
@@ -386,26 +395,24 @@ class OpenAIVideoProcessor(VideoProcessor):
     def __init__(self):
         pass
 
-    async def extract_frames(self, video: MediaContent, max_frames: int = 10) -> List[bytes]:
+    async def extract_frames(self, video: MediaContent, max_frames: int = 10) -> list[bytes]:
         """Extract key frames from video."""
-        try:
-            import cv2
-            return self._extract_frames_opencv(video, max_frames)
-        except ImportError:
-            try:
-                from moviepy import VideoFileClip
-                return self._extract_frames_moviepy(video, max_frames)
-            except ImportError:
-                raise ImportError("opencv-python or moviepy is required for video processing")
+        import importlib.util
 
-    def _extract_frames_opencv(self, video: MediaContent, max_frames: int) -> List[bytes]:
+        if importlib.util.find_spec("cv2") is not None:
+            return self._extract_frames_opencv(video, max_frames)
+        if importlib.util.find_spec("moviepy") is not None:
+            return self._extract_frames_moviepy(video, max_frames)
+        raise ImportError("opencv-python or moviepy is required for video processing")
+
+    def _extract_frames_opencv(self, video: MediaContent, max_frames: int) -> list[bytes]:
         """Extract frames using OpenCV."""
         import cv2
-        import numpy as np
 
         if isinstance(video.data, bytes):
             # Write to temp file
             import tempfile
+
             with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
                 f.write(video.data)
                 video_path = f.name
@@ -433,13 +440,15 @@ class OpenAIVideoProcessor(VideoProcessor):
         video.metadata["total_frames"] = total_frames
         return frames
 
-    def _extract_frames_moviepy(self, video: MediaContent, max_frames: int) -> List[bytes]:
+    def _extract_frames_moviepy(self, video: MediaContent, max_frames: int) -> list[bytes]:
         """Extract frames using moviepy."""
-        from moviepy import VideoFileClip
         import io
+
+        from moviepy import VideoFileClip
 
         if isinstance(video.data, bytes):
             import tempfile
+
             with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
                 f.write(video.data)
                 video_path = f.name
@@ -456,6 +465,7 @@ class OpenAIVideoProcessor(VideoProcessor):
             if t < duration:
                 frame = clip.get_frame(t)
                 from PIL import Image
+
                 img = Image.fromarray(frame)
                 buf = io.BytesIO()
                 img.save(buf, format="JPEG", quality=80)
@@ -464,7 +474,7 @@ class OpenAIVideoProcessor(VideoProcessor):
         clip.close()
         return frames
 
-    async def summarize(self, video: MediaContent, image_processor: Optional[ImageProcessor] = None) -> VideoSummaryResult:
+    async def summarize(self, video: MediaContent, image_processor: ImageProcessor | None = None) -> VideoSummaryResult:
         """Summarize video by analyzing key frames."""
         if image_processor is None:
             image_processor = MockImageProcessor()
@@ -499,10 +509,10 @@ class OpenAIVideoProcessor(VideoProcessor):
 class MockVideoProcessor(VideoProcessor):
     """Mock video processor for testing."""
 
-    async def extract_frames(self, video: MediaContent, max_frames: int = 10) -> List[bytes]:
+    async def extract_frames(self, video: MediaContent, max_frames: int = 10) -> list[bytes]:
         return [b"fake_frame_" + str(i).encode() for i in range(min(max_frames, 3))]
 
-    async def summarize(self, video: MediaContent, image_processor: Optional[ImageProcessor] = None) -> VideoSummaryResult:
+    async def summarize(self, video: MediaContent, image_processor: ImageProcessor | None = None) -> VideoSummaryResult:
         return VideoSummaryResult(
             summary="Mock video summary: The video shows various scenes with different content.",
             key_frames=[0, 1, 2],
@@ -514,29 +524,30 @@ class MockVideoProcessor(VideoProcessor):
 
 # ======================== MultiModal Pipeline ========================
 
+
 class MultiModalPipeline:
     """
     Unified multi-modal processing pipeline.
-    
+
     Usage:
         pipeline = MultiModalPipeline(
             image_processor=OpenAIImageProcessor(),
             audio_processor=OpenAIAudioProcessor(),
             video_processor=OpenAIVideoProcessor(),
         )
-        
+
         # Image analysis
         result = await pipeline.analyze_image(MediaContent(
             media_type=MediaType.IMAGE,
             data="path/to/image.jpg",
         ))
-        
+
         # Audio transcription
         result = await pipeline.transcribe_audio(MediaContent(
             media_type=MediaType.AUDIO,
             data="path/to/audio.wav",
         ))
-        
+
         # Video summary
         result = await pipeline.summarize_video(MediaContent(
             media_type=MediaType.VIDEO,
@@ -546,9 +557,9 @@ class MultiModalPipeline:
 
     def __init__(
         self,
-        image_processor: Optional[ImageProcessor] = None,
-        audio_processor: Optional[AudioProcessor] = None,
-        video_processor: Optional[VideoProcessor] = None,
+        image_processor: ImageProcessor | None = None,
+        audio_processor: AudioProcessor | None = None,
+        video_processor: VideoProcessor | None = None,
     ):
         self.image_processor = image_processor or MockImageProcessor()
         self.audio_processor = audio_processor or MockAudioProcessor()
@@ -582,7 +593,7 @@ class MultiModalPipeline:
         """Summarize video content."""
         return await self.video_processor.summarize(video, self.image_processor)
 
-    async def extract_video_frames(self, video: MediaContent, max_frames: int = 10) -> List[bytes]:
+    async def extract_video_frames(self, video: MediaContent, max_frames: int = 10) -> list[bytes]:
         """Extract frames from video."""
         return await self.video_processor.extract_frames(video, max_frames)
 

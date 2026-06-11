@@ -3,15 +3,16 @@
 LLM-driven intent parser that converts natural language user requests
 into structured TaskGraph definitions that the orchestrator can execute.
 """
+
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
-    from . import LLMClient, LLMMessage, TaskGraph, LLMToolDefinition
+    from . import LLMClient, LLMMessage, TaskGraph
 except ImportError:
-    from hiveflow import LLMClient, LLMMessage, TaskGraph, LLMToolDefinition
+    from hiveflow import LLMClient, LLMMessage, TaskGraph
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +20,14 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ParsedIntent:
     """Result of intent parsing."""
+
     intent_type: str  # "single_task", "pipeline", "conditional", "loop", "unknown"
     description: str
-    nodes: List[Dict[str, Any]] = field(default_factory=list)
-    edges: List[Dict[str, Any]] = field(default_factory=list)
+    nodes: list[dict[str, Any]] = field(default_factory=list)
+    edges: list[dict[str, Any]] = field(default_factory=list)
     confidence: float = 0.0
     raw_response: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 INTENT_SYSTEM_PROMPT = """You are an intent parser for a multi-agent workflow orchestration system called HiveFlow.
@@ -77,14 +79,22 @@ class IntentParser:
         llm_client: LLMClient,
         model: str = "",
         system_prompt: str = "",
-        available_skills: Optional[List[str]] = None,
+        available_skills: list[str] | None = None,
     ):
         self.llm_client = llm_client
         self.model = model
         self.system_prompt = system_prompt or INTENT_SYSTEM_PROMPT
         self.available_skills = available_skills or [
-            "research", "write", "review", "analyze", "summarize",
-            "classify", "extract", "translate", "validate", "generate",
+            "research",
+            "write",
+            "review",
+            "analyze",
+            "summarize",
+            "classify",
+            "extract",
+            "translate",
+            "validate",
+            "generate",
         ]
 
         if self.available_skills:
@@ -131,7 +141,7 @@ class IntentParser:
             logger.error(f"Intent parsing failed: {e}")
             return ParsedIntent(
                 intent_type="unknown",
-                description=f"Failed to parse: {str(e)}",
+                description=f"Failed to parse: {e!s}",
                 confidence=0.0,
                 raw_response="",
             )
@@ -139,12 +149,12 @@ class IntentParser:
             logger.error(f"Intent parsing error: {e}")
             return ParsedIntent(
                 intent_type="unknown",
-                description=f"Error: {str(e)}",
+                description=f"Error: {e!s}",
                 confidence=0.0,
                 raw_response="",
             )
 
-    def to_task_graph(self, parsed: ParsedIntent) -> Optional[TaskGraph]:
+    def to_task_graph(self, parsed: ParsedIntent) -> TaskGraph | None:
         """Convert a ParsedIntent into a TaskGraph for execution."""
         if parsed.intent_type == "unknown" or not parsed.nodes:
             return None
@@ -154,7 +164,7 @@ class IntentParser:
         # Build task functions for each node
         for node in parsed.nodes:
             node_id = node["id"]
-            node_type = node.get("type", "task")
+            node.get("type", "task")
             skill = node.get("skill", "")
             label = node.get("label", node_id)
             config = node.get("config", {})

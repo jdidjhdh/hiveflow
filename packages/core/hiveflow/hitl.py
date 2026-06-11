@@ -7,48 +7,53 @@ Supports:
 - Interactive input (human provides data during execution)
 - Timeout handling (auto-proceed or fail on timeout)
 """
+
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Awaitable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 class HITLStatus(str, Enum):
     """Status of a human-in-the-loop gate."""
-    PENDING = "pending"       # Waiting for human response
-    APPROVED = "approved"     # Human approved
-    REJECTED = "rejected"     # Human rejected
-    MODIFIED = "modified"     # Human modified the content
-    TIMED_OUT = "timed_out"   # Timeout reached
-    CANCELLED = "cancelled"   # Human cancelled
+
+    PENDING = "pending"  # Waiting for human response
+    APPROVED = "approved"  # Human approved
+    REJECTED = "rejected"  # Human rejected
+    MODIFIED = "modified"  # Human modified the content
+    TIMED_OUT = "timed_out"  # Timeout reached
+    CANCELLED = "cancelled"  # Human cancelled
 
 
 class HITLAction(str, Enum):
     """Action type for HITL gate."""
-    APPROVAL = "approval"     # Simple yes/no approval
-    REVIEW = "review"         # Review and modify
-    INPUT = "input"           # Request human input
+
+    APPROVAL = "approval"  # Simple yes/no approval
+    REVIEW = "review"  # Review and modify
+    INPUT = "input"  # Request human input
     CONFIRMATION = "confirmation"  # Confirm understanding
 
 
 @dataclass
 class HITLGate:
     """A point in the workflow where human intervention is required."""
+
     gate_id: str
     workflow_id: str
     node_id: str
     action: HITLAction
-    prompt: str               # What to ask the human
-    context: Dict[str, Any]   # Context data to show the human
+    prompt: str  # What to ask the human
+    context: dict[str, Any]  # Context data to show the human
     status: HITLStatus = HITLStatus.PENDING
-    human_response: Optional[Any] = None
+    human_response: Any | None = None
     human_comment: str = ""
     created_at: float = field(default_factory=time.time)
-    responded_at: Optional[float] = None
+    responded_at: float | None = None
     timeout_seconds: float = 300.0  # 5 minutes default
     on_timeout: str = "fail"  # "fail", "approve", "skip"
 
@@ -81,9 +86,9 @@ class HITLManager:
     """
 
     def __init__(self):
-        self._gates: Dict[str, HITLGate] = {}
-        self._waiters: Dict[str, asyncio.Event] = {}
-        self._callbacks: List[Callable[[HITLGate], Awaitable[None]]] = []
+        self._gates: dict[str, HITLGate] = {}
+        self._waiters: dict[str, asyncio.Event] = {}
+        self._callbacks: list[Callable[[HITLGate], Awaitable[None]]] = []
 
     async def create_gate(
         self,
@@ -91,12 +96,13 @@ class HITLManager:
         node_id: str,
         action: HITLAction,
         prompt: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         timeout_seconds: float = 300.0,
         on_timeout: str = "fail",
     ) -> HITLGate:
         """Create a new HITL gate."""
         import uuid
+
         gate = HITLGate(
             gate_id=str(uuid.uuid4())[:12],
             workflow_id=workflow_id,
@@ -124,10 +130,10 @@ class HITLManager:
         self,
         gate_id: str,
         approved: bool = True,
-        modified_data: Optional[Any] = None,
+        modified_data: Any | None = None,
         comment: str = "",
-        input_data: Optional[Any] = None,
-    ) -> Optional[HITLGate]:
+        input_data: Any | None = None,
+    ) -> HITLGate | None:
         """Record a human response to a gate."""
         gate = self._gates.get(gate_id)
         if not gate:
@@ -145,8 +151,12 @@ class HITLManager:
             gate.status = HITLStatus.APPROVED if approved else HITLStatus.REJECTED
             gate.human_response = approved
         elif gate.action == HITLAction.REVIEW:
-            gate.status = HITLStatus.MODIFIED if modified_data is not None else HITLStatus.APPROVED
-            gate.human_response = modified_data
+            if not approved:
+                gate.status = HITLStatus.REJECTED
+                gate.human_response = None
+            else:
+                gate.status = HITLStatus.MODIFIED if modified_data is not None else HITLStatus.APPROVED
+                gate.human_response = modified_data
         elif gate.action == HITLAction.INPUT:
             gate.status = HITLStatus.APPROVED
             gate.human_response = input_data
@@ -164,7 +174,7 @@ class HITLManager:
     async def wait_for_response(
         self,
         gate_id: str,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
     ) -> HITLGate:
         """Wait for a human response to a gate. Returns the gate with updated status."""
         gate = self._gates.get(gate_id)
@@ -196,14 +206,14 @@ class HITLManager:
 
         return gate
 
-    async def list_pending_gates(self, workflow_id: Optional[str] = None) -> List[HITLGate]:
+    async def list_pending_gates(self, workflow_id: str | None = None) -> list[HITLGate]:
         """List all pending HITL gates."""
         gates = [g for g in self._gates.values() if g.status == HITLStatus.PENDING]
         if workflow_id:
             gates = [g for g in gates if g.workflow_id == workflow_id]
         return sorted(gates, key=lambda g: g.created_at)
 
-    async def get_gate(self, gate_id: str) -> Optional[HITLGate]:
+    async def get_gate(self, gate_id: str) -> HITLGate | None:
         """Get a specific gate."""
         return self._gates.get(gate_id)
 
@@ -222,7 +232,7 @@ class HITLManager:
         """Register a callback for when gates are created."""
         self._callbacks.append(callback)
 
-    def get_gate_stats(self) -> Dict[str, Any]:
+    def get_gate_stats(self) -> dict[str, Any]:
         """Get statistics about HITL gates."""
         total = len(self._gates)
         pending = sum(1 for g in self._gates.values() if g.status == HITLStatus.PENDING)

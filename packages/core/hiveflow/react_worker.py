@@ -4,16 +4,18 @@ Reasoning-Acting-Observing worker that uses LLM to solve tasks through
 iterative tool use. Follows the ReAct paradigm:
   Thought -> Action -> Observation -> Thought -> ... -> Final Answer
 """
+
 import json
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 try:
-    from . import LLMClient, LLMMessage, LLMToolDefinition, LLMResponse
+    from . import LLMClient, LLMMessage, LLMToolDefinition
 except ImportError:
-    from hiveflow import LLMClient, LLMMessage, LLMToolDefinition, LLMResponse
+    from hiveflow import LLMClient, LLMMessage, LLMToolDefinition
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +23,11 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ReActTool:
     """A tool available to the ReActWorker."""
+
     name: str
     description: str
-    parameters: Dict[str, Any]  # JSON Schema
-    handler: Callable[[Dict[str, Any]], Any]  # Sync or async handler
+    parameters: dict[str, Any]  # JSON Schema
+    handler: Callable[[dict[str, Any]], Any]  # Sync or async handler
 
 
 REACT_SYSTEM_PROMPT = """You are a ReAct agent that solves tasks by reasoning and using tools.
@@ -47,7 +50,7 @@ Rules:
 class ReActWorker:
     """
     ReAct-style worker that uses LLM + tools to solve tasks.
-    
+
     Usage:
         worker = ReActWorker(llm_client=client, tools=[my_tool])
         result = await worker.execute(task="Research Python async patterns", max_iterations=10)
@@ -56,7 +59,7 @@ class ReActWorker:
     def __init__(
         self,
         llm_client: LLMClient,
-        tools: Optional[List[ReActTool]] = None,
+        tools: list[ReActTool] | None = None,
         system_prompt: str = "",
         model: str = "",
         max_iterations: int = 15,
@@ -66,10 +69,10 @@ class ReActWorker:
         self.system_prompt = system_prompt or REACT_SYSTEM_PROMPT
         self.model = model
         self.max_iterations = max_iterations
-        self._tool_map: Dict[str, ReActTool] = {t.name: t for t in self.tools}
-        self._iteration_history: List[Dict[str, Any]] = []
+        self._tool_map: dict[str, ReActTool] = {t.name: t for t in self.tools}
+        self._iteration_history: list[dict[str, Any]] = []
 
-    def _get_tool_definitions(self) -> List[LLMToolDefinition]:
+    def _get_tool_definitions(self) -> list[LLMToolDefinition]:
         return [
             LLMToolDefinition(
                 name=t.name,
@@ -79,7 +82,7 @@ class ReActWorker:
             for t in self.tools
         ]
 
-    async def _call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
+    async def _call_tool(self, tool_name: str, arguments: dict[str, Any]) -> Any:
         tool = self._tool_map.get(tool_name)
         if tool is None:
             return f"Error: tool '{tool_name}' not found"
@@ -89,28 +92,28 @@ class ReActWorker:
                 result = await result
             return result
         except Exception as e:
-            return f"Error: {str(e)}"
+            return f"Error: {e!s}"
 
     async def execute(
         self,
         task: str,
         max_iterations: int = 0,
         blackboard_put=None,  # Optional callback: (key, value) for writing results
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Execute a task using ReAct reasoning.
-        
+
         Args:
             task: The task description
             max_iterations: Override max iterations (0 = use default)
             blackboard_put: Optional callback (key, value) to write results to blackboard
-        
+
         Returns:
             Dict with 'answer', 'tool_calls', 'iterations', 'latency_ms'
         """
         start_time = time.monotonic()
         max_iter = max_iterations or self.max_iterations
-        tool_calls_made: List[Dict[str, Any]] = []
+        tool_calls_made: list[dict[str, Any]] = []
 
         messages = [
             LLMMessage(role="system", content=self.system_prompt),
@@ -128,11 +131,13 @@ class ReActWorker:
                 tools=self._get_tool_definitions() if self.tools else None,
             )
 
-            messages.append(LLMMessage(
-                role="assistant",
-                content=response.content,
-                tool_calls=response.tool_calls if response.tool_calls else None,
-            ))
+            messages.append(
+                LLMMessage(
+                    role="assistant",
+                    content=response.content,
+                    tool_calls=response.tool_calls if response.tool_calls else None,
+                )
+            )
 
             if response.tool_calls:
                 # Execute each tool call
@@ -144,27 +149,35 @@ class ReActWorker:
                         arguments = {}
 
                     observation = await self._call_tool(tool_name, arguments)
-                    observation_str = json.dumps(observation) if isinstance(observation, (dict, list)) else str(observation)
+                    observation_str = (
+                        json.dumps(observation) if isinstance(observation, (dict, list)) else str(observation)
+                    )
 
-                    messages.append(LLMMessage(
-                        role="tool",
-                        content=observation_str,
-                        tool_call_id=tc["id"],
-                    ))
+                    messages.append(
+                        LLMMessage(
+                            role="tool",
+                            content=observation_str,
+                            tool_call_id=tc["id"],
+                        )
+                    )
 
-                    tool_calls_made.append({
-                        "tool": tool_name,
-                        "arguments": arguments,
-                        "result": observation,
-                    })
+                    tool_calls_made.append(
+                        {
+                            "tool": tool_name,
+                            "arguments": arguments,
+                            "result": observation,
+                        }
+                    )
 
                     if blackboard_put:
                         await blackboard_put(f"tool_result.{tool_name}", observation)
 
-                self._iteration_history.append({
-                    "iteration": iteration + 1,
-                    "tool_calls": len(response.tool_calls),
-                })
+                self._iteration_history.append(
+                    {
+                        "iteration": iteration + 1,
+                        "tool_calls": len(response.tool_calls),
+                    }
+                )
                 continue
 
             # No tool calls = final answer
@@ -186,12 +199,14 @@ class ReActWorker:
 
 # ========== Built-in Tools ==========
 
+
 def create_read_blackboard_tool(blackboard_get):
     """Create a tool that reads from the blackboard.
-    
+
     Args:
         blackboard_get: async function(key) -> value
     """
+
     async def handler(args):
         key = args.get("key", "")
         if not key:
@@ -220,10 +235,11 @@ def create_read_blackboard_tool(blackboard_get):
 
 def create_write_blackboard_tool(blackboard_put):
     """Create a tool that writes to the blackboard.
-    
+
     Args:
         blackboard_put: async function(key, value) -> None
     """
+
     async def handler(args):
         key = args.get("key", "")
         value = args.get("value")
@@ -287,10 +303,11 @@ def create_http_request_tool():
 
 def create_search_tool(search_fn):
     """Create a tool that searches for information.
-    
+
     Args:
         search_fn: async function(query) -> List[Dict]
     """
+
     async def handler(args):
         query = args.get("query", "")
         if not query:
@@ -317,6 +334,7 @@ def create_search_tool(search_fn):
 
 def create_python_code_tool():
     """Create a tool that executes Python code safely (sandboxed)."""
+
     async def handler(args):
         code = args.get("code", "")
         if not code:
@@ -326,18 +344,47 @@ def create_python_code_tool():
 
         # Restricted execution: only allow safe builtins
         import builtins
+
         allowed_builtins = {
-            "len", "str", "int", "float", "list", "dict", "set", "tuple",
-            "range", "enumerate", "zip", "map", "filter", "sorted", "reversed",
-            "min", "max", "sum", "abs", "round", "bool", "type", "isinstance",
-            "print", "repr", "format", "join", "split", "strip", "replace",
-            "True", "False", "None",
+            "len",
+            "str",
+            "int",
+            "float",
+            "list",
+            "dict",
+            "set",
+            "tuple",
+            "range",
+            "enumerate",
+            "zip",
+            "map",
+            "filter",
+            "sorted",
+            "reversed",
+            "min",
+            "max",
+            "sum",
+            "abs",
+            "round",
+            "bool",
+            "type",
+            "isinstance",
+            "print",
+            "repr",
+            "format",
+            "join",
+            "split",
+            "strip",
+            "replace",
+            "True",
+            "False",
+            "None",
         }
         safe_builtins = {k: v for k, v in vars(builtins).items() if k in allowed_builtins}
-        
-        import math
+
         import datetime
         import json
+        import math
         import re
 
         safe_globals = {
@@ -378,7 +425,7 @@ def create_default_tools(
     blackboard_get=None,
     blackboard_put=None,
     search_fn=None,
-) -> List[ReActTool]:
+) -> list[ReActTool]:
     """Create a set of default tools for the ReActWorker."""
     tools = []
     if blackboard_get:

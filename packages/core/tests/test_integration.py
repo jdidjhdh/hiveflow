@@ -1,13 +1,15 @@
-import pytest
 import asyncio
-import time
-from typing import Any, Dict, Set
+
+import pytest
 
 from hiveflow import (
-    HiveFlow, HiveFlowConfig,
-    InProcessEventBus, InProcessScheduler, SchedulerConfig,
-    SecureBlackboard, MemoryBlackboard,
-    Cell, Worker, DAGOrchestrator, Capability, ECM, Expectation
+    ECM,
+    DAGOrchestrator,
+    Expectation,
+    HiveFlow,
+    HiveFlowConfig,
+    MemoryBlackboard,
+    SecureBlackboard,
 )
 
 
@@ -42,7 +44,6 @@ async def test_worker_blackboard_integration(tmp_path):
     hf = HiveFlow(config)
     await hf.start()
 
-    results = {}
 
     async def handler(ecm, view):
         # Read from upstream
@@ -52,7 +53,7 @@ async def test_worker_blackboard_integration(tmp_path):
         await view.put("worker_result", result)
         return result
 
-    worker = await hf.create_agent(
+    await hf.create_agent(
         agent_id="test-worker",
         skills={"process"},
         read_keys={"upstream_data"},
@@ -204,7 +205,7 @@ async def test_worker_error_propagation():
     async def failing_handler(ecm, view):
         raise ValueError("Simulated failure")
 
-    worker = await hf.create_agent(
+    await hf.create_agent(
         agent_id="failing-worker",
         skills={"fail"},
         read_keys=set(),
@@ -291,7 +292,7 @@ async def test_full_pipeline_with_expectation():
         await view.put("validated_result", data)
         return data
 
-    worker = await hf.create_agent(
+    await hf.create_agent(
         agent_id="validated-worker",
         skills={"validate"},
         read_keys=set(),

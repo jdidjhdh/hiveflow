@@ -24,28 +24,54 @@ jobs:
           python -m pip install --upgrade pip
           pip install build twine
 
-      - name: Build package
+      - name: Build hiveflow (core)
         run: |
           cd packages/core
           python -m build
 
-      - name: Check package
+      - name: Check core package
         run: |
           cd packages/core
           twine check dist/*
 
-      - name: Run tests
+      - name: Run core tests
         run: |
           cd packages/core
           pip install -e ".[dev]"
-          python -m pytest
+          python -m pytest --cov=hiveflow --cov-fail-under=60
 
-      - name: Publish to PyPI
+      - name: Publish hiveflow to PyPI
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           cd packages/core
+          twine upload dist/*
+
+      - name: Build hiveflow-agent
+        run: |
+          cd packages/agent
+          pip install -e ../core
+          python -m build
+
+      - name: Check agent package
+        run: |
+          cd packages/agent
+          twine check dist/*
+
+      - name: Run agent tests
+        run: |
+          cd packages/agent
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-timeout
+          python -m pytest tests/ --ignore=tests/test_real_llm.py --ignore=tests/test_llm_connection.py
+
+      - name: Publish hiveflow-agent to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          cd packages/agent
           twine upload dist/*
 
       - name: Create GitHub Release

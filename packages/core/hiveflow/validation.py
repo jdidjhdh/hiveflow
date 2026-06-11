@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict
+from typing import Any
 
 try:
     from . import Expectation
@@ -10,12 +10,14 @@ logger = logging.getLogger(__name__)
 
 try:
     import jsonschema
+
     _JSONSCHEMA_AVAILABLE = True
 except ImportError:
     _JSONSCHEMA_AVAILABLE = False
 
 try:
     from simpleeval import simple_eval
+
     _SIMPLEEVAL_AVAILABLE = True
 except ImportError:
     _SIMPLEEVAL_AVAILABLE = False

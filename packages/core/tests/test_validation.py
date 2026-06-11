@@ -1,5 +1,6 @@
 import pytest
-from hiveflow import ValidationPipeline, Expectation
+
+from hiveflow import Expectation, ValidationPipeline
 
 
 @pytest.fixture

@@ -1,24 +1,53 @@
 import { useState, useEffect } from 'react';
-import { Card, Form, Select, InputNumber, Slider, Switch, Button, Divider, App, Space, Alert } from 'antd';
-import { SaveOutlined, ExperimentOutlined } from '@ant-design/icons';
+import { Card, Form, Select, InputNumber, Slider, Switch, Button, App, Space, Alert, Input, Tag } from 'antd';
+import { SaveOutlined, RobotOutlined } from '@ant-design/icons';
 import { useEngineStore } from '@/store/useEngineStore';
-import { getWsManager } from '@/engine/ws/WsConnectionManager';
-import { API_BASE_URL } from '@/utils/api';
+import { useAgentRuntimeStore } from '@/store/useAgentRuntimeStore';
+import { getErrorMessage } from '@/utils/api';
 
 export default function SettingsPage() {
   const engine = useEngineStore().getEngine();
+  const engineMode = useEngineStore(s => s.mode);
   const config = engine.getConfig();
   const { message } = App.useApp();
-  const { connected, error } = useEngineStore();
+  const { error } = useEngineStore();
 
   const [strategy, setStrategy] = useState(config.strategy);
   const [auctionTimeout, setAuctionTimeout] = useState(config.auctionTimeout);
   const [failProbability, setFailProbability] = useState(config.failProbability);
   const [delayMin, setDelayMin] = useState(config.delayRange[0]);
   const [delayMax, setDelayMax] = useState(config.delayRange[1]);
-  const wsBaseUrl = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://');
-  const [wsUrl, setWsUrl] = useState(`${wsBaseUrl}/ws`);
-  const [connecting, setConnecting] = useState(false);
+  const runtimeMode = useAgentRuntimeStore(s => s.runtimeMode);
+  const agentLoading = useAgentRuntimeStore(s => s.loading);
+  const fetchRuntime = useAgentRuntimeStore(s => s.fetchRuntime);
+  const setRuntimeMode = useAgentRuntimeStore(s => s.setRuntimeMode);
+  const runQuery = useAgentRuntimeStore(s => s.runQuery);
+  const lastAnswer = useAgentRuntimeStore(s => s.lastAnswer);
+  const [agentQuery, setAgentQuery] = useState('');
+
+  useEffect(() => {
+    if (engineMode === 'real') fetchRuntime();
+  }, [engineMode, fetchRuntime]);
+
+  const handleRuntimeChange = async (checked: boolean) => {
+    const mode = checked ? 'agent' : 'core';
+    try {
+      await setRuntimeMode(mode);
+      message.success(`运行时已切换为 ${mode === 'agent' ? 'Agent 模式' : 'Core 模式'}`);
+    } catch (e) {
+      message.error(getErrorMessage(e));
+    }
+  };
+
+  const handleAgentQuery = async () => {
+    if (!agentQuery.trim()) return;
+    try {
+      await runQuery(agentQuery);
+      message.success('Agent 查询完成');
+    } catch (e) {
+      message.error(getErrorMessage(e));
+    }
+  };
 
   const handleSave = () => {
     engine.setConfig({
@@ -28,23 +57,6 @@ export default function SettingsPage() {
       delayRange: [delayMin, delayMax],
     });
     message.success('设置已保存');
-  };
-
-  const handleConnect = async () => {
-    setConnecting(true);
-    try {
-      await useEngineStore.getState().connect(wsUrl);
-      message.success('WebSocket 已连接');
-    } catch (e) {
-      message.error('连接失败: ' + String(e));
-    } finally {
-      setConnecting(false);
-    }
-  };
-
-  const handleDisconnect = () => {
-    useEngineStore.getState().disconnect();
-    message.info('已断开连接');
   };
 
   return (
@@ -61,6 +73,55 @@ export default function SettingsPage() {
           style={{ marginBottom: 16 }}
         />
       )}
+
+      <Card title="Agent 运行时" style={{ marginBottom: 16 }}>
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="Agent 模式启用 HiveMindApp（run_query / ReAct Skill），Core 模式仅使用 DAG 编排。"
+        />
+        <Form layout="vertical">
+          <Form.Item label="运行时模式">
+            <Switch
+              checked={runtimeMode === 'agent'}
+              onChange={handleRuntimeChange}
+              disabled={engineMode !== 'real'}
+              checkedChildren="Agent"
+              unCheckedChildren="Core"
+            />
+            {engineMode !== 'real' && (
+              <span style={{ marginLeft: 8, color: '#888', fontSize: 12 }}>需切换到真实模式</span>
+            )}
+            {runtimeMode === 'agent' && <Tag color="purple" style={{ marginLeft: 8 }}>HiveMindApp</Tag>}
+          </Form.Item>
+          {runtimeMode === 'agent' && engineMode === 'real' && (
+            <>
+              <Form.Item label="Agent 查询 (run_query)">
+                <Input.TextArea
+                  rows={3}
+                  value={agentQuery}
+                  onChange={e => setAgentQuery(e.target.value)}
+                  placeholder="输入自然语言任务..."
+                />
+              </Form.Item>
+              <Button
+                type="primary"
+                icon={<RobotOutlined />}
+                loading={agentLoading}
+                onClick={handleAgentQuery}
+              >
+                执行 Agent 查询
+              </Button>
+              {lastAnswer && (
+                <pre style={{ marginTop: 12, background: '#f5f5f5', padding: 12, borderRadius: 6, fontSize: 13 }}>
+                  {lastAnswer}
+                </pre>
+              )}
+            </>
+          )}
+        </Form>
+      </Card>
 
       <Card title="调度策略" style={{ marginBottom: 16 }}>
         <Form layout="vertical">

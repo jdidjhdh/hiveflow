@@ -1,17 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card, Row, Col, Button, Input, Modal, Form, Select,
-  Upload, Table, Tag, Space, Popconfirm, message, Empty,
-  Progress, Divider, Tabs, Alert, Statistic, Tooltip,
+  Upload, Table, Tag, Space, Popconfirm, message, Empty, Divider, Tabs, Alert,
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, EditOutlined, SearchOutlined,
-  UploadOutlined, FileTextOutlined, PlayCircleOutlined,
-  StopOutlined, FolderOpenOutlined, DatabaseOutlined,
+  UploadOutlined, FileTextOutlined, PlayCircleOutlined, DatabaseOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { KnowledgeBase, DocumentDef } from '@/types';
 import { useKnowledgeBaseStore } from '@/store/useKnowledgeBaseStore';
+import { useEngineStore } from '@/store/useEngineStore';
 
 const { Dragger } = Upload;
 
@@ -84,12 +83,12 @@ function KnowledgeBaseCard({
 function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
   const {
     addDocument, removeDocument, updateChunkConfig,
-    startEmbedding, searchDocuments, updateDocumentStatus,
+    startEmbedding, searchDocuments,
   } = useKnowledgeBaseStore();
   const [activeTab, setActiveTab] = useState('documents');
-  const [uploading, setUploading] = useState(false);
+  const [, setUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<ReturnType<typeof searchDocuments>>([]);
+  const [searchResults, setSearchResults] = useState<{ document: string; score: number; chunk: string }[]>([]);
   const [chunkSize, setChunkSize] = useState(kb.chunk_size);
   const [chunkOverlap, setChunkOverlap] = useState(kb.chunk_overlap);
 
@@ -122,12 +121,12 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
     message.info('开始向量化处理...');
   };
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!searchQuery.trim()) {
       message.warning('请输入搜索内容');
       return;
     }
-    const results = searchDocuments(kb.id, searchQuery);
+    const results = await searchDocuments(kb.id, searchQuery);
     setSearchResults(results);
   };
 
@@ -141,7 +140,7 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
       title: '文件名',
       dataIndex: 'name',
       key: 'name',
-      render: (text, record) => (
+      render: (text) => (
         <Space>
           <FileTextOutlined />
           <span>{text}</span>
@@ -375,8 +374,15 @@ export default function KnowledgeBasePage() {
   const {
     knowledgeBases, selectedKbId, createKnowledgeBase,
     updateKnowledgeBase, deleteKnowledgeBase, selectKnowledgeBase,
-    getKnowledgeBase,
+    getKnowledgeBase, fetchKnowledgeBases,
   } = useKnowledgeBaseStore();
+  const { mode } = useEngineStore();
+
+  useEffect(() => {
+    if (mode === 'real') {
+      fetchKnowledgeBases();
+    }
+  }, [mode, fetchKnowledgeBases]);
 
   const [searchText, setSearchText] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
@@ -417,7 +423,7 @@ export default function KnowledgeBasePage() {
       updateKnowledgeBase(editingKb.id, values);
       message.success('知识库已更新');
     } else {
-      createKnowledgeBase(values);
+      await createKnowledgeBase(values);
       message.success('知识库已创建');
     }
     setModalVisible(false);
@@ -425,10 +431,6 @@ export default function KnowledgeBasePage() {
 
   const handleSelectKb = (kb: KnowledgeBase) => {
     selectKnowledgeBase(kb.id);
-  };
-
-  const handleBackToList = () => {
-    selectKnowledgeBase(null);
   };
 
   if (selectedKb) {

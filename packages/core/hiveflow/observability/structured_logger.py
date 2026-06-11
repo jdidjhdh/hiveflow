@@ -26,13 +26,12 @@
 
 import json
 import logging
+import os
 import sys
 import time
-import os
-import traceback
-from typing import Any, Dict, Optional
-from datetime import datetime, timezone
 from contextlib import contextmanager
+from datetime import datetime, timezone
+from typing import Any
 
 
 class JSONFormatter(logging.Formatter):
@@ -73,11 +72,27 @@ class JSONFormatter(logging.Formatter):
             extra_fields = {}
             for key, value in record.__dict__.items():
                 if key not in (
-                    'name', 'msg', 'args', 'created', 'relativeCreated',
-                    'thread', 'threadName', 'process', 'processName',
-                    'message', 'exc_info', 'exc_text', 'stack_info',
-                    'lineno', 'funcName', 'pathname', 'filename',
-                    'module', 'levelno', 'levelname', 'msecs',
+                    "name",
+                    "msg",
+                    "args",
+                    "created",
+                    "relativeCreated",
+                    "thread",
+                    "threadName",
+                    "process",
+                    "processName",
+                    "message",
+                    "exc_info",
+                    "exc_text",
+                    "stack_info",
+                    "lineno",
+                    "funcName",
+                    "pathname",
+                    "filename",
+                    "module",
+                    "levelno",
+                    "levelname",
+                    "msecs",
                 ):
                     extra_fields[key] = value
             if extra_fields:
@@ -102,9 +117,9 @@ class HiveFlowLogger:
 
         self.logger.log(level, msg, extra=extra)
 
-    def _sanitize(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _sanitize(self, data: dict[str, Any]) -> dict[str, Any]:
         """敏感信息脱敏"""
-        sensitive_keys = {'password', 'api_key', 'secret', 'token', 'authorization'}
+        sensitive_keys = {"password", "api_key", "secret", "token", "authorization"}
         sanitized = {}
 
         for key, value in data.items():
@@ -190,14 +205,11 @@ class _AsyncTimingContext:
                 operation=self.operation,
                 duration=elapsed,
                 error=str(exc_val),
-                **self.extra_labels
+                **self.extra_labels,
             )
         else:
             self.logger.info(
-                f"Completed {self.operation}",
-                operation=self.operation,
-                duration=elapsed,
-                **self.extra_labels
+                f"Completed {self.operation}", operation=self.operation, duration=elapsed, **self.extra_labels
             )
         return False
 
@@ -205,7 +217,7 @@ class _AsyncTimingContext:
 def setup_structured_logging(
     level: str = "INFO",
     service: str = "hiveflow",
-    output: str = None,
+    output: str | None = None,
     include_extra: bool = True,
 ) -> HiveFlowLogger:
     """配置结构化日志
@@ -228,7 +240,7 @@ def setup_structured_logging(
 
     # 创建处理器
     if output:
-        handler = logging.FileHandler(output, encoding='utf-8')
+        handler = logging.FileHandler(output, encoding="utf-8")
     else:
         handler = logging.StreamHandler(sys.stdout)
 

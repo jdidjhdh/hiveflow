@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, useMemo, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import ReactFlow, {
   Controls,
   Background,
@@ -10,7 +11,6 @@ import ReactFlow, {
   Connection,
   Node,
   Edge,
-  Panel,
   type NodeProps,
   Handle,
   Position,
@@ -22,26 +22,28 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import {
   Button, Space, Tooltip, Drawer, Form, Input, InputNumber,
-  Select, Tag, App, Dropdown, Divider, Spin, message, Tabs,
-  Table, Badge, Popconfirm, List, Typography, Alert, Collapse,
+  Select, Tag, App, Dropdown, Divider, Popconfirm, Typography, Alert, Switch,
 } from 'antd';
 const { TextArea } = Input;
 import type { MenuProps } from 'antd';
-import { API_BASE_URL } from '@/utils/api';
+import { API_BASE_URL, getErrorMessage } from '@/utils/api';
 import {
   PlayCircleOutlined, StopOutlined, SaveOutlined,
   FolderOpenOutlined, ExportOutlined, UndoOutlined,
   RedoOutlined, PartitionOutlined, PlusOutlined,
-  DeleteOutlined, CopyOutlined, AppstoreAddOutlined,
+  DeleteOutlined, AppstoreAddOutlined,
   CloseOutlined, BranchesOutlined, SyncOutlined, CodeOutlined,
-  ApiOutlined, ThunderboltOutlined, FileTextOutlined,
+  ApiOutlined, ThunderboltOutlined, FileTextOutlined, RobotOutlined,
 } from '@ant-design/icons';
 import { useWorkflowStore } from '@/store/useWorkflowStore';
 import { useEngineStore } from '@/store/useEngineStore';
+import { useAgentRuntimeStore } from '@/store/useAgentRuntimeStore';
 import { useEventStore } from '@/store/useEventStore';
 import { useVariableStore } from '@/store/useVariableStore';
 import type { WorkflowNodeData, ExecutionLog, VariableDef, ConditionNodeData, CodeNodeData } from '@/types';
 import { getWsManager } from '@/engine/ws/WsConnectionManager';
+import { planToReactFlow, type TaskGraphPlan } from '@/utils/planToWorkflow';
+import { downloadJson, downloadText } from '@/utils/downloadFile';
 
 const { Text } = Typography;
 
@@ -63,6 +65,7 @@ function TaskNode({ data, selected }: NodeProps<WorkflowNodeData>) {
     code: '#f5222d',
     http: '#1890ff',
     trigger: '#13c2c2',
+    hitl: '#eb2f96',
   };
 
   const variant = data.variant || 'task';
@@ -286,10 +289,11 @@ const nodeTypeConfigs: NodeTypeConfig[] = [
   { type: 'taskNode', label: '代码执行', variant: 'code', color: '#f5222d', icon: <CodeOutlined style={{ color: '#f5222d' }} /> },
   { type: 'taskNode', label: 'HTTP请求', variant: 'http', color: '#1890ff', icon: <ApiOutlined style={{ color: '#1890ff' }} /> },
   { type: 'taskNode', label: '触发器', variant: 'trigger', color: '#13c2c2', icon: <ThunderboltOutlined style={{ color: '#13c2c2' }} /> },
+  { type: 'taskNode', label: '人工审批', variant: 'hitl', color: '#eb2f96', icon: <span style={{ color: '#eb2f96' }}>👤</span> },
 ];
 
-// 日志级别颜色
-const logLevelColors: Record<string, string> = {
+// 日志级别颜色（预留）
+const _logLevelColors: Record<string, string> = {
   info: '#1890ff',
   warn: '#faad14',
   error: '#ff4d4f',
@@ -304,25 +308,45 @@ export default function OrchestratorPage() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node<WorkflowNodeData> | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('config');
+  const [, setActiveTab] = useState('config');
 
   // 日志状态
   const [logs, setLogs] = useState<ExecutionLog[]>([]);
-  const [logFilter, setLogFilter] = useState<string>('all');
+  const [_logFilter, _setLogFilter] = useState<string>('all');
   const logPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [agentDrawerOpen, setAgentDrawerOpen] = useState(false);
+  const [agentQuery, setAgentQuery] = useState('');
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentResult, setAgentResult] = useState<Record<string, unknown> | null>(null);
+
   const { message } = App.useApp();
-  const store = useWorkflowStore();
+  const engineMode = useEngineStore(s => s.mode);
+  const runtimeMode = useAgentRuntimeStore(s => s.runtimeMode);
+  const runtimeSkills = useAgentRuntimeStore(s => s.skills);
+  const runtimeLoading = useAgentRuntimeStore(s => s.loading);
+  const fetchRuntime = useAgentRuntimeStore(s => s.fetchRuntime);
+  const setRuntimeMode = useAgentRuntimeStore(s => s.setRuntimeMode);
+  const runAgentQuery = useAgentRuntimeStore(s => s.runQuery);
+  const executePlan = useAgentRuntimeStore(s => s.executePlan);
+  const planOnly = useAgentRuntimeStore(s => s.planOnly);
+  const exportLangGraph = useAgentRuntimeStore(s => s.exportLangGraph);
   const engine = useEngineStore().getEngine();
   const addEvent = useEventStore(s => s.addEvent);
-  const variables = useVariableStore(s => s.variables);
   const addVariable = useVariableStore(s => s.addVariable);
   const updateVariable = useVariableStore(s => s.updateVariable);
   const deleteVariable = useVariableStore(s => s.deleteVariable);
+  const executionStatus = useWorkflowStore(s => s.executionStatus);
 
   // 日志轮询
   useEffect(() => {
-    if (useWorkflowStore.getState().executionStatus === 'running') {
+    if (engineMode === 'real') {
+      fetchRuntime();
+    }
+  }, [engineMode, fetchRuntime]);
+
+  useEffect(() => {
+    if (executionStatus === 'running') {
       logPollRef.current = setInterval(() => {
         const engineLogs = useEngineStore.getState().getEngine().getLogs?.() || [];
         setLogs(engineLogs);
@@ -331,7 +355,7 @@ export default function OrchestratorPage() {
     return () => {
       if (logPollRef.current) clearInterval(logPollRef.current);
     };
-  }, [useWorkflowStore.getState().executionStatus]);
+  }, [executionStatus]);
 
   // 组件挂载时从 IndexedDB 加载持久化的工作流
   useEffect(() => {
@@ -528,6 +552,14 @@ export default function OrchestratorPage() {
                     output_mapping: values.output_mapping || {},
                   },
                 } : {}),
+                ...(n.data.variant === 'hitl' ? {
+                  hitl_config: {
+                    prompt: values.hitl_prompt || '请审批是否继续',
+                    action: values.hitl_action || 'approval',
+                    timeout_seconds: values.hitl_timeout || 300,
+                    on_timeout: values.hitl_on_timeout || 'fail',
+                  },
+                } : {}),
               },
             }
           : n
@@ -535,7 +567,7 @@ export default function OrchestratorPage() {
     );
     setDrawerOpen(false);
     message.success('节点配置已保存');
-  }, [selectedNode, setNodes]);
+  }, [selectedNode, setNodes, message]);
 
   // 删除选中节点
   const deleteSelectedNode = useCallback(() => {
@@ -567,6 +599,7 @@ export default function OrchestratorPage() {
     message.info('工作流执行中...');
 
     const engineMode = useEngineStore.getState().mode;
+    const agentRuntime = useAgentRuntimeStore.getState();
 
     try {
       if (engineMode === 'mock') {
@@ -592,6 +625,26 @@ export default function OrchestratorPage() {
         // 获取日志
         const engineLogs = engine.getLogs?.() || [];
         setLogs(engineLogs);
+      } else if (agentRuntime.runtimeMode === 'agent' && agentRuntime.agentActive) {
+        const result = await executePlan(graph as Record<string, unknown>);
+        const rawResults = (result.raw_results ?? {}) as Record<string, unknown>;
+        setNodes((nds) =>
+          nds.map((nd) => {
+            const nodeResult = rawResults[nd.id];
+            if (nodeResult !== undefined) {
+              return {
+                ...nd,
+                data: {
+                  ...nd.data,
+                  status: 'completed' as const,
+                  result: nodeResult,
+                },
+              };
+            }
+            return nd;
+          }),
+        );
+        message.success(`Agent 已执行计划 (intent: ${String(result.intent_id ?? '')})`);
       } else {
         const wsManager = getWsManager();
         const cleanup = wsManager.onWorkflowStatus((nodeName, status, result) => {
@@ -624,14 +677,106 @@ export default function OrchestratorPage() {
       await useWorkflowStore.getState().saveToIndexedDB();
       message.error(`执行失败: ${err.message}`);
     }
-  }, [pushToStore, setNodes, engine, addEvent, nodes]);
+  }, [pushToStore, setNodes, engine, addEvent, nodes, message, executePlan]);
+
+  const handleRuntimeToggle = useCallback(async (checked: boolean) => {
+    try {
+      await setRuntimeMode(checked ? 'agent' : 'core');
+      message.success(checked ? '已切换至 Agent 模式（run_query / Skill 图）' : '已切换至 Core 模式（DAG 编排）');
+    } catch (e) {
+      message.error(getErrorMessage(e));
+    }
+  }, [setRuntimeMode, message]);
+
+  const handleAgentQuery = useCallback(async () => {
+    if (!agentQuery.trim()) return;
+    setAgentLoading(true);
+    try {
+      const result = await runAgentQuery(agentQuery);
+      setAgentResult(result);
+      message.success('Agent 查询完成');
+    } catch (e) {
+      message.error(getErrorMessage(e));
+    } finally {
+      setAgentLoading(false);
+    }
+  }, [agentQuery, runAgentQuery, message]);
+
+  const handlePlanOnly = useCallback(async () => {
+    if (!agentQuery.trim()) return;
+    setAgentLoading(true);
+    try {
+      const result = await planOnly(agentQuery);
+      setAgentResult(result);
+      message.success('已生成执行计划（未执行）');
+    } catch (e) {
+      message.error(getErrorMessage(e));
+    } finally {
+      setAgentLoading(false);
+    }
+  }, [agentQuery, planOnly, message]);
+
+  const importPlanToCanvas = useCallback((plan: Record<string, unknown>) => {
+    const { nodes: flowNodes, edges: flowEdges } = planToReactFlow(plan as TaskGraphPlan);
+    if (flowNodes.length === 0) {
+      message.warning('计划为空，无法导入');
+      return;
+    }
+    setNodes(flowNodes);
+    setEdges(flowEdges);
+    useWorkflowStore.setState({ nodes: flowNodes, edges: flowEdges });
+    setTimeout(() => useWorkflowStore.getState().saveToIndexedDB(), 0);
+    message.success(`已导入 ${flowNodes.length} 个节点到画布`);
+    setAgentDrawerOpen(false);
+  }, [setNodes, setEdges, message]);
+
+  const exportPlanAsLangGraph = useCallback(async (
+    plan: Record<string, unknown>,
+    source: 'plan' | 'canvas',
+    includePython = false,
+  ) => {
+    try {
+      const wfId = source === 'canvas'
+        ? useWorkflowStore.getState().currentWorkflowId
+        : String(agentResult?.intent_id ?? 'studio_plan');
+      const result = await exportLangGraph(plan, {
+        workflowId: wfId,
+        includePython,
+      });
+      downloadJson(result.spec, `langgraph-${wfId}.json`);
+      if (includePython && result.python) {
+        downloadText(result.python, `langgraph-${wfId}.py`, 'text/x-python');
+      }
+      message.success(`已导出 LangGraph 规范（${result.node_count} 个节点）`);
+    } catch (e) {
+      message.error(getErrorMessage(e));
+    }
+  }, [exportLangGraph, agentResult, message]);
+
+  const exportCanvasAsLangGraph = useCallback(async () => {
+    pushToStore();
+    const { graph } = useWorkflowStore.getState().exportWorkflow();
+    if (Object.keys(graph).length === 0) {
+      message.warning('画布为空，无法导出 LangGraph');
+      return;
+    }
+    await exportPlanAsLangGraph(graph as Record<string, unknown>, 'canvas', false);
+  }, [pushToStore, exportPlanAsLangGraph, message]);
+
+  const exportAgentPlanAsLangGraph = useCallback(async (includePython = false) => {
+    if (agentResult?.plan == null || typeof agentResult.plan !== 'object') {
+      message.warning('无 plan 可导出，请先 plan-only 或 run_query');
+      return;
+    }
+    await exportPlanAsLangGraph(agentResult.plan as Record<string, unknown>, 'plan', includePython);
+  }, [agentResult, exportPlanAsLangGraph, message]);
 
   // 停止执行
   const stopExecution = useCallback(() => {
     useWorkflowStore.setState({ executionStatus: 'idle' });
     if (logPollRef.current) clearInterval(logPollRef.current);
     message.info('已停止');
-  }, []);
+  }, [message]);
 
   // 导出工作流为 .hflow 文件
   const exportWorkflow = useCallback(() => {
@@ -651,7 +796,7 @@ export default function OrchestratorPage() {
     a.click();
     URL.revokeObjectURL(url);
     message.success('工作流已导出为 .hflow 文件');
-  }, [pushToStore]);
+  }, [pushToStore, message]);
 
   // 导入 .hflow 文件
   const importWorkflow = useCallback(() => {
@@ -680,7 +825,7 @@ export default function OrchestratorPage() {
       reader.readAsText(file);
     };
     input.click();
-  }, [setNodes, setEdges]);
+  }, [setNodes, setEdges, message]);
 
   // 批量导出
   const batchExportWorkflows = useCallback(async () => {
@@ -702,7 +847,7 @@ export default function OrchestratorPage() {
     } catch {
       message.error('批量导出失败');
     }
-  }, []);
+  }, [message]);
 
   // 自动布局
   const autoLayout = useCallback(() => {
@@ -721,7 +866,14 @@ export default function OrchestratorPage() {
     setNodes([]);
     setEdges([]);
     useWorkflowStore.getState().reset();
-  }, [setNodes, setEdges]);
+    message.success('已新建画布');
+  }, [setNodes, setEdges, message]);
+
+  // 手动保存工作流
+  const saveWorkflow = useCallback(() => {
+    pushToStore();
+    message.success('工作流已保存');
+  }, [pushToStore, message]);
 
   // 加载内置模板
   const loadTemplate = useCallback((key: string) => {
@@ -732,8 +884,6 @@ export default function OrchestratorPage() {
     useWorkflowStore.getState().loadWorkflow(tmpl);
     message.success(`已加载"${builtinTemplates.find(t => t.key === key)?.label}"模板`);
   }, [setNodes, setEdges, message]);
-
-  const executionStatus = useWorkflowStore(s => s.executionStatus);
 
   // 模板菜单项
   const templateMenuItems: MenuProps['items'] = builtinTemplates.map(t => ({
@@ -746,24 +896,24 @@ export default function OrchestratorPage() {
     ),
   }));
 
-  // 过滤后的日志
-  const filteredLogs = useMemo(() => {
-    if (logFilter === 'all') return logs;
-    return logs.filter(log => log.level === logFilter);
-  }, [logs, logFilter]);
+  // 过滤后的日志（预留）
+  const _filteredLogs = useMemo(() => {
+    if (_logFilter === 'all') return logs;
+    return logs.filter(log => log.level === _logFilter);
+  }, [logs, _logFilter]);
 
-  // 格式化时间
-  const formatTime = (timestamp: number) => {
+  // 格式化时间（预留）
+  const _formatTime = (timestamp: number) => {
     const d = new Date(timestamp);
     return d.toLocaleTimeString('zh-CN', { hour12: false });
   };
 
   // 变量表单
   const [variableForm] = Form.useForm();
-  const [varModalOpen, setVarModalOpen] = useState(false);
+  const [_varModalOpen, setVarModalOpen] = useState(false);
   const [editingVar, setEditingVar] = useState<VariableDef | null>(null);
 
-  const handleSaveVariable = useCallback(async () => {
+  const _handleSaveVariable = useCallback(async () => {
     try {
       const values = await variableForm.validateFields();
       let parsedValue = values.value;
@@ -782,9 +932,9 @@ export default function OrchestratorPage() {
       }
       setVarModalOpen(false);
     } catch { /* ignore */ }
-  }, [variableForm, editingVar, addVariable, updateVariable]);
+  }, [variableForm, editingVar, addVariable, updateVariable, message]);
 
-  const varColumns = [
+  const _varColumns = [
     { title: '名称', dataIndex: 'name', key: 'name', render: (t: string) => <Text code>{t}</Text> },
     { title: '类型', dataIndex: 'type', key: 'type', width: 80, render: (t: string) => <Tag>{t}</Tag> },
     { title: '值', dataIndex: 'value', key: 'value', ellipsis: true, render: (v: unknown) => String(v ?? '-') },
@@ -814,22 +964,82 @@ export default function OrchestratorPage() {
           <Dropdown menu={{ items: templateMenuItems, onClick: ({ key }) => loadTemplate(key) }}>
             <Button icon={<AppstoreAddOutlined />} data-testid="btn-template">模板</Button>
           </Dropdown>
+          <Button icon={<SaveOutlined />} data-testid="btn-save" onClick={saveWorkflow}>保存</Button>
           <Button icon={<FolderOpenOutlined />} data-testid="btn-import" onClick={importWorkflow}>导入</Button>
           <Button icon={<ExportOutlined />} data-testid="btn-export" onClick={exportWorkflow}>导出</Button>
+          <Button
+            icon={<BranchesOutlined />}
+            data-testid="btn-export-langgraph-canvas"
+            onClick={exportCanvasAsLangGraph}
+          >
+            导出 LangGraph
+          </Button>
           <Button icon={<ExportOutlined />} data-testid="btn-batch-export" onClick={batchExportWorkflows}>批量导出</Button>
           <Divider type="vertical" />
           <Button icon={<PartitionOutlined />} data-testid="btn-layout" onClick={autoLayout}>自动布局</Button>
           <Button icon={<UndoOutlined />} disabled data-testid="btn-undo">撤销</Button>
           <Button icon={<RedoOutlined />} disabled data-testid="btn-redo">重做</Button>
         </Space>
-        <Space>
+        <Space wrap>
+          {engineMode === 'real' && (
+            <>
+              <Tag color={runtimeMode === 'agent' ? 'purple' : 'blue'}>
+                {runtimeMode === 'agent' ? 'HiveMindApp' : 'Core DAG'}
+              </Tag>
+              <Tooltip title={runtimeMode === 'agent' ? '自然语言 run_query' : 'Skill 图 / DAG 执行'}>
+                <Switch
+                  checked={runtimeMode === 'agent'}
+                  loading={runtimeLoading}
+                  checkedChildren="Agent"
+                  unCheckedChildren="Core"
+                  onChange={handleRuntimeToggle}
+                  data-testid="runtime-mode-switch"
+                />
+              </Tooltip>
+              {runtimeMode === 'agent' && (
+                <Button
+                  icon={<RobotOutlined />}
+                  data-testid="btn-agent-query"
+                  onClick={() => setAgentDrawerOpen(true)}
+                >
+                  Agent 查询
+                </Button>
+              )}
+              <Divider type="vertical" />
+            </>
+          )}
           {executionStatus === 'running' ? (
             <Button danger icon={<StopOutlined />} data-testid="btn-stop" onClick={stopExecution}>停止</Button>
           ) : (
-            <Button type="primary" icon={<PlayCircleOutlined />} data-testid="btn-execute" onClick={executeWorkflow}>执行</Button>
+            <Tooltip
+              title={
+                runtimeMode === 'agent'
+                  ? '按画布 DAG 执行工作流（Core 引擎）；自然语言任务请用「Agent 查询」'
+                  : '按画布节点依赖顺序执行 DAG 工作流'
+              }
+            >
+              <Button
+                type="primary"
+                icon={<PlayCircleOutlined />}
+                data-testid="btn-execute"
+                onClick={executeWorkflow}
+              >
+                {runtimeMode === 'agent' ? '执行 DAG' : '执行'}
+              </Button>
+            </Tooltip>
           )}
         </Space>
       </div>
+
+      {engineMode === 'real' && runtimeMode === 'agent' && (
+        <Alert
+          type="info"
+          showIcon
+          closable
+          style={{ marginBottom: 12 }}
+          message="Agent 模式：「执行 DAG」通过 HiveMind 执行画布 Skill 图（/api/agent/execute-plan）；「Agent 查询」用于自然语言 run_query。"
+        />
+      )}
 
       {/* 面板：左侧节点库 + 中央画布 */}
       <div style={{ flex: 1, display: 'flex', gap: 0, border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
@@ -932,6 +1142,10 @@ export default function OrchestratorPage() {
               default_branch: (selectedNode.data as unknown as { condition_data?: ConditionNodeData }).condition_data?.default_branch || 'false',
               language: (selectedNode.data as unknown as { code_data?: CodeNodeData }).code_data?.language || 'javascript',
               code: (selectedNode.data as unknown as { code_data?: CodeNodeData }).code_data?.code || '',
+              hitl_prompt: selectedNode.data.hitl_config?.prompt || '',
+              hitl_action: selectedNode.data.hitl_config?.action || 'approval',
+              hitl_timeout: selectedNode.data.hitl_config?.timeout_seconds || 300,
+              hitl_on_timeout: selectedNode.data.hitl_config?.on_timeout || 'fail',
             }}
             onFinish={saveNodeConfig}
           >
@@ -1001,6 +1215,32 @@ export default function OrchestratorPage() {
               </>
             )}
 
+            {selectedNode.data.variant === 'hitl' && (
+              <>
+                <Divider plain style={{ borderColor: '#eb2f96' }}>人工审批 (HITL)</Divider>
+                <Form.Item name="hitl_prompt" label="审批提示" rules={[{ required: true }]}>
+                  <Input.TextArea rows={2} placeholder="展示给审批人的说明" />
+                </Form.Item>
+                <Form.Item name="hitl_action" label="审批类型">
+                  <Select>
+                    <Select.Option value="approval">批准/拒绝</Select.Option>
+                    <Select.Option value="review">审阅修改</Select.Option>
+                    <Select.Option value="input">人工输入</Select.Option>
+                  </Select>
+                </Form.Item>
+                <Form.Item name="hitl_timeout" label="超时 (秒)">
+                  <InputNumber min={30} style={{ width: '100%' }} />
+                </Form.Item>
+                <Form.Item name="hitl_on_timeout" label="超时策略">
+                  <Select>
+                    <Select.Option value="fail">失败中止</Select.Option>
+                    <Select.Option value="approve">自动批准</Select.Option>
+                    <Select.Option value="skip">自动跳过</Select.Option>
+                  </Select>
+                </Form.Item>
+              </>
+            )}
+
             <Divider plain>期望输出</Divider>
             <Form.Item name="state_key" label="状态键 (state_key)">
               <Input placeholder="黑板存储键名" />
@@ -1041,6 +1281,113 @@ export default function OrchestratorPage() {
               <Button type="primary" htmlType="submit" block>保存配置</Button>
             </Form.Item>
           </Form>
+        )}
+      </Drawer>
+
+      <Drawer
+        title="Agent 模式 — 自然语言查询"
+        open={agentDrawerOpen}
+        onClose={() => setAgentDrawerOpen(false)}
+        width={480}
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Agent 模式使用 HiveMindApp.run_query，由认知编排器自动规划 Skill 图并执行。"
+        />
+        {runtimeSkills.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <Text type="secondary">已注册 Skill：</Text>
+            <div style={{ marginTop: 6 }}>
+              {runtimeSkills.map(s => (
+                <Tag key={s} color="purple" style={{ marginBottom: 4 }}>{s}</Tag>
+              ))}
+            </div>
+          </div>
+        )}
+        <Input.TextArea
+          rows={4}
+          value={agentQuery}
+          onChange={e => setAgentQuery(e.target.value)}
+          placeholder="描述你的任务，例如：检索文档并生成摘要..."
+          style={{ marginBottom: 12 }}
+        />
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Button
+            type="default"
+            icon={<FileTextOutlined />}
+            loading={agentLoading}
+            block
+            onClick={handlePlanOnly}
+          >
+            NL 生成草图（plan-only）
+          </Button>
+          <Button
+            type="primary"
+            icon={<RobotOutlined />}
+            loading={agentLoading}
+            block
+            onClick={handleAgentQuery}
+          >
+            执行 run_query
+          </Button>
+        </Space>
+        {agentResult && (
+          <div style={{ marginTop: 16 }}>
+            <Text strong>{agentResult.plan != null ? '执行计划' : '回答'}</Text>
+            <pre style={{
+              marginTop: 8,
+              background: '#1e1e1e',
+              color: '#ce9178',
+              padding: 12,
+              borderRadius: 8,
+              fontSize: 13,
+              maxHeight: 240,
+              overflow: 'auto',
+            }}>
+              {JSON.stringify(agentResult.plan ?? agentResult.answer ?? agentResult, null, 2)}
+            </pre>
+            {agentResult.intent_id != null && (
+              <Space style={{ marginTop: 8 }} wrap>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  intent_id: {String(agentResult.intent_id)}
+                </Text>
+                <Link to={`/tracer?intent_id=${encodeURIComponent(String(agentResult.intent_id))}`}>
+                  在 Tracer 中打开
+                </Link>
+                <Link to={`/replay?intent_id=${encodeURIComponent(String(agentResult.intent_id))}`}>
+                  Replay 回放
+                </Link>
+              </Space>
+            )}
+            {agentResult.plan != null && typeof agentResult.plan === 'object' && (
+              <Space direction="vertical" style={{ marginTop: 12, width: '100%' }}>
+                <Button
+                  type="primary"
+                  ghost
+                  block
+                  onClick={() => importPlanToCanvas(agentResult.plan as Record<string, unknown>)}
+                >
+                  导入到画布
+                </Button>
+                <Button
+                  block
+                  data-testid="btn-export-langgraph-plan"
+                  onClick={() => exportAgentPlanAsLangGraph(false)}
+                >
+                  导出 LangGraph JSON
+                </Button>
+                <Button
+                  block
+                  type="dashed"
+                  onClick={() => exportAgentPlanAsLangGraph(true)}
+                >
+                  导出 LangGraph + Python 模板
+                </Button>
+              </Space>
+            )}
+          </div>
         )}
       </Drawer>
     </div>

@@ -1,10 +1,9 @@
 """Tests for hiveflow checkpoint module."""
-import pytest
-import asyncio
 import time
-from unittest.mock import MagicMock, patch
 
-from hiveflow import Checkpoint, CheckpointManager, CheckpointBackend, MemoryCheckpointBackend
+import pytest
+
+from hiveflow import Checkpoint, CheckpointManager, MemoryCheckpointBackend
 
 
 class TestCheckpoint:
@@ -241,7 +240,7 @@ class TestCheckpointManager:
         mgr = CheckpointManager(backend)
 
         cp1_id = await mgr.save_checkpoint("wf_001", {"step": 1})
-        cp2_id = await mgr.save_checkpoint(
+        await mgr.save_checkpoint(
             "wf_001", {"step": 2}, parent_id=cp1_id
         )
 
@@ -281,3 +280,33 @@ class TestCheckpointManager:
 
         state = mgr.get_current_state("wf_001")
         assert state == {"version": 2}
+
+
+class TestSQLiteCheckpointBackend:
+    @pytest.mark.asyncio
+    async def test_sqlite_save_load_list_delete(self, tmp_path):
+        aiosqlite = pytest.importorskip("aiosqlite")
+        from hiveflow.checkpoint import SQLiteCheckpointBackend
+
+        db_path = str(tmp_path / "checkpoints.db")
+        backend = SQLiteCheckpointBackend(db_path)
+
+        cp = Checkpoint(
+            checkpoint_id="cp_sqlite_1",
+            workflow_id="wf_sqlite",
+            timestamp=time.time(),
+            state={"step": "done"},
+            metadata={"source": "test"},
+        )
+        await backend.save(cp)
+        loaded = await backend.load("cp_sqlite_1")
+        assert loaded is not None
+        assert loaded.state == {"step": "done"}
+
+        listed = await backend.list_checkpoints("wf_sqlite")
+        assert len(listed) == 1
+        assert listed[0].checkpoint_id == "cp_sqlite_1"
+
+        assert await backend.delete("cp_sqlite_1")
+        assert await backend.load("cp_sqlite_1") is None
+        _ = aiosqlite  # used via importorskip side effect

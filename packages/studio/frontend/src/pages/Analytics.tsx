@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
   Card, Row, Col, Statistic, Table, Tag, Space,
-  Select, Empty, Spin, Divider, Typography, Tooltip,
+  Select, Empty, Spin, Typography, Tooltip, Alert,
 } from 'antd';
 import {
   ThunderboltOutlined, CheckCircleOutlined,
@@ -13,6 +13,7 @@ import type { EChartsOption } from 'echarts';
 import type { ColumnsType } from 'antd/es/table';
 import type { NodeDurationRank, AgentLoadDist, ErrorTypeStat } from '@/types';
 import { useAnalyticsStore } from '@/store/useAnalyticsStore';
+import { useEngineStore } from '@/store/useEngineStore';
 
 const { Text } = Typography;
 
@@ -199,55 +200,84 @@ function AgentLoadChart({ data }: { data: AgentLoadDist[] }) {
 
 // ========== 错误类型统计 ==========
 function ErrorStatsChart({ data }: { data: ErrorTypeStat[] }) {
+  // 错误类型颜色映射
+  const errorColors: Record<string, string> = {
+    '超时错误': '#ff4d4f',
+    '连接失败': '#fa8c16',
+    '响应异常': '#faad14',
+    '资源耗尽': '#722ed1',
+    '其他': '#d9d9d9',
+    'Unknown': '#8c8c8c',
+    'Runtime Error': '#ff7a45',
+    'Validation Error': '#52c41a',
+  };
+
+  const totalCount = data.reduce((sum, d) => sum + d.count, 0);
+
+  if (data.length === 0) {
+    return <Empty description="暂无错误数据" style={{ padding: '40px 0' }} />;
+  }
+
   const option: EChartsOption = {
     tooltip: {
       trigger: 'item',
-      formatter: '{b}: {c} ({d}%)',
-    },
-    legend: {
-      orient: 'vertical',
-      left: 'left',
+      formatter: '{b}: {c}次 ({d}%)',
     },
     series: [
       {
         type: 'pie',
-        radius: ['40%', '70%'],
-        avoidLabelOverlap: false,
+        radius: ['50%', '70%'],
+        center: ['50%', '55%'],
         itemStyle: {
-          borderRadius: 6,
+          borderRadius: 8,
           borderColor: '#fff',
           borderWidth: 2,
         },
         label: {
           show: true,
-          formatter: '{b}\n{d}%',
+          position: 'outside',
+          formatter: '{b}\n{c}次',
         },
-        data: data.map((d, i) => ({
+        labelLine: {
+          show: true,
+          length: 15,
+          length2: 10,
+        },
+        data: data.map((d) => ({
           value: d.count,
           name: d.error_type,
           itemStyle: {
-            color: ['#ff4d4f', '#fa8c16', '#faad14', '#d9d9d9', '#8c8c8c'][i],
+            color: errorColors[d.error_type] || undefined,
           },
         })),
       },
     ],
   };
 
-  return <ReactECharts option={option} style={{ height: 300 }} />;
+  return (
+    <div>
+      <ReactECharts option={option} style={{ height: 320 }} />
+      <div style={{ marginTop: 8, textAlign: 'center', color: '#8c8c8c', fontSize: 12 }}>
+        共 {totalCount} 次错误
+      </div>
+    </div>
+  );
 }
 
 // ========== 主页面 ==========
 export default function AnalyticsPage() {
-  const { data, loading, timeRange, fetchAnalytics, setTimeRange } = useAnalyticsStore();
+  const { data, loading, error, timeRange, fetchAnalytics, setTimeRange } = useAnalyticsStore();
+  const engineMode = useEngineStore(s => s.mode);
 
   useEffect(() => {
     fetchAnalytics(timeRange);
-  }, []);
+  }, [engineMode, fetchAnalytics, timeRange]);
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: 60 }}>
-        <Spin size="large" tip="加载分析数据..." />
+      <div style={{ textAlign: 'center', padding: 60, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <Spin size="large" />
+        <span style={{ color: '#888', fontSize: 14 }}>加载分析数据...</span>
       </div>
     );
   }
@@ -311,6 +341,9 @@ export default function AnalyticsPage() {
 
   return (
     <div>
+      {error && engineMode === 'real' && (
+        <Alert type="warning" showIcon message={error} style={{ marginBottom: 16 }} />
+      )}
       {/* 顶部控制栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h3 style={{ margin: 0 }}>执行分析</h3>
@@ -397,12 +430,12 @@ export default function AnalyticsPage() {
 
       {/* 错误统计 + 最近执行 */}
       <Row gutter={[16, 16]}>
-        <Col xs={24} lg={10}>
+        <Col xs={24} lg={12}>
           <Card title="错误类型统计">
             <ErrorStatsChart data={error_stats} />
           </Card>
         </Col>
-        <Col xs={24} lg={14}>
+        <Col xs={24} lg={12}>
           <Card title="最近执行记录">
             <Table
               columns={execColumns}

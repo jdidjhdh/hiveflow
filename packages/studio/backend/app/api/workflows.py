@@ -281,15 +281,18 @@ async def execute_workflow_direct(body: dict):
             "on_failure": node_data.get("on_failure", "abort"),
             "retry_policy": node_data.get("retry_policy", {}),
             "dynamic": node_data.get("dynamic", False),
+            "variant": node_data.get("variant", "task"),
+            "hitl_config": node_data.get("hitl_config", {}),
         }
 
     try:
-        # 执行工作流
         result = await engine.execute_workflow(
             wf_id=wf_id,
             graph=graph,
             mode="dag",
             global_timeout=body.get("global_timeout"),
+            enable_guard=body.get("enable_guard", True),
+            enable_checkpoint=body.get("enable_checkpoint", True),
         )
         return {"wf_id": wf_id, "status": "completed", "result": result}
     except RuntimeError as e:
@@ -375,9 +378,21 @@ async def rollback_workflow(wf_id: str, version: int):
 def _make_task_fn_from_spec(node_id: str, node_data: dict):
     """Create an async task function from a node specification."""
     task_name = node_data.get("task", node_id)
+    variant = node_data.get("variant", "task")
 
     async def task_fn(deps, blackboard):
-        # Simulate work based on task name
+        if variant == "hitl":
+            # Execution is handled by EngineService HITL wrapper
+            return {"node": node_id, "task": task_name, "awaiting": "hitl"}
+
+        if variant == "code":
+            code = node_data.get("code", "")
+            if code.strip():
+                local_vars: dict = {"deps": deps, "result": None}
+                exec(code, {"__builtins__": {}}, local_vars)  # noqa: S102
+                return local_vars.get("result", {"node": node_id, "executed": True})
+            return {"node": node_id, "task": task_name, "variant": "code"}
+
         await asyncio.sleep(0.1)
         return {"node": node_id, "task": task_name, "deps": list(deps.keys())}
 

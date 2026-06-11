@@ -1,8 +1,9 @@
+
 import pytest
-import asyncio
-from hiveflow import Cell, ECM, Capability
+
+from hiveflow import Cell
+from hiveflow.blackboard import MemoryBlackboard, SecureBlackboard
 from hiveflow.bus import InProcessEventBus
-from hiveflow.blackboard import SecureBlackboard, MemoryBlackboard
 from hiveflow.scheduler import InProcessScheduler, SchedulerConfig
 from hiveflow.validation import ValidationPipeline
 
@@ -23,7 +24,7 @@ def setup_env():
 
 @pytest.mark.asyncio
 async def test_cell_create_worker(setup_env):
-    cell, bus, bb, sched = setup_env
+    cell, _bus, _bb, _sched = setup_env
     worker = await cell.create_worker(
         agent_id="test_worker",
         skills={"test"},
@@ -38,7 +39,7 @@ async def test_cell_create_worker(setup_env):
 
 @pytest.mark.asyncio
 async def test_cell_stop_worker(setup_env):
-    cell, bus, bb, sched = setup_env
+    cell, _bus, _bb, _sched = setup_env
     await cell.create_worker(
         agent_id="stop_test",
         skills={"test"},
@@ -52,7 +53,7 @@ async def test_cell_stop_worker(setup_env):
 
 @pytest.mark.asyncio
 async def test_cell_double_worker_error(setup_env):
-    cell, bus, bb, sched = setup_env
+    cell, _bus, _bb, _sched = setup_env
     await cell.create_worker(
         agent_id="dup_worker",
         skills={"test"},

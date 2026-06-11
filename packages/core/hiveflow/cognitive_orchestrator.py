@@ -6,16 +6,17 @@ LLM-driven orchestrator that:
 3. Caches results for repeated sub-tasks
 4. Provides explainable reasoning for decisions
 """
+
 import json
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
-    from . import LLMClient, LLMMessage, TaskGraph, MISSING
+    from . import LLMClient, LLMMessage, TaskGraph
 except ImportError:
-    from hiveflow import LLMClient, LLMMessage, TaskGraph, MISSING
+    from hiveflow import LLMClient, LLMMessage, TaskGraph
 
 logger = logging.getLogger(__name__)
 
@@ -67,22 +68,24 @@ Output MUST be valid JSON:
 @dataclass
 class Plan:
     """A generated execution plan."""
-    steps: List[Dict[str, Any]]
+
+    steps: list[dict[str, Any]]
     rationale: str = ""
     estimated_steps: int = 0
-    critical_path: List[int] = field(default_factory=list)
+    critical_path: list[int] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
 
 
 @dataclass
 class ExecutionResult:
     """Result of plan execution."""
+
     plan: Plan
-    results: Dict[str, Any]
+    results: dict[str, Any]
     status: str  # "completed", "replanned", "failed"
     replan_count: int = 0
     total_latency_ms: float = 0.0
-    reasoning_log: List[str] = field(default_factory=list)
+    reasoning_log: list[str] = field(default_factory=list)
 
 
 class ResultCache:
@@ -90,8 +93,8 @@ class ResultCache:
 
     def __init__(self, max_size: int = 100):
         self.max_size = max_size
-        self._cache: Dict[str, Any] = {}
-        self._order: List[str] = []
+        self._cache: dict[str, Any] = {}
+        self._order: list[str] = []
 
     def get(self, key: str) -> Any:
         if key in self._cache:
@@ -116,7 +119,7 @@ class ResultCache:
     def size(self) -> int:
         return len(self._cache)
 
-    def make_cache_key(self, skill: str, inputs: Dict[str, Any]) -> str:
+    def make_cache_key(self, skill: str, inputs: dict[str, Any]) -> str:
         """Generate a cache key from skill and inputs."""
         sorted_inputs = json.dumps(inputs, sort_keys=True, default=str)
         return f"{skill}:{sorted_inputs}"
@@ -147,7 +150,7 @@ class CognitiveOrchestrator:
         self.max_replans = max_replans
         self.cache = ResultCache(max_size=cache_size)
         self.system_prompt = system_prompt or PLANNER_SYSTEM_PROMPT
-        self._reasoning_log: List[str] = []
+        self._reasoning_log: list[str] = []
 
     async def plan(self, goal: str) -> Plan:
         """Generate a plan for the given goal."""
@@ -189,9 +192,9 @@ class CognitiveOrchestrator:
     async def replan(
         self,
         original_plan: Plan,
-        failed_step: Dict[str, Any],
+        failed_step: dict[str, Any],
         error: str,
-        completed: List[int],
+        completed: list[int],
     ) -> Plan:
         """Generate a revised plan after a failure."""
         original_plan_str = json.dumps([s for s in original_plan.steps], indent=2)
@@ -259,8 +262,8 @@ class CognitiveOrchestrator:
 
         plan = await self.plan(goal)
         replan_count = 0
-        results: Dict[str, Any] = {}
-        completed_steps: List[int] = []
+        results: dict[str, Any] = {}
+        completed_steps: list[int] = []
 
         for attempt in range(self.max_replans + 1):
             success = True
@@ -357,7 +360,7 @@ class CognitiveOrchestrator:
 
         return graph
 
-    def get_reasoning_log(self) -> List[str]:
+    def get_reasoning_log(self) -> list[str]:
         return list(self._reasoning_log)
 
     def clear_cache(self):

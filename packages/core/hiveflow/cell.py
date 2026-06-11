@@ -1,23 +1,25 @@
 import asyncio
-import time
 import itertools
 import logging
+import time
 import traceback
+from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import Any, Callable, Optional, Dict, Set, Awaitable
+from typing import Any
 
 try:
     from . import ECM, Capability
+    from .blackboard import AuditedBlackboardView, SecureBlackboard
     from .bus import EventBus
-    from .blackboard import SecureBlackboard, AuditedBlackboardView
+    from .scheduler import PRIORITY_ORDER, Scheduler
     from .validation import ValidationPipeline
-    from .scheduler import Scheduler, PRIORITY_ORDER
 except ImportError:
-    from hiveflow import ECM, Capability
+    from blackboard import AuditedBlackboardView, SecureBlackboard
     from bus import EventBus
-    from blackboard import SecureBlackboard, AuditedBlackboardView
+    from scheduler import PRIORITY_ORDER, Scheduler
     from validation import ValidationPipeline
-    from scheduler import Scheduler, PRIORITY_ORDER
+
+    from hiveflow import ECM, Capability
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,7 @@ def ensure_error_writes(blackboard: SecureBlackboard, agent_id: str):
     the error is automatically written to the blackboard under a standard key.
     This prevents other workers from waiting forever for a result that will never arrive.
     """
+
     def decorator(fn):
         @wraps(fn)
         async def wrapper(ecm: ECM, view: AuditedBlackboardView):
@@ -47,15 +50,26 @@ def ensure_error_writes(blackboard: SecureBlackboard, agent_id: str):
                 except Exception:
                     logger.exception(f"Failed to write error to blackboard for {agent_id}")
                 raise
+
         return wrapper
+
     return decorator
 
 
 class Worker:
-    def __init__(self, agent_id: str, skills: Set[str], read_keys: Set[str], write_keys: Set[str],
-                 task_handler: Callable[[ECM, AuditedBlackboardView], Awaitable[Any]],
-                 blackboard: SecureBlackboard, bus: EventBus, cap: Capability,
-                 validation: 'ValidationPipeline', max_queue_size: int = 0):
+    def __init__(
+        self,
+        agent_id: str,
+        skills: set[str],
+        read_keys: set[str],
+        write_keys: set[str],
+        task_handler: Callable[[ECM, AuditedBlackboardView], Awaitable[Any]],
+        blackboard: SecureBlackboard,
+        bus: EventBus,
+        cap: Capability,
+        validation: "ValidationPipeline",
+        max_queue_size: int = 0,
+    ):
         self.agent_id = agent_id
         self.skills = skills
         self.read_keys = read_keys
@@ -69,7 +83,7 @@ class Worker:
         self._queue: asyncio.Queue = asyncio.PriorityQueue(maxsize=max_queue_size)
         self._seq = itertools.count()
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
         self._draining = False
         self._state_lock = asyncio.Lock()
 
@@ -92,7 +106,7 @@ class Worker:
                 except asyncio.CancelledError:
                     raise
                 except Exception:
-                    pass
+                    logger.exception(f"Worker {self.agent_id} failed to execute task")
                 finally:
                     self.capability.load = max(0.0, self.capability.load - 1.0)
         except asyncio.CancelledError:
@@ -108,20 +122,30 @@ class Worker:
                 if not valid:
                     raise ValueError(f"Validation failed for expectation on key '{ecm.expectation.state_key}'")
                 await view.put(ecm.expectation.state_key, result)
-            await self.bus.publish("task.completed", ECM(
-                trace_id=ecm.trace_id, intent="task.completed",
-                intent_id=ecm.intent_id, emitter=self.agent_id,
-                payload={"result": result}
-            ))
+            await self.bus.publish(
+                "task.completed",
+                ECM(
+                    trace_id=ecm.trace_id,
+                    intent="task.completed",
+                    intent_id=ecm.intent_id,
+                    emitter=self.agent_id,
+                    payload={"result": result},
+                ),
+            )
             success = True
         except Exception as e:
             logger.exception(f"Worker {self.agent_id} task failed")
             try:
-                await self.bus.publish("task.failed", ECM(
-                    trace_id=ecm.trace_id, intent="task.failed",
-                    intent_id=ecm.intent_id, emitter=self.agent_id,
-                    payload={"error": str(e)}
-                ))
+                await self.bus.publish(
+                    "task.failed",
+                    ECM(
+                        trace_id=ecm.trace_id,
+                        intent="task.failed",
+                        intent_id=ecm.intent_id,
+                        emitter=self.agent_id,
+                        payload={"error": str(e)},
+                    ),
+                )
             except Exception:
                 logger.exception("Failed to publish task.failed")
         finally:
@@ -180,21 +204,32 @@ class Worker:
 
 
 class Cell:
-    def __init__(self, bus: EventBus, blackboard: SecureBlackboard,
-                 scheduler: Scheduler, validation: 'ValidationPipeline',
-                 default_max_queue_size: int = 0):
+    def __init__(
+        self,
+        bus: EventBus,
+        blackboard: SecureBlackboard,
+        scheduler: Scheduler,
+        validation: "ValidationPipeline",
+        default_max_queue_size: int = 0,
+    ):
         self.bus = bus
         self.blackboard = blackboard
         self.scheduler = scheduler
         self.validation = validation
         self.default_max_queue_size = default_max_queue_size
-        self._workers: Dict[str, Worker] = {}
+        self._workers: dict[str, Worker] = {}
         self._lock = asyncio.Lock()
         self._shutting_down = False
 
-    async def create_worker(self, agent_id: str, skills: Set[str],
-                            read_keys: Set[str], write_keys: Set[str],
-                            handler: Callable, max_queue_size: Optional[int] = None) -> Worker:
+    async def create_worker(
+        self,
+        agent_id: str,
+        skills: set[str],
+        read_keys: set[str],
+        write_keys: set[str],
+        handler: Callable,
+        max_queue_size: int | None = None,
+    ) -> Worker:
         maxsize = max_queue_size if max_queue_size is not None else self.default_max_queue_size
         async with self._lock:
             if self._shutting_down:
@@ -212,8 +247,18 @@ class Cell:
 
             worker = None
             try:
-                worker = Worker(agent_id, skills, read_keys, write_keys, handler,
-                                self.blackboard, self.bus, cap, self.validation, max_queue_size=maxsize)
+                worker = Worker(
+                    agent_id,
+                    skills,
+                    read_keys,
+                    write_keys,
+                    handler,
+                    self.blackboard,
+                    self.bus,
+                    cap,
+                    self.validation,
+                    max_queue_size=maxsize,
+                )
             except Exception:
                 await self.blackboard.unregister_agent(agent_id)
                 await self.scheduler.unregister_worker(agent_id)

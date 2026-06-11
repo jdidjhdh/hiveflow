@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { LLMProviderConfig } from '@/types';
-import { API_BASE_URL, apiFetch } from '@/utils/api';
+import { apiFetch } from '@/utils/api';
 
 interface LLMConfigState {
   providers: LLMProviderConfig[];
@@ -80,7 +80,6 @@ export const useLLMConfigStore = create<LLMConfigState>((set, get) => ({
 
   // 测试 LLM 连接
   async testConnection(provider: LLMProviderConfig): Promise<{ success: boolean; message: string }> {
-    const { getProvider } = get();
     let apiKey = '';
 
     if (provider.api_key_credential_id) {

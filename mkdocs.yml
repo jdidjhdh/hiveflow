@@ -1,0 +1,91 @@
+site_name: HiveFlow
+site_description: Lightweight multi-agent orchestration engine with HITL, Studio, and MCP
+site_url: https://hiveflow.github.io/hiveflow/
+repo_url: https://github.com/hiveflow/hiveflow
+repo_name: hiveflow/hiveflow
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+    - search.suggest
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Concepts: concepts.md
+  - Architecture: architecture.md
+  - Cookbook:
+      - Overview: cookbook/index.md
+      - HITL Approval: cookbook/hitl-approval.md
+      - Multi-Agent Debate: cookbook/multi-agent-debate.md
+      - RAG + MCP: cookbook/rag-mcp-pipeline.md
+      - Studio Agent Mode: cookbook/studio-agent-mode.md
+      - Checkpoint Recovery: cookbook/checkpoint-recovery.md
+  - Studio:
+      - Agent Operations: studio-agent-ops.md
+  - Guides:
+      - Migrate from LangGraph: guides/migrate-from-langgraph.md
+  - Integrations:
+      - Overview: integrations/index.md
+      - LangGraph (PoC): integrations/langgraph.md
+      - OpenAI: integrations/openai.md
+      - Anthropic: integrations/anthropic.md
+      - Redis: integrations/redis.md
+      - PostgreSQL: integrations/postgres.md
+  - API:
+      - Auto-generated: api/index.md
+      - Manual reference: api-reference.md
+  - Observability: observability.md
+  - Deployment: deployment.md
+  - Versioning: versioning.md
+  - Benchmarks:
+      - Orchestration latency: benchmarks/orchestration-latency.md
+  - Case Studies:
+      - Regulated HITL review: case-studies/regulated-hitl-content-review.md
+  - Publishing (maintainers): publishing.md
+  - Roadmap: roadmap.md
+  - OSS Launch: oss-launch.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.highlight:
+      guess_lang: false
+      use_pygments: false
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [packages/core]
+          options:
+            docstring_style: google
+            show_source: false
+            members_order: source

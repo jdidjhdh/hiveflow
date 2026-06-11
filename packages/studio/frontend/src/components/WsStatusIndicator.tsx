@@ -9,7 +9,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Badge, Tooltip, Popover, Button, List, Space, Tag, Typography } from 'antd';
 import {
-  WifiOutlined, DisconnectOutlined, ReloadOutlined,
+  WifiOutlined, DisconnectOutlined,
   BellOutlined, CheckCircleOutlined, WarningOutlined,
 } from '@ant-design/icons';
 import { getWsManager } from '@/engine/ws/WsConnectionManager';

@@ -1,31 +1,99 @@
-import { useState, useCallback } from 'react';
-import { Card, Table, Input, Tree, Tag, Empty, Button, Modal, message } from 'antd';
-import { DatabaseOutlined, SearchOutlined, EyeOutlined, EditOutlined } from '@ant-design/icons';
+import { useState, useCallback, useEffect } from 'react';
+import { Card, Table, Input, Tag, Empty, Button, Modal, message, Row, Col } from 'antd';
+import { DatabaseOutlined, SearchOutlined, EyeOutlined, EditOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useEngineStore } from '@/store/useEngineStore';
+import { apiFetch } from '@/utils/api';
+
+interface KeyRow {
+  key: string;
+  type: string;
+}
+
+interface AuditEntry {
+  agent: string;
+  action: string;
+  key: string;
+  timestamp: number;
+}
 
 export default function BlackboardPage() {
+  const engineMode = useEngineStore(s => s.mode);
   const engine = useEngineStore().getEngine();
-  const [keys, setKeys] = useState(() => engine.getBlackboardKeys());
+  const [keys, setKeys] = useState<KeyRow[]>(() =>
+    engineMode === 'mock' ? engine.getBlackboardKeys() : []
+  );
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedValue, setSelectedValue] = useState<unknown>(null);
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [search, setSearch] = useState('');
   const [editModal, setEditModal] = useState(false);
   const [editValue, setEditValue] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const refresh = useCallback(() => {
-    setKeys(engine.getBlackboardKeys());
-  }, [engine]);
+  const refresh = useCallback(async () => {
+    if (engineMode === 'mock') {
+      setKeys(engine.getBlackboardKeys());
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await apiFetch('/api/blackboard/keys');
+      setKeys((data.keys || []).map((k: KeyRow) => ({ key: k.key, type: k.type || 'unknown' })));
+    } catch (e) {
+      message.error(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [engine, engineMode]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!selectedKey) {
+      setSelectedValue(null);
+      setAuditLog([]);
+      return;
+    }
+    if (engineMode === 'mock') {
+      setSelectedValue(engine.getBlackboardValue(selectedKey));
+      setAuditLog(engine.getAuditLog().filter(e => e.key === selectedKey));
+      return;
+    }
+    (async () => {
+      try {
+        const valData = await apiFetch(`/api/blackboard/keys/${encodeURIComponent(selectedKey)}`);
+        setSelectedValue(valData.value);
+        const auditData = await apiFetch(
+          `/api/audit?key=${encodeURIComponent(selectedKey)}&limit=100`
+        );
+        setAuditLog(auditData.entries || []);
+      } catch {
+        setSelectedValue(null);
+        setAuditLog([]);
+      }
+    })();
+  }, [selectedKey, engine, engineMode]);
 
   const filteredKeys = keys.filter(k => !search || k.key.toLowerCase().includes(search.toLowerCase()));
+  const permissions = engineMode === 'mock' && selectedKey
+    ? engine.getBlackboardPermissions(selectedKey)
+    : null;
 
-  const value = selectedKey ? engine.getBlackboardValue(selectedKey) : null;
-  const permissions = selectedKey ? engine.getBlackboardPermissions(selectedKey) : null;
-  const auditLog = engine.getAuditLog().filter(e => e.key === selectedKey);
-
-  const handleEdit = () => {
+  const handleEdit = async () => {
     try {
       const parsed = JSON.parse(editValue);
-      engine.setBlackboardValue(selectedKey!, parsed);
-      refresh();
+      if (engineMode === 'mock') {
+        engine.setBlackboardValue(selectedKey!, parsed);
+      } else {
+        await apiFetch(`/api/blackboard/keys/${encodeURIComponent(selectedKey!)}`, {
+          method: 'POST',
+          body: JSON.stringify({ value: parsed }),
+        });
+      }
+      setSelectedValue(parsed);
+      await refresh();
       setEditModal(false);
       message.success('值已更新');
     } catch {
@@ -34,23 +102,28 @@ export default function BlackboardPage() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 16 }}>
-      {/* 左侧键列表 */}
-      <div style={{ width: 280, flexShrink: 0 }}>
-        <Card title="黑板键列表" size="small" extra={
+    <Row gutter={[16, 16]} style={{ height: '100%' }}>
+      <Col xs={24} sm={24} md={8} lg={7} xl={6}>
+        <Card
+          title="黑板键列表"
+          size="small"
+          loading={loading}
+          extra={
+            <Button type="text" size="small" icon={<ReloadOutlined />} onClick={refresh} />
+          }
+        >
           <Input
             placeholder="搜索键名"
             prefix={<SearchOutlined />}
             size="small"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ width: 150 }}
+            style={{ width: '100%', marginBottom: 8 }}
           />
-        }>
           {filteredKeys.length === 0 ? (
             <Empty description="暂无数据" />
           ) : (
-            <div style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+            <div style={{ maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
               {filteredKeys.map(k => (
                 <div
                   key={k.key}
@@ -76,17 +149,16 @@ export default function BlackboardPage() {
             </div>
           )}
         </Card>
-      </div>
+      </Col>
 
-      {/* 右侧详情 */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Col xs={24} sm={24} md={16} lg={17} xl={18} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Card
           title={selectedKey ? `值: ${selectedKey}` : '选择一个键查看'}
           size="small"
           extra={
             selectedKey && (
               <Button icon={<EditOutlined />} size="small" onClick={() => {
-                setEditValue(JSON.stringify(value, null, 2));
+                setEditValue(JSON.stringify(selectedValue, null, 2));
                 setEditModal(true);
               }}>编辑</Button>
             )
@@ -104,12 +176,11 @@ export default function BlackboardPage() {
               overflow: 'auto',
               fontSize: 13,
             }}>
-              {JSON.stringify(value, null, 2)}
+              {JSON.stringify(selectedValue, null, 2)}
             </pre>
           )}
         </Card>
 
-        {/* 权限标签 */}
         {permissions && (
           <Card title="权限信息" size="small">
             <p>
@@ -127,26 +198,27 @@ export default function BlackboardPage() {
           </Card>
         )}
 
-        {/* 审计日志 */}
-        <Card title="审计日志" size="small">
+        <Card title="审计日志" size="small" extra={
+          engineMode === 'real' ? <Tag color="green">真实 audit</Tag> : <Tag>模拟</Tag>
+        }>
           <Table
             dataSource={auditLog.slice(-50)}
-            rowKey={(r) => `${r.agent}-${r.action}-${r.key}-${r.timestamp}`}
+            rowKey={(r, i) => `${r.agent}-${r.action}-${r.key}-${r.timestamp}-${i}`}
             size="small"
-            pagination={false}
+            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: t => `共 ${t} 条记录` }}
+            scroll={{ x: 600 }}
             columns={[
               {
                 title: '时间', dataIndex: 'timestamp', width: 150,
                 render: (t: number) => new Date(t * 1000).toLocaleTimeString(),
               },
               { title: '操作', dataIndex: 'action', width: 80, render: (a: string) => <Tag>{a}</Tag> },
-              { title: 'Agent', dataIndex: 'agent' },
-              { title: '键', dataIndex: 'key' },
+              { title: 'Agent', dataIndex: 'agent', ellipsis: true },
+              { title: '键', dataIndex: 'key', ellipsis: true },
             ]}
           />
         </Card>
 
-        {/* 编辑弹窗 */}
         <Modal
           title={`编辑: ${selectedKey}`}
           open={editModal}
@@ -161,7 +233,7 @@ export default function BlackboardPage() {
             style={{ fontFamily: 'monospace', fontSize: 13 }}
           />
         </Modal>
-      </div>
-    </div>
+      </Col>
+    </Row>
   );
 }

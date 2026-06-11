@@ -2,67 +2,52 @@
 
 ## Supported Versions
 
-| Version | Supported |
-|---------|-----------|
-| 0.1.x   | ✅        |
+| Version | Supported          |
+| ------- | ------------------ |
+| 0.1.x   | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
-We take security seriously. If you discover a security vulnerability, please:
+We take security seriously. If you discover a security vulnerability in HiveFlow,
+please report it responsibly.
 
-1. **DO NOT** open a public issue
-2. Email us at [security@hiveflow.dev](mailto:security@hiveflow.dev)
-3. Include:
-   - Description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if any)
+**Please do not open a public GitHub issue for security vulnerabilities.**
 
-We will respond within 48 hours and work with you to resolve the issue.
+Instead, report via one of:
 
-## Security Best Practices
+1. **GitHub Security Advisories** (preferred): [Report a vulnerability](https://github.com/hiveflow/hiveflow/security/advisories/new)
+2. **Email:** security@hiveflow.dev (if configured for your deployment)
 
-### API Keys
+Include:
 
-- Never commit API keys to the repository
-- Use environment variables or `.env` files
-- Rotate API keys regularly
-- Use key management services in production
+- Description of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Suggested fix (if any)
 
-### Blackboard Security
+## Response Timeline
 
-- Enable encryption for sensitive data:
-  ```bash
-  pip install "hiveflow[security]"
-  ```
-- Configure proper read/write permissions per agent
-- Regularly audit blackboard access logs
+| Stage | Target |
+|-------|--------|
+| Acknowledgment | Within 48 hours |
+| Initial assessment | Within 5 business days |
+| Fix or mitigation plan | Within 14 days for critical issues |
 
-### Input Validation
+## Security Features
 
-- Always enable input/output guards in production:
-  ```python
-  from hiveflow import InputGuard, OutputValidator
+HiveFlow includes built-in security primitives:
 
-  guard = InputGuard(max_length=10000)
-  validator = OutputValidator(allowed_patterns=[...])
-  ```
-- Guard against:
-  - Prompt injection
-  - XSS attacks
-  - SQL injection
-  - Excessive output
+- **InputGuard** — prompt injection, XSS, and SQLi pattern detection
+- **OutputValidator** — output sanitization and schema validation
+- **SecureBlackboard** — audit logging and access control
+- **EncryptedBlackboard** — AES encryption at rest (requires `hiveflow[security]`)
 
-### Network Security
+See [Guard Configuration](examples/14_guard_configuration.py) and
+[Secure Blackboard](examples/10_secure_blackboard.py) examples.
 
-- Use HTTPS for all API communication
-- Enable Redis authentication in production
-- Use PostgreSQL with SSL for database connections
-- Configure firewall rules for internal services
+## Best Practices for Deployments
 
-### Deployment
-
-- Never run HiveFlow with debug mode in production
-- Use non-root containers
-- Set resource limits in Kubernetes
-- Enable audit logging
+- Never commit API keys or encryption keys to version control
+- Use `.env` files locally and secrets managers in production
+- Enable encrypted blackboard for sensitive workloads
+- Keep dependencies up to date (`dependabot` is enabled in this repository)

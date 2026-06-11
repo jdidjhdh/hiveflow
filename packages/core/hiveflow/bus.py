@@ -1,10 +1,10 @@
-from abc import ABC, abstractmethod
-from collections import defaultdict
 import asyncio
-import time
 import json
 import logging
-from typing import Callable, Awaitable, Optional, Set, Dict, Tuple
+import time
+from abc import ABC, abstractmethod
+from collections import defaultdict
+from collections.abc import Awaitable, Callable
 
 try:
     from . import ECM, Expectation
@@ -16,50 +16,39 @@ logger = logging.getLogger(__name__)
 
 class EventBus(ABC):
     @abstractmethod
-    async def publish(self, topic: str, msg: ECM) -> None:
-        ...
+    async def publish(self, topic: str, msg: ECM) -> None: ...
 
     @abstractmethod
-    async def subscribe(self, topic: str,
-                        handler: Callable[[ECM], Awaitable[None]],
-                        tags: Optional[Set[str]] = None) -> str:
-        ...
+    async def subscribe(
+        self, topic: str, handler: Callable[[ECM], Awaitable[None]], tags: set[str] | None = None
+    ) -> str: ...
 
     @abstractmethod
-    async def unsubscribe(self, topic: str, subscriber_id: str) -> None:
-        ...
+    async def unsubscribe(self, topic: str, subscriber_id: str) -> None: ...
 
     @abstractmethod
-    async def update_subscription_tags(self, topic: str,
-                                       subscriber_id: str,
-                                       tags: Set[str]) -> None:
-        ...
+    async def update_subscription_tags(self, topic: str, subscriber_id: str, tags: set[str]) -> None: ...
 
     @abstractmethod
-    async def register_intent(self, intent_id: str, timeout: float) -> None:
-        ...
+    async def register_intent(self, intent_id: str, timeout: float) -> None: ...
 
     @abstractmethod
-    async def complete_intent(self, intent_id: str, success: bool = True) -> None:
-        ...
+    async def complete_intent(self, intent_id: str, success: bool = True) -> None: ...
 
     @abstractmethod
-    async def is_intent_active(self, intent_id: str) -> bool:
-        ...
+    async def is_intent_active(self, intent_id: str) -> bool: ...
 
     @abstractmethod
-    async def start(self) -> None:
-        ...
+    async def start(self) -> None: ...
 
     @abstractmethod
-    async def close(self) -> None:
-        ...
+    async def close(self) -> None: ...
 
 
 class InProcessEventBus(EventBus):
     def __init__(self):
-        self._topics: Dict[str, Dict[str, Tuple[Callable[[ECM], Awaitable[None]], Set[str]]]] = defaultdict(dict)
-        self._intents: Dict[str, asyncio.Task] = {}
+        self._topics: dict[str, dict[str, tuple[Callable[[ECM], Awaitable[None]], set[str]]]] = defaultdict(dict)
+        self._intents: dict[str, asyncio.Task] = {}
         self._lock = asyncio.Lock()
         self._sub_counter = 0
 
@@ -78,9 +67,9 @@ class InProcessEventBus(EventBus):
             except Exception:
                 logger.exception(f"Handler error on topic {topic}")
 
-    async def subscribe(self, topic: str,
-                        handler: Callable[[ECM], Awaitable[None]],
-                        tags: Optional[Set[str]] = None) -> str:
+    async def subscribe(
+        self, topic: str, handler: Callable[[ECM], Awaitable[None]], tags: set[str] | None = None
+    ) -> str:
         tags = tags or set()
         async with self._lock:
             sub_id = self._next_sub_id_locked()
@@ -91,9 +80,7 @@ class InProcessEventBus(EventBus):
         async with self._lock:
             self._topics[topic].pop(subscriber_id, None)
 
-    async def update_subscription_tags(self, topic: str,
-                                       subscriber_id: str,
-                                       tags: Set[str]) -> None:
+    async def update_subscription_tags(self, topic: str, subscriber_id: str, tags: set[str]) -> None:
         async with self._lock:
             if subscriber_id in self._topics.get(topic, {}):
                 handler, _ = self._topics[topic][subscriber_id]
@@ -125,9 +112,9 @@ class InProcessEventBus(EventBus):
         async with self._lock:
             task = self._intents.pop(intent_id, None)
         if task is not None:
-            await self.publish("intent.timeout", ECM(
-                trace_id=intent_id, intent="intent.timeout",
-                intent_id=intent_id, emitter="bus"))
+            await self.publish(
+                "intent.timeout", ECM(trace_id=intent_id, intent="intent.timeout", intent_id=intent_id, emitter="bus")
+            )
 
     async def start(self) -> None:
         pass
@@ -145,27 +132,26 @@ class InProcessEventBus(EventBus):
 
 try:
     import redis.asyncio as aioredis
+
     _REDIS_AVAILABLE = True
 except ImportError:
     _REDIS_AVAILABLE = False
 
+
 class RedisEventBus(EventBus):
-    def __init__(self, redis_url="redis://localhost", prefix="hiveflow", db=0,
-                 max_connections=10, socket_timeout=5.0):
+    def __init__(self, redis_url="redis://localhost", prefix="hiveflow", db=0, max_connections=10, socket_timeout=5.0):
         if not _REDIS_AVAILABLE:
             raise ImportError("redis required")
-        self.redis = aioredis.from_url(redis_url, db=db,
-                                       max_connections=max_connections,
-                                       socket_timeout=socket_timeout)
+        self.redis = aioredis.from_url(redis_url, db=db, max_connections=max_connections, socket_timeout=socket_timeout)
         self.prefix = prefix
         self.db = db
         self._lock = asyncio.Lock()
         self._sub_counter = 0
-        self._listener_tasks: Dict[str, asyncio.Task] = {}
-        self._subscriptions: Dict[str, Tuple[str, Callable, Set[str]]] = {}
-        self._local_intents: Dict[str, asyncio.Task] = {}
-        self._intent_monitor_task: Optional[asyncio.Task] = None
-        self._use_local_intent_timeout: Optional[bool] = None
+        self._listener_tasks: dict[str, asyncio.Task] = {}
+        self._subscriptions: dict[str, tuple[str, Callable, set[str]]] = {}
+        self._local_intents: dict[str, asyncio.Task] = {}
+        self._intent_monitor_task: asyncio.Task | None = None
+        self._use_local_intent_timeout: bool | None = None
         self._shutdown = False
         self._intent_mode_lock = asyncio.Lock()
 
@@ -199,12 +185,22 @@ class RedisEventBus(EventBus):
 
     async def publish(self, topic: str, msg: ECM) -> None:
         key = f"{self.prefix}:topic:{topic}"
-        data = json.dumps({
-            "trace_id": msg.trace_id, "intent": msg.intent, "intent_id": msg.intent_id,
-            "emitter": msg.emitter, "expectation": msg.expectation.__dict__ if msg.expectation else None,
-            "payload": msg.payload, "reply_to": msg.reply_to, "timestamp": msg.timestamp,
-            "required_skills": msg.required_skills, "priority": msg.priority, "metadata": msg.metadata
-        }, default=str)
+        data = json.dumps(
+            {
+                "trace_id": msg.trace_id,
+                "intent": msg.intent,
+                "intent_id": msg.intent_id,
+                "emitter": msg.emitter,
+                "expectation": msg.expectation.__dict__ if msg.expectation else None,
+                "payload": msg.payload,
+                "reply_to": msg.reply_to,
+                "timestamp": msg.timestamp,
+                "required_skills": msg.required_skills,
+                "priority": msg.priority,
+                "metadata": msg.metadata,
+            },
+            default=str,
+        )
         await self.redis.publish(key, data)
 
     async def subscribe(self, topic: str, handler, tags=None) -> str:
@@ -227,25 +223,34 @@ class RedisEventBus(EventBus):
                         async for message in pubsub.listen():
                             if self._shutdown:
                                 break
-                            if message['type'] != 'message':
+                            if message["type"] != "message":
                                 continue
                             async with self._lock:
                                 sub_info = self._subscriptions.get(sub_id)
                                 if sub_info is None:
                                     break
                                 _, current_handler, current_tags = sub_info
-                            data = json.loads(message['data'])
-                            exp = data.get('expectation')
+                            data = json.loads(message["data"])
+                            exp = data.get("expectation")
                             expectation = Expectation(**exp) if isinstance(exp, dict) else None
                             msg = ECM(
-                                trace_id=data['trace_id'], intent=data['intent'], intent_id=data['intent_id'],
-                                emitter=data['emitter'], expectation=expectation,
-                                payload=data.get('payload', {}), reply_to=data.get('reply_to', ''),
-                                timestamp=data.get('timestamp', time.monotonic()),
-                                required_skills=data.get('required_skills', []),
-                                priority=data.get('priority', 'normal'), metadata=data.get('metadata', {})
+                                trace_id=data["trace_id"],
+                                intent=data["intent"],
+                                intent_id=data["intent_id"],
+                                emitter=data["emitter"],
+                                expectation=expectation,
+                                payload=data.get("payload", {}),
+                                reply_to=data.get("reply_to", ""),
+                                timestamp=data.get("timestamp", time.monotonic()),
+                                required_skills=data.get("required_skills", []),
+                                priority=data.get("priority", "normal"),
+                                metadata=data.get("metadata", {}),
                             )
-                            if current_tags and msg.required_skills and not current_tags.intersection(set(msg.required_skills)):
+                            if (
+                                current_tags
+                                and msg.required_skills
+                                and not current_tags.intersection(set(msg.required_skills))
+                            ):
                                 continue
                             try:
                                 await current_handler(msg)
@@ -318,11 +323,11 @@ class RedisEventBus(EventBus):
                     async for message in pubsub.listen():
                         if self._shutdown:
                             break
-                        if message['type'] != 'pmessage':
+                        if message["type"] != "pmessage":
                             continue
-                        expired = message['data'].decode() if isinstance(message['data'], bytes) else message['data']
+                        expired = message["data"].decode() if isinstance(message["data"], bytes) else message["data"]
                         if expired.startswith(f"{self.prefix}:intent:"):
-                            intent_id = expired[len(f"{self.prefix}:intent:"):]
+                            intent_id = expired[len(f"{self.prefix}:intent:") :]
                             # 若本地意图缓存中已不存在该 intent_id，说明已在过期前被完成，忽略虚假超时
                             async with self._lock:
                                 if intent_id not in self._local_intents:
@@ -331,7 +336,10 @@ class RedisEventBus(EventBus):
                                 task = self._local_intents.pop(intent_id, None)
                                 if task and not task.done():
                                     task.cancel()
-                            await self.publish("intent.timeout", ECM(trace_id=intent_id, intent="intent.timeout", intent_id=intent_id, emitter="bus"))
+                            await self.publish(
+                                "intent.timeout",
+                                ECM(trace_id=intent_id, intent="intent.timeout", intent_id=intent_id, emitter="bus"),
+                            )
             except Exception:
                 logger.exception("Keyspace monitor connection lost, reconnecting...")
                 await asyncio.sleep(1)
@@ -344,7 +352,9 @@ class RedisEventBus(EventBus):
         async with self._lock:
             task = self._local_intents.pop(intent_id, None)
         if task is not None:
-            await self.publish("intent.timeout", ECM(trace_id=intent_id, intent="intent.timeout", intent_id=intent_id, emitter="bus"))
+            await self.publish(
+                "intent.timeout", ECM(trace_id=intent_id, intent="intent.timeout", intent_id=intent_id, emitter="bus")
+            )
 
     async def close(self):
         self._shutdown = True
@@ -363,4 +373,4 @@ class RedisEventBus(EventBus):
         for t in local_tasks:
             t.cancel()
         await asyncio.gather(*local_tasks, return_exceptions=True)
-        await self.redis.close()
+        await self.redis.aclose()

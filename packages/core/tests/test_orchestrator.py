@@ -1,8 +1,10 @@
-import pytest
 import asyncio
 from graphlib import TopologicalSorter
+
+import pytest
+
 from hiveflow import DAGOrchestrator
-from hiveflow.blackboard import SecureBlackboard, MemoryBlackboard
+from hiveflow.blackboard import MemoryBlackboard, SecureBlackboard
 
 
 @pytest.mark.asyncio
@@ -72,3 +74,89 @@ async def test_dag_orchestrator():
     result = await orch.execute(graph)
     assert result["A"] == "done_a"
     assert result["B"] == "after_done_a"
+
+
+@pytest.mark.asyncio
+async def test_dag_orchestrator_hitl_approval():
+    from hiveflow import HITLAction, HITLManager
+
+    hitl = HITLManager()
+    bb = SecureBlackboard(MemoryBlackboard())
+    orch = DAGOrchestrator(blackboard=bb, hitl_manager=hitl, workflow_id="wf_hitl")
+
+    async def gated_task(deps, view):
+        return "executed"
+
+    graph = {
+        "gate": {
+            "task": gated_task,
+            "depends_on": [],
+            "hitl": {
+                "action": HITLAction.APPROVAL.value,
+                "prompt": "Approve?",
+                "context": {"step": 1},
+            },
+        },
+    }
+
+    exec_task = asyncio.create_task(orch.execute(graph))
+    await asyncio.sleep(0.05)
+    pending = await hitl.list_pending_gates()
+    assert len(pending) == 1
+    await hitl.respond(pending[0].gate_id, approved=True)
+
+    result = await exec_task
+    assert result["gate"] == "executed"
+
+
+@pytest.mark.asyncio
+async def test_dag_orchestrator_hitl_rejection_aborts():
+    from hiveflow import AbortExecutionException, HITLAction, HITLManager
+
+    hitl = HITLManager()
+    bb = SecureBlackboard(MemoryBlackboard())
+    orch = DAGOrchestrator(blackboard=bb, hitl_manager=hitl)
+
+    async def gated_task(deps, view):
+        return "should_not_run"
+
+    graph = {
+        "gate": {
+            "task": gated_task,
+            "depends_on": [],
+            "hitl": {"action": HITLAction.APPROVAL.value, "prompt": "Approve?"},
+        },
+    }
+
+    exec_task = asyncio.create_task(orch.execute(graph))
+    await asyncio.sleep(0.05)
+    pending = await hitl.list_pending_gates()
+    await hitl.respond(pending[0].gate_id, approved=False)
+
+    with pytest.raises(AbortExecutionException):
+        await exec_task
+
+
+@pytest.mark.asyncio
+async def test_dag_orchestrator_checkpoint_after_node():
+    from hiveflow import CheckpointManager, MemoryCheckpointBackend
+
+    cp_mgr = CheckpointManager(MemoryCheckpointBackend())
+    bb = SecureBlackboard(MemoryBlackboard())
+    orch = DAGOrchestrator(blackboard=bb, checkpoint_manager=cp_mgr, workflow_id="wf_cp")
+
+    async def step(deps, view):
+        return {"value": 42}
+
+    graph = {
+        "step1": {
+            "task": step,
+            "depends_on": [],
+            "checkpoint": {"when": "after", "metadata": {"label": "step1"}},
+        },
+    }
+
+    await orch.execute(graph)
+    checkpoints = await cp_mgr.list_checkpoints("wf_cp")
+    assert len(checkpoints) == 1
+    assert checkpoints[0].state["result"] == {"value": 42}

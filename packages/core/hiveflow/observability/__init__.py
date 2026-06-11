@@ -7,15 +7,15 @@
 """
 
 from .metrics_prometheus import PrometheusMetricsExporter, create_prometheus_registry
-from .tracing import setup_tracing, create_span, trace_workflow_execution
-from .structured_logger import setup_structured_logging, HiveFlowLogger
+from .structured_logger import HiveFlowLogger, setup_structured_logging
+from .tracing import create_span, setup_tracing, trace_workflow_execution
 
 __all__ = [
+    "HiveFlowLogger",
     "PrometheusMetricsExporter",
     "create_prometheus_registry",
-    "setup_tracing",
     "create_span",
-    "trace_workflow_execution",
     "setup_structured_logging",
-    "HiveFlowLogger",
+    "setup_tracing",
+    "trace_workflow_execution",
 ]

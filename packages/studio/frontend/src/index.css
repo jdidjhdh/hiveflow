@@ -29,6 +29,19 @@ html, body, #root {
   gap: 12px;
 }
 
+.hf-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.hf-header-runtime {
+  padding: 0 8px;
+  border-right: 1px solid #f0f0f0;
+  margin-right: 4px;
+}
+
 .hf-logo {
   font-size: 20px;
   font-weight: 700;

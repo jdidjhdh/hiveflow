@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Table, Tag, Button, Space, Drawer, Form, Input, Select, Slider,
   Progress, Radio, Tooltip, Popconfirm, Collapse, Empty, Card, Row, Col, Dropdown, App, Tabs, Upload,
@@ -12,6 +12,7 @@ import {
   UploadOutlined, CodeOutlined, CloudServerOutlined, SendOutlined,
 } from '@ant-design/icons';
 import { useEngineStore } from '@/store/useEngineStore';
+import { useAgentRuntimeStore } from '@/store/useAgentRuntimeStore';
 import type { Capability, CapabilitySource } from '@/types';
 
 // ========== 简约头像组件 ==========
@@ -96,7 +97,11 @@ function agentColor(agent: Capability): string {
 }
 
 export default function AgentsPage() {
+  const engineMode = useEngineStore(s => s.mode);
   const engine = useEngineStore().getEngine();
+  const runtimeMode = useAgentRuntimeStore(s => s.runtimeMode);
+  const runtimeSkills = useAgentRuntimeStore(s => s.skills);
+  const fetchRuntime = useAgentRuntimeStore(s => s.fetchRuntime);
   const { message } = App.useApp();
   const [agents, setAgents] = useState<Capability[]>(() => engine.getAgents());
   const [search, setSearch] = useState('');
@@ -109,6 +114,12 @@ export default function AgentsPage() {
   const [capSource, setCapSource] = useState<CapabilitySource>('preset');
 
   const refresh = useCallback(() => setAgents(engine.getAgents()), [engine]);
+
+  useEffect(() => {
+    if (engineMode === 'real') {
+      fetchRuntime();
+    }
+  }, [engineMode, fetchRuntime]);
 
   const filteredAgents = useMemo(() => {
     if (!search) return agents;
@@ -212,7 +223,7 @@ export default function AgentsPage() {
       form.resetFields();
       setEditingAgent(null);
     }).catch(() => { });
-  }, [engine, refresh, form, editingAgent]);
+  }, [engine, refresh, form, editingAgent, message]);
 
   // ========== 表格列 ==========
   const columns: ColumnsType<Capability> = [
@@ -293,7 +304,7 @@ export default function AgentsPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             allowClear
-            style={{ width: 260 }}
+            style={{ width: 200, maxWidth: 300 }}
           />
           <Radio.Group value={viewMode} onChange={e => setViewMode(e.target.value)} size="small">
             <Tooltip title="表格视图"><Radio.Button value="table"><UnorderedListOutlined /></Radio.Button></Tooltip>
@@ -312,6 +323,21 @@ export default function AgentsPage() {
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreateForm}>新建 Agent</Button>
         </Space>
       </div>
+
+      {engineMode === 'real' && runtimeMode === 'agent' && runtimeSkills.length > 0 && (
+        <Card
+          title="HiveMind 已注册 Skills"
+          size="small"
+          style={{ marginBottom: 16 }}
+          extra={<Tag color="purple">Agent 模式</Tag>}
+        >
+          {runtimeSkills.map(s => (
+            <Tag key={s} color={s.startsWith('mcp_') ? 'gold' : 'purple'} style={{ marginBottom: 4 }}>
+              {s}
+            </Tag>
+          ))}
+        </Card>
+      )}
 
       {/* 空状态 */}
       {isEmpty && (

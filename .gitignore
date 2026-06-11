@@ -82,3 +82,21 @@ packages/studio/frontend/.next/
 # Logs
 *.log
 logs/
+
+# MkDocs build output (CI generates)
+/site/
+
+# Frontend build artifacts
+packages/studio/frontend/tsconfig.tsbuildinfo
+packages/studio/frontend/playwright-report/
+packages/studio/frontend/test-results/
+packages/studio/frontend/dist-app/
+
+# Internal planning notes (do not commit)
+OPTIMIZATION_SUMMARY.md
+PROGRESS_TRACKER.md
+TEST_COVERAGE_ROADMAP.md
+
+# Benchmark CI artifacts
+benchmarks/last-run*.json
+benchmarks/test-last-run.json

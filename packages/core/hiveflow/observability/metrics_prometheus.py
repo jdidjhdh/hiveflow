@@ -18,21 +18,21 @@
         return exporter.generate_metrics()
 """
 
-from typing import Dict, Any, Optional
-from dataclasses import dataclass, field
-import time
 import re
+import time
+from dataclasses import dataclass, field
 
 
 @dataclass
 class PrometheusMetric:
     """单个 Prometheus 指标"""
+
     name: str
     help_text: str
     metric_type: str  # counter, gauge, histogram
-    labels: Dict[str, str] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
     value: float = 0.0
-    buckets: Optional[list] = None  # histogram buckets
+    buckets: list | None = None  # histogram buckets
 
 
 class PrometheusMetricsExporter:
@@ -40,22 +40,22 @@ class PrometheusMetricsExporter:
 
     def __init__(self, prefix: str = "hiveflow"):
         self.prefix = prefix
-        self._metrics: Dict[str, PrometheusMetric] = {}
+        self._metrics: dict[str, PrometheusMetric] = {}
         self._start_time = time.time()
 
     def _sanitize_name(self, name: str) -> str:
         """将指标名称转换为 Prometheus 兼容格式"""
-        name = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+        name = re.sub(r"[^a-zA-Z0-9_]", "_", name)
         return f"{self.prefix}_{name}"
 
-    def _format_labels(self, labels: Dict[str, str]) -> str:
+    def _format_labels(self, labels: dict[str, str]) -> str:
         """格式化标签为 Prometheus 格式"""
         if not labels:
             return ""
         label_parts = [f'{k}="{v}"' for k, v in sorted(labels.items())]
         return "{" + ",".join(label_parts) + "}"
 
-    def register_counter(self, name: str, help_text: str, labels: Dict[str, str] = None):
+    def register_counter(self, name: str, help_text: str, labels: dict[str, str] | None = None):
         """注册 Counter 指标"""
         metric_name = self._sanitize_name(name)
         self._metrics[metric_name] = PrometheusMetric(
@@ -66,7 +66,7 @@ class PrometheusMetricsExporter:
             value=0,
         )
 
-    def register_gauge(self, name: str, help_text: str, labels: Dict[str, str] = None):
+    def register_gauge(self, name: str, help_text: str, labels: dict[str, str] | None = None):
         """注册 Gauge 指标"""
         metric_name = self._sanitize_name(name)
         self._metrics[metric_name] = PrometheusMetric(
@@ -77,8 +77,9 @@ class PrometheusMetricsExporter:
             value=0,
         )
 
-    def register_histogram(self, name: str, help_text: str,
-                          buckets: list = None, labels: Dict[str, str] = None):
+    def register_histogram(
+        self, name: str, help_text: str, buckets: list | None = None, labels: dict[str, str] | None = None
+    ):
         """注册 Histogram 指标"""
         metric_name = self._sanitize_name(name)
         if buckets is None:
@@ -92,7 +93,7 @@ class PrometheusMetricsExporter:
             buckets=buckets,
         )
 
-    def update_counter(self, name: str, value: float = 1.0, labels: Dict[str, str] = None):
+    def update_counter(self, name: str, value: float = 1.0, labels: dict[str, str] | None = None):
         """更新 Counter 值"""
         metric_name = self._sanitize_name(name)
         if metric_name in self._metrics:
@@ -100,7 +101,7 @@ class PrometheusMetricsExporter:
             if labels:
                 self._metrics[metric_name].labels.update(labels)
 
-    def update_gauge(self, name: str, value: float, labels: Dict[str, str] = None):
+    def update_gauge(self, name: str, value: float, labels: dict[str, str] | None = None):
         """更新 Gauge 值"""
         metric_name = self._sanitize_name(name)
         if metric_name in self._metrics:
@@ -108,7 +109,7 @@ class PrometheusMetricsExporter:
             if labels:
                 self._metrics[metric_name].labels.update(labels)
 
-    def observe_histogram(self, name: str, value: float, labels: Dict[str, str] = None):
+    def observe_histogram(self, name: str, value: float, labels: dict[str, str] | None = None):
         """记录 Histogram 观测值"""
         metric_name = self._sanitize_name(name)
         if metric_name in self._metrics:
@@ -144,8 +145,8 @@ class PrometheusMetricsExporter:
                 output.append(f"{name}_count{label_str} 1")
                 if metric.buckets:
                     for bucket in metric.buckets:
-                        output.append(f"{name}_bucket{{le=\"{bucket}\"{self._format_labels(metric.labels)[1:]}}} 0")
-                    output.append(f"{name}_bucket{{le=\"+Inf\"{self._format_labels(metric.labels)[1:]}}} 1")
+                        output.append(f'{name}_bucket{{le="{bucket}"{self._format_labels(metric.labels)[1:]}}} 0')
+                    output.append(f'{name}_bucket{{le="+Inf"{self._format_labels(metric.labels)[1:]}}} 1')
 
         return "\n".join(output) + "\n"
 

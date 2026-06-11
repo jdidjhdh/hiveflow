@@ -1,8 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
   Table, Button, Modal, Form, Input, Select, Space, Tag, Popconfirm,
-  message, Card, Typography, Divider, Tabs, Badge, Tooltip, Empty,
-  InputNumber, Alert, List, Collapse, Drawer, Descriptions,
+  message, Typography, Divider, Badge, Tooltip, Empty, List, Drawer, Descriptions,
 } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, HistoryOutlined,
@@ -10,9 +9,9 @@ import {
   DiffOutlined, ThunderboltOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { API_BASE_URL, apiFetch, getErrorMessage } from '@/utils/api';
+import { apiFetch, getErrorMessage } from '@/utils/api';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 // ======================== Types ========================
@@ -555,7 +554,7 @@ export default function PromptTemplatesPage() {
           <Text strong>变量赋值：</Text>
           <Form.Item name="variables" style={{ marginTop: 8 }}>
             <Form.List name="variables">
-              {(fields) => (
+              {(_fields) => (
                 <Space direction="vertical" style={{ width: '100%' }}>
                   {selectedTemplate?.variables?.map((v) => (
                     <Form.Item key={v} label={`{{${v}}}`} name={[v]}>

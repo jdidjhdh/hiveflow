@@ -3,15 +3,16 @@
 Manages short-term memory (conversation history) and optional long-term memory
 via Chroma vector storage for semantic retrieval.
 """
-import time
+
 import logging
+import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
-    from . import LLMClient, LLMMessage
+    from . import LLMMessage
 except ImportError:
-    from hiveflow import LLMClient, LLMMessage
+    from hiveflow import LLMMessage
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +20,15 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MemoryEntry:
     """A single memory entry."""
+
     content: str
     role: str  # "user", "assistant", "system", "observation"
     timestamp: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # ========== Short-Term Memory ==========
+
 
 class ShortTermMemory:
     """In-memory conversation/task history with configurable size limits."""
@@ -33,10 +36,10 @@ class ShortTermMemory:
     def __init__(self, max_entries: int = 50, max_tokens: int = 8000):
         self.max_entries = max_entries
         self.max_tokens = max_tokens
-        self.entries: List[MemoryEntry] = []
+        self.entries: list[MemoryEntry] = []
         self._total_tokens = 0
 
-    def add(self, content: str, role: str = "user", metadata: Optional[Dict[str, Any]] = None) -> MemoryEntry:
+    def add(self, content: str, role: str = "user", metadata: dict[str, Any] | None = None) -> MemoryEntry:
         entry = MemoryEntry(content=content, role=role, metadata=metadata or {})
         self.entries.append(entry)
         self._total_tokens += self._count_tokens(content)
@@ -52,10 +55,10 @@ class ShortTermMemory:
 
         return entry
 
-    def get_recent(self, n: int = 10) -> List[MemoryEntry]:
+    def get_recent(self, n: int = 10) -> list[MemoryEntry]:
         return self.entries[-n:]
 
-    def get_as_messages(self, system_prompt: str = "") -> List[LLMMessage]:
+    def get_as_messages(self, system_prompt: str = "") -> list[LLMMessage]:
         messages = []
         if system_prompt:
             messages.append(LLMMessage(role="system", content=system_prompt))
@@ -78,23 +81,25 @@ class ShortTermMemory:
 
 # ========== Long-Term Memory (Chroma-backed) ==========
 
+
 class LongTermMemory:
     """Vector-based long-term memory using Chroma for semantic retrieval.
 
     Falls back to keyword-based search if Chroma is not available.
     """
 
-    def __init__(self, collection_name: str = "hiveflow_memory", persist_dir: Optional[str] = None):
+    def __init__(self, collection_name: str = "hiveflow_memory", persist_dir: str | None = None):
         self.collection_name = collection_name
         self.persist_dir = persist_dir
         self._available = False
         self._collection = None
-        self._fallback_store: List[MemoryEntry] = []
+        self._fallback_store: list[MemoryEntry] = []
 
         # Try to initialize Chroma
         try:
-            import chromadb
             import threading
+
+            import chromadb
 
             init_result = [None, None]
 
@@ -130,7 +135,7 @@ class LongTermMemory:
         except ImportError:
             logger.info("Chroma not available, using fallback keyword search for long-term memory")
 
-    def add(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> str:
+    def add(self, content: str, metadata: dict[str, Any] | None = None) -> str:
         entry_id = f"mem_{time.time()}"
         entry = MemoryEntry(content=content, role="memory", metadata=metadata or {})
 
@@ -149,7 +154,7 @@ class LongTermMemory:
 
         return entry_id
 
-    def search(self, query: str, n_results: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query: str, n_results: int = 5) -> list[dict[str, Any]]:
         if self._available and self._collection:
             try:
                 results = self._collection.query(
@@ -171,7 +176,7 @@ class LongTermMemory:
         # Fallback: keyword-based search
         return self._fallback_search(query, n_results)
 
-    def _fallback_search(self, query: str, n_results: int) -> List[Dict[str, Any]]:
+    def _fallback_search(self, query: str, n_results: int) -> list[dict[str, Any]]:
         """Simple keyword-based search as fallback."""
         query_lower = query.lower()
         scored = []
@@ -183,10 +188,7 @@ class LongTermMemory:
                 scored.append((score, entry))
 
         scored.sort(key=lambda x: -x[0])
-        return [
-            {"content": entry.content, "metadata": entry.metadata, "id": ""}
-            for _, entry in scored[:n_results]
-        ]
+        return [{"content": entry.content, "metadata": entry.metadata, "id": ""} for _, entry in scored[:n_results]]
 
     def delete(self, entry_id: str) -> bool:
         if self._available and self._collection:
@@ -222,6 +224,7 @@ class LongTermMemory:
 
 # ========== MemoryManager (unified interface) ==========
 
+
 class MemoryManager:
     """Unified memory manager combining short-term and long-term memory."""
 
@@ -230,7 +233,7 @@ class MemoryManager:
         session_id: str = "default",
         short_term_max_entries: int = 50,
         short_term_max_tokens: int = 8000,
-        long_term_persist_dir: Optional[str] = None,
+        long_term_persist_dir: str | None = None,
         long_term_collection: str = "hiveflow_memory",
     ):
         self.session_id = session_id
@@ -243,29 +246,29 @@ class MemoryManager:
             persist_dir=long_term_persist_dir,
         )
 
-    def add_user_message(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> MemoryEntry:
+    def add_user_message(self, content: str, metadata: dict[str, Any] | None = None) -> MemoryEntry:
         entry = self.short_term.add(content, "user", metadata)
         # Also store in long-term memory for future retrieval
         self.long_term.add(content, {"role": "user", **{k: str(v) for k, v in (metadata or {}).items()}})
         return entry
 
-    def add_assistant_message(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> MemoryEntry:
+    def add_assistant_message(self, content: str, metadata: dict[str, Any] | None = None) -> MemoryEntry:
         entry = self.short_term.add(content, "assistant", metadata)
         # Store important assistant responses in long-term memory
         if metadata and metadata.get("persist", False):
             self.long_term.add(content, {"role": "assistant", **{k: str(v) for k, v in metadata.items()}})
         return entry
 
-    def add_observation(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> MemoryEntry:
+    def add_observation(self, content: str, metadata: dict[str, Any] | None = None) -> MemoryEntry:
         return self.short_term.add(content, "observation", metadata)
 
-    def get_context(self, system_prompt: str = "", recent_n: int = 10) -> List[LLMMessage]:
+    def get_context(self, system_prompt: str = "", recent_n: int = 10) -> list[LLMMessage]:
         return self.short_term.get_as_messages(system_prompt)
 
-    def search_memory(self, query: str, n_results: int = 5) -> List[Dict[str, Any]]:
+    def search_memory(self, query: str, n_results: int = 5) -> list[dict[str, Any]]:
         return self.long_term.search(query, n_results)
 
-    def get_recent(self, n: int = 10) -> List[MemoryEntry]:
+    def get_recent(self, n: int = 10) -> list[MemoryEntry]:
         return self.short_term.get_recent(n)
 
     def clear_session(self):
@@ -278,7 +281,7 @@ class MemoryManager:
         system_prompt: str = "",
         recent_n: int = 10,
         memory_n: int = 3,
-    ) -> List[LLMMessage]:
+    ) -> list[LLMMessage]:
         """Build context combining recent conversation with relevant long-term memories."""
         messages = self.short_term.get_as_messages(system_prompt)
 

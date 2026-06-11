@@ -12,19 +12,17 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Table, Tag, Button, Space, Input, App, Popconfirm, Modal, Form,
-  Select, Tabs, Card, Statistic, Row, Col, Tooltip, Typography,
-  Descriptions, Alert, Upload, message as msg, Divider, Badge,
+  Select, Tabs, Card, Statistic, Row, Col, Tooltip, Typography, Upload, Divider,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   SearchOutlined, ApiOutlined, CodeOutlined,
-  CloudServerOutlined, UploadOutlined, DeleteOutlined,
-  SendOutlined, EditOutlined, PlusOutlined, DownloadOutlined,
-  InboxOutlined, ShopOutlined, CheckCircleOutlined,
-  ExportOutlined, ImportOutlined, EyeOutlined,
+  CloudServerOutlined, UploadOutlined, DeleteOutlined, EditOutlined, PlusOutlined, DownloadOutlined, ShopOutlined, CheckCircleOutlined,
+  ExportOutlined, ImportOutlined,
 } from '@ant-design/icons';
 import type { CapabilityDef, CapabilitySource } from '@/types';
-import { API_BASE_URL, apiFetch, getErrorMessage } from '@/utils/api';
+import { apiFetch, getErrorMessage } from '@/utils/api';
+import { useAgentRuntimeStore } from '@/store/useAgentRuntimeStore';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -59,6 +57,8 @@ interface MarketplaceStats {
 
 function MarketplaceTab() {
   const { message } = App.useApp();
+  const runtimeMode = useAgentRuntimeStore(s => s.runtimeMode);
+  const fetchRuntime = useAgentRuntimeStore(s => s.fetchRuntime);
   const [plugins, setPlugins] = useState<PluginMarketplaceItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Record<string, string>>({});
@@ -80,7 +80,7 @@ function MarketplaceTab() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, searchText]);
+  }, [selectedCategory, searchText, message]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -94,20 +94,48 @@ function MarketplaceTab() {
   useEffect(() => {
     fetchMarketplace();
     fetchCategories();
-  }, [fetchMarketplace, fetchCategories]);
+    fetchRuntime();
+  }, [fetchMarketplace, fetchCategories, fetchRuntime]);
 
   const handleInstall = useCallback(async (plugin: PluginMarketplaceItem) => {
     try {
-      await apiFetch('/api/plugins/install', {
+      const data = await apiFetch('/api/plugins/install', {
         method: 'POST',
         body: JSON.stringify({ plugin_id: plugin.plugin_id }),
       });
-      message.success(`插件 "${plugin.name}" 已安装`);
+      const skills: string[] = data.registered_skills || [];
+      if (skills.length > 0) {
+        message.success(
+          `插件 "${plugin.name}" 已安装，并注册 ${skills.length} 个 Agent Skill`,
+          5,
+        );
+        Modal.info({
+          title: 'MCP → Skill 已注册',
+          content: (
+            <div>
+              <p>以下 Skill 已加入 HiveMindApp，可在 Agent 模式下被认知编排器调用：</p>
+              <ul style={{ marginTop: 8, paddingLeft: 20 }}>
+                {skills.map(s => (
+                  <li key={s}><Text code>{s}</Text></li>
+                ))}
+              </ul>
+            </div>
+          ),
+        });
+      } else {
+        message.success(`插件 "${plugin.name}" 已安装`);
+        if (runtimeMode !== 'agent') {
+          message.info('在设置或编排器中开启 Agent 模式后，可自动将 MCP 工具注册为 Skill', 6);
+        } else {
+          message.warning('插件已安装，但未注册 Skill（可能无可用 MCP 工具）', 5);
+        }
+      }
       fetchMarketplace();
+      fetchRuntime();
     } catch (err) {
       message.error(getErrorMessage(err));
     }
-  }, [fetchMarketplace]);
+  }, [fetchMarketplace, fetchRuntime, runtimeMode, message]);
 
   const columns: ColumnsType<PluginMarketplaceItem> = [
     {
@@ -345,14 +373,14 @@ function MyCapabilitiesTab() {
         message.error(getErrorMessage(err));
       }
     }
-  }, [form, editingCap, caps, saveToStorage]);
+  }, [form, editingCap, caps, saveToStorage, message]);
 
   const handleDelete = useCallback((id: string) => {
     const updated = caps.filter(c => c.id !== id);
     setCaps(updated);
     saveToStorage(updated);
     message.success('能力已删除');
-  }, [caps, saveToStorage]);
+  }, [caps, saveToStorage, message]);
 
   const handleExport = useCallback(() => {
     const json = JSON.stringify(caps, null, 2);
@@ -364,7 +392,7 @@ function MyCapabilitiesTab() {
     a.click();
     URL.revokeObjectURL(url);
     message.success('已导出能力定义');
-  }, [caps]);
+  }, [caps, message]);
 
   const handleImport = useCallback((file: File) => {
     const reader = new FileReader();
@@ -383,7 +411,7 @@ function MyCapabilitiesTab() {
     };
     reader.readAsText(file);
     return false;
-  }, [caps, saveToStorage]);
+  }, [caps, saveToStorage, message]);
 
   const filtered = useMemo(() => {
     let result = caps;

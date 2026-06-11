@@ -71,6 +71,21 @@ async def get_agent_performance():
     return {"agents": agents}
 
 
+@router.get("/nodes/duration")
+async def get_node_duration_stats(limit: int = 20):
+    """获取节点/意图耗时排行"""
+    engine = get_engine()
+    nodes = engine.get_node_duration_stats(limit=limit)
+    return {"nodes": nodes}
+
+
+@router.get("/prometheus")
+async def get_prometheus_analytics():
+    """Prometheus 指标与节点耗时聚合（供 Analytics 深度展示）"""
+    engine = get_engine()
+    return await engine.get_prometheus_analytics()
+
+
 @router.get("/errors")
 async def get_error_analysis(limit: int = 50):
     """获取错误分析"""

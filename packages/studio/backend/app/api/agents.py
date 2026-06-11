@@ -6,6 +6,14 @@ from app.core.engine_service import get_engine
 router = APIRouter()
 
 
+@router.get("/capabilities")
+async def list_capabilities():
+    """列出所有已注册的 Agent 能力（别名接口，等同于 /agents）"""
+    engine = get_engine()
+    agents = await engine.list_agents()
+    return {"capabilities": agents}
+
+
 @router.get("/agents")
 async def list_agents():
     engine = get_engine()

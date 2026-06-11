@@ -8,48 +8,59 @@ Provides:
 
 Implements the MCP specification (https://modelcontextprotocol.io) for tool discovery and invocation.
 """
+
 import asyncio
 import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 # ======================== MCP Transport ========================
 
+
 class MCPTransportType(str, Enum):
     """Supported MCP transport types."""
-    STDIO = "stdio"       # Subprocess with stdin/stdout
-    SSE = "sse"           # Server-Sent Events
-    HTTP = "http"         # HTTP POST/GET
-    STREAMABLE = "streamable_http"  # Streamable HTTP transport
-    MOCK = "mock"         # Mock transport for testing
+
+    STDIO = "stdio"  # Subprocess with stdin/stdout
+    SSE = "sse"  # Server-Sent Events (planned)
+    HTTP = "http"  # HTTP POST/GET (planned)
+    STREAMABLE = "streamable_http"  # Streamable HTTP transport (planned)
+    MOCK = "mock"  # Mock transport for testing
+
+    @classmethod
+    def implemented(cls) -> set["MCPTransportType"]:
+        """Transports with a working client implementation."""
+        return {cls.STDIO, cls.MOCK}
 
 
 @dataclass
 class MCPToolParam:
     """Parameter definition for an MCP tool."""
+
     name: str
     description: str
     type: str = "string"
     required: bool = False
-    enum: Optional[List[str]] = None
+    enum: list[str] | None = None
 
 
 @dataclass
 class MCPTool:
     """A tool provided by an MCP server."""
+
     name: str
     description: str
-    parameters: List[MCPToolParam]
+    parameters: list[MCPToolParam]
     server_name: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "description": self.description,
@@ -68,6 +79,7 @@ class MCPTool:
 @dataclass
 class MCPResource:
     """A resource provided by an MCP server."""
+
     uri: str
     name: str
     description: str = ""
@@ -78,20 +90,21 @@ class MCPResource:
 @dataclass
 class MCPToolCallResult:
     """Result of calling an MCP tool."""
+
     tool_name: str
     success: bool
     content: str = ""
     error: str = ""
     latency_ms: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class MCPClient:
     """
     Client for connecting to MCP servers.
-    
+
     Supports stdio transport (subprocess) and mock mode for testing.
-    
+
     Usage:
         # stdio mode
         client = MCPClient(
@@ -102,7 +115,7 @@ class MCPClient:
         await client.initialize()
         tools = await client.list_tools()
         result = await client.call_tool("read_file", {"path": "/path/file.txt"})
-        
+
         # Mock mode (for testing)
         client = MCPClient(transport="mock")
         client.register_tool("echo", lambda args: {"content": args.get("text", "")})
@@ -112,8 +125,8 @@ class MCPClient:
         self,
         transport: str = "stdio",
         command: str = "",
-        args: Optional[List[str]] = None,
-        env: Optional[Dict[str, str]] = None,
+        args: list[str] | None = None,
+        env: dict[str, str] | None = None,
         timeout: float = 30.0,
     ):
         self.transport = MCPTransportType(transport) if isinstance(transport, str) else transport
@@ -121,11 +134,11 @@ class MCPClient:
         self.args = args or []
         self.env = env or {}
         self.timeout = timeout
-        self._process: Optional[asyncio.subprocess.Process] = None
+        self._process: asyncio.subprocess.Process | None = None
         self._initialized = False
-        self._tools: List[MCPTool] = []
-        self._resources: List[MCPResource] = []
-        self._mock_handlers: Dict[str, Callable] = {}
+        self._tools: list[MCPTool] = []
+        self._resources: list[MCPResource] = []
+        self._mock_handlers: dict[str, Callable] = {}
         self._request_id = 0
 
     async def initialize(self):
@@ -136,7 +149,10 @@ class MCPClient:
             self._initialized = True
             self._refresh_tools_mock()
         else:
-            raise NotImplementedError(f"Transport {self.transport.value} not implemented")
+            supported = ", ".join(t.value for t in MCPTransportType.implemented())
+            raise NotImplementedError(
+                f"Transport {self.transport.value} not implemented. Supported transports: {supported}"
+            )
 
         if self._initialized:
             await self._refresh_tools()
@@ -170,7 +186,7 @@ class MCPClient:
         self._initialized = False
         self._tools = []
 
-    async def list_tools(self) -> List[MCPTool]:
+    async def list_tools(self) -> list[MCPTool]:
         """List available tools from the MCP server."""
         if not self._initialized:
             await self.initialize()
@@ -195,22 +211,26 @@ class MCPClient:
                         schema = tool_def["inputSchema"]
                         required = set(schema.get("required", []))
                         for name, prop in schema.get("properties", {}).items():
-                            params.append(MCPToolParam(
-                                name=name,
-                                description=prop.get("description", ""),
-                                type=prop.get("type", "string"),
-                                required=name in required,
-                                enum=prop.get("enum"),
-                            ))
-                    self._tools.append(MCPTool(
-                        name=tool_def["name"],
-                        description=tool_def.get("description", ""),
-                        parameters=params,
-                    ))
+                            params.append(
+                                MCPToolParam(
+                                    name=name,
+                                    description=prop.get("description", ""),
+                                    type=prop.get("type", "string"),
+                                    required=name in required,
+                                    enum=prop.get("enum"),
+                                )
+                            )
+                    self._tools.append(
+                        MCPTool(
+                            name=tool_def["name"],
+                            description=tool_def.get("description", ""),
+                            parameters=params,
+                        )
+                    )
         except Exception as e:
             logger.warning(f"Failed to refresh MCP tools: {e}")
 
-    async def _send_request(self, method: str, params: Optional[Dict] = None) -> Optional[Dict]:
+    async def _send_request(self, method: str, params: dict | None = None) -> dict | None:
         """Send a JSON-RPC request via stdio and return the response."""
         if not self._process or not self._process.stdin or not self._process.stdout:
             raise RuntimeError("MCP stdio transport not initialized")
@@ -254,20 +274,25 @@ class MCPClient:
                         parts = line[2:].split(": ", 1)
                         if len(parts) == 2:
                             param_name, desc = parts
-                            params.append(MCPToolParam(
-                                name=param_name,
-                                description=desc,
-                            ))
-            self._tools.append(MCPTool(
-                name=name,
-                description=handler.__doc__ or f"Mock tool: {name}",
-                parameters=params,
-                server_name="mock",
-            ))
+                            params.append(
+                                MCPToolParam(
+                                    name=param_name,
+                                    description=desc,
+                                )
+                            )
+            self._tools.append(
+                MCPTool(
+                    name=name,
+                    description=handler.__doc__ or f"Mock tool: {name}",
+                    parameters=params,
+                    server_name="mock",
+                )
+            )
 
-    async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> MCPToolCallResult:
+    async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> MCPToolCallResult:
         """Call an MCP tool."""
         import time
+
         start = time.monotonic()
 
         try:
@@ -298,7 +323,7 @@ class MCPClient:
                 latency_ms=latency_ms,
             )
 
-    async def _call_mock(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
+    async def _call_mock(self, tool_name: str, arguments: dict[str, Any]) -> Any:
         """Call a mock tool handler."""
         handler = self._mock_handlers.get(tool_name)
         if not handler:
@@ -309,7 +334,7 @@ class MCPClient:
             return await result
         return result
 
-    async def _call_stdio(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
+    async def _call_stdio(self, tool_name: str, arguments: dict[str, Any]) -> Any:
         """Call a tool via stdio transport."""
         if not self._process or not self._process.stdin:
             raise RuntimeError("MCP stdio transport not initialized")
@@ -348,13 +373,13 @@ class MCPClient:
         self._mock_handlers[name] = handler
         self._refresh_tools_mock()
 
-    def register_tools(self, tools: Dict[str, Callable]):
+    def register_tools(self, tools: dict[str, Callable]):
         """Register multiple mock tool handlers."""
         for name, handler in tools.items():
             self._mock_handlers[name] = handler
         self._refresh_tools_mock()
 
-    async def list_resources(self) -> List[MCPResource]:
+    async def list_resources(self) -> list[MCPResource]:
         """List available resources from the MCP server."""
         return list(self._resources)
 
@@ -364,23 +389,25 @@ class MCPClient:
 
 # ======================== MCP Plugin Manager ========================
 
+
 @dataclass
 class MCPPlugin:
     """An MCP plugin configuration."""
+
     plugin_id: str
     name: str
     description: str = ""
     transport: str = "stdio"
     command: str = ""
-    args: List[str] = field(default_factory=list)
-    env: Dict[str, str] = field(default_factory=dict)
-    tools: List[MCPTool] = field(default_factory=list)
-    resources: List[MCPResource] = field(default_factory=list)
+    args: list[str] = field(default_factory=list)
+    env: dict[str, str] = field(default_factory=dict)
+    tools: list[MCPTool] = field(default_factory=list)
+    resources: list[MCPResource] = field(default_factory=list)
     enabled: bool = True
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "plugin_id": self.plugin_id,
             "name": self.name,
@@ -397,10 +424,10 @@ class MCPPlugin:
 class MCPPluginManager:
     """
     Manages MCP plugins (servers).
-    
+
     Usage:
         mgr = MCPPluginManager()
-        
+
         # Register a plugin
         plugin = await mgr.register_plugin(
             plugin_id="filesystem",
@@ -409,18 +436,18 @@ class MCPPluginManager:
             command="npx",
             args=["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
         )
-        
+
         # Initialize and discover tools
         await mgr.initialize_plugin("filesystem")
         tools = await mgr.get_plugin_tools("filesystem")
-        
+
         # Call a tool
         result = await mgr.call_tool("filesystem", "read_file", {"path": "/workspace/file.txt"})
     """
 
     def __init__(self):
-        self._plugins: Dict[str, MCPPlugin] = {}
-        self._clients: Dict[str, MCPClient] = {}
+        self._plugins: dict[str, MCPPlugin] = {}
+        self._clients: dict[str, MCPClient] = {}
 
     async def register_plugin(
         self,
@@ -429,8 +456,8 @@ class MCPPluginManager:
         description: str = "",
         transport: str = "stdio",
         command: str = "",
-        args: Optional[List[str]] = None,
-        env: Optional[Dict[str, str]] = None,
+        args: list[str] | None = None,
+        env: dict[str, str] | None = None,
     ) -> MCPPlugin:
         """Register an MCP plugin."""
         plugin = MCPPlugin(
@@ -478,22 +505,22 @@ class MCPPluginManager:
         if plugin_id in self._plugins:
             self._plugins[plugin_id].tools = []
 
-    async def get_plugin(self, plugin_id: str) -> Optional[MCPPlugin]:
+    async def get_plugin(self, plugin_id: str) -> MCPPlugin | None:
         """Get a plugin by ID."""
         return self._plugins.get(plugin_id)
 
-    async def list_plugins(self) -> List[MCPPlugin]:
+    async def list_plugins(self) -> list[MCPPlugin]:
         """List all registered plugins."""
         return list(self._plugins.values())
 
-    async def get_plugin_tools(self, plugin_id: str) -> List[MCPTool]:
+    async def get_plugin_tools(self, plugin_id: str) -> list[MCPTool]:
         """Get tools from a specific plugin."""
         plugin = self._plugins.get(plugin_id)
         if not plugin:
             raise ValueError(f"Plugin not found: {plugin_id}")
         return plugin.tools
 
-    async def get_all_tools(self) -> List[MCPTool]:
+    async def get_all_tools(self) -> list[MCPTool]:
         """Get all tools from all enabled plugins."""
         all_tools = []
         for plugin in self._plugins.values():
@@ -505,7 +532,7 @@ class MCPPluginManager:
         self,
         plugin_id: str,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
     ) -> MCPToolCallResult:
         """Call a tool from a specific plugin."""
         client = self._clients.get(plugin_id)
@@ -524,7 +551,7 @@ class MCPPluginManager:
             return True
         return False
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get plugin statistics."""
         total_tools = sum(len(p.tools) for p in self._plugins.values())
         return {

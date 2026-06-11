@@ -5,7 +5,7 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from hiveflow import MISSING, AbortExecutionException
+from hiveflow import MISSING, AbortExecutionException, Expectation, HITLAction, HITLStatus
 
 if TYPE_CHECKING:
     from ..app import SkillBinding
@@ -57,7 +57,9 @@ class CognitiveOrchestrator:
                  global_timeout: float = 300.0,
                  node_result_ttl: float = 600.0,
                  schedule_retries: int = 3,
-                 schedule_backoff_base: float = 0.5):
+                 schedule_backoff_base: float = 0.5,
+                 hitl_manager=None,
+                 enable_plan_hitl: bool = False):
         self.llm = llm
         self.hive = hiveflow
         self.scheduler = hiveflow.scheduler
@@ -72,9 +74,10 @@ class CognitiveOrchestrator:
         self.schedule_retries = schedule_retries
         self.schedule_backoff_base = schedule_backoff_base
         self.dynamic_orch = hiveflow.dynamic_orchestrator
+        self.hitl_manager = hitl_manager
+        self.enable_plan_hitl = enable_plan_hitl
 
     async def execute(self, user_query: str, conversation_id: str = "") -> dict:
-        """返回 {'intent_id': str, 'results': dict}"""
         ecm = await self.intent_parser.parse(user_query, conversation_id)
         intent_id = ecm.intent_id
 
@@ -83,6 +86,15 @@ class CognitiveOrchestrator:
         long_term_context = "\n".join([i.content for i in long_term_items])
 
         graph_spec = await self._plan(ecm, short_term, long_term_context)
+        graph_spec, rejection = await self._maybe_approve_plan(graph_spec, intent_id, conversation_id)
+        if rejection:
+            return {
+                "intent_id": intent_id,
+                "results": {},
+                "status": "plan_rejected",
+                "reason": rejection,
+            }
+
         partial_results: Dict[str, Any] = {}
 
         for attempt in range(self.max_replan_attempts):
@@ -118,6 +130,58 @@ class CognitiveOrchestrator:
 
         return {"intent_id": intent_id, "results": partial_results}
 
+    async def plan_only(self, user_query: str, conversation_id: str = "") -> dict:
+        """Generate TaskGraph plan without executing or HITL."""
+        ecm = await self.intent_parser.parse(user_query, conversation_id)
+        intent_id = ecm.intent_id
+        short_term = self.memory.get_short_term()
+        long_term_items = await self.memory.recall_long_term(user_query, k=3)
+        long_term_context = "\n".join([i.content for i in long_term_items])
+        graph_spec = await self._plan(ecm, short_term, long_term_context)
+        return {"intent_id": intent_id, "plan": graph_spec, "status": "planned"}
+
+    async def execute_plan(
+        self,
+        graph_spec: Dict,
+        user_query: str = "",
+        conversation_id: str = "",
+    ) -> dict:
+        """Execute a pre-built TaskGraph without LLM planning or plan HITL."""
+        ecm = await self.intent_parser.parse(user_query or "execute plan", conversation_id)
+        intent_id = ecm.intent_id
+        short_term = self.memory.get_short_term()
+        long_term_items = await self.memory.recall_long_term(user_query or "execute plan", k=3)
+        long_term_context = "\n".join([i.content for i in long_term_items])
+        partial_results: Dict[str, Any] = {}
+
+        for attempt in range(self.max_replan_attempts):
+            if attempt > 0:
+                short_term = self.memory.get_short_term()
+                long_term_items = await self.memory.recall_long_term(user_query, k=3)
+                long_term_context = "\n".join([i.content for i in long_term_items])
+
+            executable_graph = self._build_executable_graph(
+                graph_spec, intent_id, user_query or "execute plan",
+                short_term, long_term_context, partial_results, ecm.payload,
+            )
+            try:
+                results = await self.dynamic_orch.execute(executable_graph, global_timeout=self.global_timeout)
+                partial_results.update(results)
+                if "final_answer" not in results:
+                    raise AbortExecutionException("Missing final_answer node")
+                return {"intent_id": intent_id, "results": partial_results, "status": "completed"}
+            except (AbortExecutionException, Exception) as e:
+                logger.exception(f"execute_plan attempt {attempt + 1} failed: {e}")
+                await self._persist_partial_results(partial_results, intent_id)
+                if attempt == self.max_replan_attempts - 1:
+                    raise
+                diagnosis = await self._diagnose(e, graph_spec, partial_results, ecm)
+                graph_spec = await self._replan(
+                    ecm, diagnosis, partial_results, short_term, long_term_context, intent_id,
+                )
+
+        return {"intent_id": intent_id, "results": partial_results, "status": "completed"}
+
     def _build_executable_graph(self,
                                 graph_spec: Dict,
                                 intent_id: str,
@@ -134,12 +198,13 @@ class CognitiveOrchestrator:
                 raise ValueError(f"Unknown skill '{skill_name}'")
 
             on_failure = node_data.get("on_failure", "abort")
+            exp_cfg = node_data.get("expectation")
 
             async def node_task(deps, view, _name=node_name, _skill=skill_name,
                                 _intent_id=intent_id, _query=user_query,
                                 _st=short_term, _lt=long_term_context,
                                 _partial=partial_results, _on_failure=on_failure,
-                                _payload=intent_payload):
+                                _payload=intent_payload, _exp_cfg=exp_cfg):
                 # 1. 缓存结果
                 cached = _partial.get(_name)
                 if cached is not None and cached is not MISSING:
@@ -169,12 +234,19 @@ class CognitiveOrchestrator:
                         "query": _query,
                         "input_keys": input_keys,
                         "context": {"short_term": _st, "long_term": _lt},
-                        **_payload  # 合并原始意图的 payload (如 expression)
+                        **_payload
                     },
                     priority="normal",
-                    expectation=None,  # Will be set by dynamic orchestrator
+                    expectation=None,
                     user_query=_query
                 )
+                if _exp_cfg:
+                    task_ecm.expectation = Expectation(
+                        state_key=result_key,
+                        expected_schema=_exp_cfg.get("schema", {}),
+                        validation=_exp_cfg.get("validation", ""),
+                        use_json_schema=_exp_cfg.get("use_json_schema", False),
+                    )
 
                 # 3. 调度重试 (不吞 CancelledError)
                 last_err = None
@@ -205,6 +277,7 @@ class CognitiveOrchestrator:
                         if _on_failure == "abort":
                             raise AbortExecutionException(f"Node '{_name}' failed: {result['error']}")
                         return MISSING
+                    result = self._validate_expectation(result, _exp_cfg, _name)
                     _partial[_name] = result
                     return result
                 except KeyError:
@@ -225,6 +298,7 @@ Keys = node names. Values:
 - task: skill name
 - depends_on: list of dependencies
 - on_failure: "skip" or "abort" (default "abort")
+- expectation: optional {{ required_keys: [], on_violation: "abort"|"warn", schema: {{}} }}
 Final node must be "final_answer".
 Skills:
 {skills_desc}
@@ -238,6 +312,37 @@ Params: {json.dumps(ecm.payload, ensure_ascii=False)}"""},
         if "final_answer" not in graph:
             raise ValueError("Generated graph lacks 'final_answer' node")
         return graph
+
+    async def _maybe_approve_plan(self, graph_spec: Dict, intent_id: str, conversation_id: str):
+        if not self.enable_plan_hitl or not self.hitl_manager:
+            return graph_spec, None
+
+        gate = await self.hitl_manager.create_gate(
+            workflow_id=conversation_id or intent_id,
+            node_id="plan_approval",
+            action=HITLAction.REVIEW,
+            prompt="请审阅执行计划，确认或修改后再运行 Agent。",
+            context={"plan": graph_spec, "intent_id": intent_id},
+        )
+        resolved = await self.hitl_manager.wait_for_response(gate.gate_id)
+        if resolved.status not in (HITLStatus.APPROVED, HITLStatus.MODIFIED):
+            return None, resolved.status.value
+
+        if isinstance(resolved.human_response, dict) and "plan" in resolved.human_response:
+            return resolved.human_response["plan"], None
+        return graph_spec, None
+
+    def _validate_expectation(self, result: Any, exp_cfg: Optional[Dict], node_name: str) -> Any:
+        if not exp_cfg or not isinstance(result, dict):
+            return result
+        required = exp_cfg.get("required_keys") or exp_cfg.get("schema", {}).get("required", [])
+        for key in required:
+            if key not in result:
+                msg = f"Expectation violated on '{node_name}': missing '{key}'"
+                if exp_cfg.get("on_violation", "warn") == "abort":
+                    raise AbortExecutionException(msg)
+                logger.warning(msg)
+        return result
 
     async def _diagnose(self, error, graph_spec, partial_results, ecm):
         return await self.llm.complete([

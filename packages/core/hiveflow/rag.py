@@ -9,6 +9,7 @@ Provides:
 
 Integrates with HiveFlow's blackboard system and LLM client.
 """
+
 import hashlib
 import json
 import logging
@@ -16,17 +17,20 @@ import os
 import re
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 # ======================== Document Processor ========================
 
+
 class DocumentType(str, Enum):
     """Supported document types."""
+
     TEXT = "text"
     MARKDOWN = "markdown"
     HTML = "html"
@@ -39,11 +43,12 @@ class DocumentType(str, Enum):
 @dataclass
 class Document:
     """A parsed document with metadata."""
+
     doc_id: str
     content: str
     doc_type: DocumentType
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    chunks: List["DocumentChunk"] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    chunks: list["DocumentChunk"] = field(default_factory=list)
 
     @staticmethod
     def compute_doc_id(content: str, source: str = "") -> str:
@@ -55,7 +60,7 @@ class Document:
 class DocumentProcessor:
     """
     Parse documents from various formats into standardized Document objects.
-    
+
     Usage:
         processor = DocumentProcessor()
         doc = processor.parse("file.pdf")
@@ -63,7 +68,7 @@ class DocumentProcessor:
         doc = processor.parse_markdown("# Title\nContent")
     """
 
-    def parse(self, file_path: str, doc_type: Optional[DocumentType] = None, **kwargs) -> Document:
+    def parse(self, file_path: str, doc_type: DocumentType | None = None, **kwargs) -> Document:
         """Parse a file into a Document."""
         if doc_type is None:
             doc_type = self._detect_type(file_path)
@@ -149,14 +154,18 @@ class DocumentProcessor:
     def _parse_pdf(self, raw: bytes, path: str, **kwargs) -> Document:
         """Parse PDF file."""
         try:
-            import pypdf
             from io import BytesIO
+
+            import pypdf
+
             reader = pypdf.PdfReader(BytesIO(raw))
             text = "\n".join(page.extract_text() or "" for page in reader.pages)
         except ImportError:
             try:
-                import pdfplumber
                 from io import BytesIO
+
+                import pdfplumber
+
                 with pdfplumber.open(BytesIO(raw)) as pdf:
                     text = "\n".join(page.extract_text() or "" for page in pdf.pages)
             except ImportError:
@@ -176,6 +185,7 @@ class DocumentProcessor:
         html = raw.decode("utf-8", errors="replace")
         try:
             from bs4 import BeautifulSoup
+
             soup = BeautifulSoup(html, "html.parser")
             text = soup.get_text(separator="\n", strip=True)
         except ImportError:
@@ -191,8 +201,10 @@ class DocumentProcessor:
     def _parse_docx(self, raw: bytes, path: str, **kwargs) -> Document:
         """Parse DOCX file."""
         try:
-            import docx
             from io import BytesIO
+
+            import docx
+
             doc = docx.Document(BytesIO(raw))
             text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
         except ImportError:
@@ -210,6 +222,7 @@ class DocumentProcessor:
         """Parse CSV file into text format."""
         import csv
         from io import StringIO
+
         text = raw.decode("utf-8", errors="replace")
         reader = csv.reader(StringIO(text))
         rows = list(reader)
@@ -219,8 +232,7 @@ class DocumentProcessor:
         else:
             headers = rows[0]
             content = "\n".join(
-                ", ".join(f"{h}: {row[i] if i < len(row) else ''}" for i, h in enumerate(headers))
-                for row in rows[1:]
+                ", ".join(f"{h}: {row[i] if i < len(row) else ''}" for i, h in enumerate(headers)) for row in rows[1:]
             )
 
         return Document(
@@ -272,14 +284,16 @@ class DocumentProcessor:
 
 # ======================== Text Chunker ========================
 
+
 @dataclass
 class DocumentChunk:
     """A chunk of text from a document."""
+
     chunk_id: str
     doc_id: str
     content: str
     index: int
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def compute_chunk_id(self) -> str:
         """Compute stable chunk ID."""
@@ -288,17 +302,18 @@ class DocumentChunk:
 
 class ChunkStrategy(str, Enum):
     """Available chunking strategies."""
-    FIXED = "fixed"              # Fixed size chunks
-    RECURSIVE = "recursive"      # Recursive character splitting
-    SEMANTIC = "semantic"        # Paragraph-based splitting
-    MARKDOWN = "markdown"        # Markdown-aware splitting
-    CODE = "code"                # Code-aware splitting
+
+    FIXED = "fixed"  # Fixed size chunks
+    RECURSIVE = "recursive"  # Recursive character splitting
+    SEMANTIC = "semantic"  # Paragraph-based splitting
+    MARKDOWN = "markdown"  # Markdown-aware splitting
+    CODE = "code"  # Code-aware splitting
 
 
 class TextChunker:
     """
     Split documents into chunks for vector embedding.
-    
+
     Usage:
         chunker = TextChunker(strategy="recursive", chunk_size=500, chunk_overlap=50)
         chunks = chunker.chunk(document)
@@ -309,14 +324,14 @@ class TextChunker:
         strategy: ChunkStrategy = ChunkStrategy.RECURSIVE,
         chunk_size: int = 500,
         chunk_overlap: int = 50,
-        separators: Optional[List[str]] = None,
+        separators: list[str] | None = None,
     ):
         self.strategy = strategy
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.separators = separators or self._default_separators()
 
-    def chunk(self, doc: Document) -> List[DocumentChunk]:
+    def chunk(self, doc: Document) -> list[DocumentChunk]:
         """Split a document into chunks."""
         if self.strategy == ChunkStrategy.FIXED:
             return self._fixed_chunk(doc)
@@ -331,7 +346,7 @@ class TextChunker:
         else:
             return self._recursive_chunk(doc)
 
-    def _fixed_chunk(self, doc: Document) -> List[DocumentChunk]:
+    def _fixed_chunk(self, doc: Document) -> list[DocumentChunk]:
         """Split by fixed character count."""
         text = doc.content
         chunks = []
@@ -353,20 +368,25 @@ class TextChunker:
             idx += 1
         return chunks
 
-    def _recursive_chunk(self, doc: Document) -> List[DocumentChunk]:
+    def _recursive_chunk(self, doc: Document) -> list[DocumentChunk]:
         """Recursive character splitting with multiple separators."""
         text = doc.content
         chunks = []
         self._recursive_split(text, self.separators, chunks, doc, 0)
         return chunks
 
-    def _recursive_split(self, text: str, separators: List[str], chunks: List[DocumentChunk], doc: Document, base_idx: int) -> int:
+    def _recursive_split(
+        self, text: str, separators: list[str], chunks: list[DocumentChunk], doc: Document, base_idx: int
+    ) -> int:
         """Recursively split text."""
         if len(text) <= self.chunk_size:
             if text.strip():
                 chunk = DocumentChunk(
-                    chunk_id="", doc_id=doc.doc_id, content=text,
-                    index=base_idx, metadata={**doc.metadata, "chunk_strategy": "recursive"},
+                    chunk_id="",
+                    doc_id=doc.doc_id,
+                    content=text,
+                    index=base_idx,
+                    metadata={**doc.metadata, "chunk_strategy": "recursive"},
                 )
                 chunk.chunk_id = chunk.compute_chunk_id()
                 chunks.append(chunk)
@@ -391,22 +411,28 @@ class TextChunker:
             else:
                 if current.strip():
                     chunk = DocumentChunk(
-                        chunk_id="", doc_id=doc.doc_id, content=current,
-                        index=idx, metadata={**doc.metadata, "chunk_strategy": "recursive"},
+                        chunk_id="",
+                        doc_id=doc.doc_id,
+                        content=current,
+                        index=idx,
+                        metadata={**doc.metadata, "chunk_strategy": "recursive"},
                     )
                     chunk.chunk_id = chunk.compute_chunk_id()
                     chunks.append(chunk)
                     idx += 1
                 # Start with overlap
                 if self.chunk_overlap > 0 and len(current) > self.chunk_overlap:
-                    current = current[-self.chunk_overlap:] + (separator if current.strip() else "") + part
+                    current = current[-self.chunk_overlap :] + (separator if current.strip() else "") + part
                 else:
                     current = part
 
         if current.strip():
             chunk = DocumentChunk(
-                chunk_id="", doc_id=doc.doc_id, content=current,
-                index=idx, metadata={**doc.metadata, "chunk_strategy": "recursive"},
+                chunk_id="",
+                doc_id=doc.doc_id,
+                content=current,
+                index=idx,
+                metadata={**doc.metadata, "chunk_strategy": "recursive"},
             )
             chunk.chunk_id = chunk.compute_chunk_id()
             chunks.append(chunk)
@@ -414,15 +440,18 @@ class TextChunker:
 
         return idx
 
-    def _fixed_chunk_text(self, text: str, chunks: List[DocumentChunk], doc: Document, idx: int) -> int:
+    def _fixed_chunk_text(self, text: str, chunks: list[DocumentChunk], doc: Document, idx: int) -> int:
         """Fallback fixed chunking."""
         start = 0
         while start < len(text):
             end = start + self.chunk_size
             chunk_text = text[start:end]
             chunk = DocumentChunk(
-                chunk_id="", doc_id=doc.doc_id, content=chunk_text,
-                index=idx, metadata={**doc.metadata, "chunk_strategy": "recursive"},
+                chunk_id="",
+                doc_id=doc.doc_id,
+                content=chunk_text,
+                index=idx,
+                metadata={**doc.metadata, "chunk_strategy": "recursive"},
             )
             chunk.chunk_id = chunk.compute_chunk_id()
             chunks.append(chunk)
@@ -430,7 +459,7 @@ class TextChunker:
             idx += 1
         return idx
 
-    def _semantic_chunk(self, doc: Document) -> List[DocumentChunk]:
+    def _semantic_chunk(self, doc: Document) -> list[DocumentChunk]:
         """Split by paragraphs, merge small ones."""
         paragraphs = re.split(r"\n\n+", doc.content)
         chunks = []
@@ -445,8 +474,11 @@ class TextChunker:
             else:
                 if current.strip():
                     chunk = DocumentChunk(
-                        chunk_id="", doc_id=doc.doc_id, content=current,
-                        index=idx, metadata={**doc.metadata, "chunk_strategy": "semantic"},
+                        chunk_id="",
+                        doc_id=doc.doc_id,
+                        content=current,
+                        index=idx,
+                        metadata={**doc.metadata, "chunk_strategy": "semantic"},
                     )
                     chunk.chunk_id = chunk.compute_chunk_id()
                     chunks.append(chunk)
@@ -455,15 +487,18 @@ class TextChunker:
 
         if current.strip():
             chunk = DocumentChunk(
-                chunk_id="", doc_id=doc.doc_id, content=current,
-                index=idx, metadata={**doc.metadata, "chunk_strategy": "semantic"},
+                chunk_id="",
+                doc_id=doc.doc_id,
+                content=current,
+                index=idx,
+                metadata={**doc.metadata, "chunk_strategy": "semantic"},
             )
             chunk.chunk_id = chunk.compute_chunk_id()
             chunks.append(chunk)
 
         return chunks
 
-    def _markdown_chunk(self, doc: Document) -> List[DocumentChunk]:
+    def _markdown_chunk(self, doc: Document) -> list[DocumentChunk]:
         """Split by markdown headings."""
         lines = doc.content.split("\n")
         chunks = []
@@ -476,8 +511,11 @@ class TextChunker:
                 chunk_text = "\n".join(current_lines)
                 if chunk_text.strip():
                     chunk = DocumentChunk(
-                        chunk_id="", doc_id=doc.doc_id, content=chunk_text,
-                        index=idx, metadata={**doc.metadata, "chunk_strategy": "markdown"},
+                        chunk_id="",
+                        doc_id=doc.doc_id,
+                        content=chunk_text,
+                        index=idx,
+                        metadata={**doc.metadata, "chunk_strategy": "markdown"},
                     )
                     chunk.chunk_id = chunk.compute_chunk_id()
                     chunks.append(chunk)
@@ -490,15 +528,18 @@ class TextChunker:
             chunk_text = "\n".join(current_lines)
             if chunk_text.strip():
                 chunk = DocumentChunk(
-                    chunk_id="", doc_id=doc.doc_id, content=chunk_text,
-                    index=idx, metadata={**doc.metadata, "chunk_strategy": "markdown"},
+                    chunk_id="",
+                    doc_id=doc.doc_id,
+                    content=chunk_text,
+                    index=idx,
+                    metadata={**doc.metadata, "chunk_strategy": "markdown"},
                 )
                 chunk.chunk_id = chunk.compute_chunk_id()
                 chunks.append(chunk)
 
         return chunks
 
-    def _code_chunk(self, doc: Document) -> List[DocumentChunk]:
+    def _code_chunk(self, doc: Document) -> list[DocumentChunk]:
         """Split code by class/function definitions."""
         # Split by class and function definitions
         pattern = r"(^(class|def)\s+\w+)"
@@ -512,8 +553,11 @@ class TextChunker:
             if re.match(r"^(class|def)\s+\w+", part) and current:
                 if current.strip():
                     chunk = DocumentChunk(
-                        chunk_id="", doc_id=doc.doc_id, content=current,
-                        index=idx, metadata={**doc.metadata, "chunk_strategy": "code"},
+                        chunk_id="",
+                        doc_id=doc.doc_id,
+                        content=current,
+                        index=idx,
+                        metadata={**doc.metadata, "chunk_strategy": "code"},
                     )
                     chunk.chunk_id = chunk.compute_chunk_id()
                     chunks.append(chunk)
@@ -524,44 +568,49 @@ class TextChunker:
 
         if current.strip():
             chunk = DocumentChunk(
-                chunk_id="", doc_id=doc.doc_id, content=current,
-                index=idx, metadata={**doc.metadata, "chunk_strategy": "code"},
+                chunk_id="",
+                doc_id=doc.doc_id,
+                content=current,
+                index=idx,
+                metadata={**doc.metadata, "chunk_strategy": "code"},
             )
             chunk.chunk_id = chunk.compute_chunk_id()
             chunks.append(chunk)
 
         return chunks
 
-    def _default_separators(self) -> List[str]:
+    def _default_separators(self) -> list[str]:
         """Default separators for recursive chunking."""
         return ["\n\n\n", "\n\n", "\n", ". ", ", ", " ", ""]
 
 
 # ======================== Vector Store ========================
 
+
 @dataclass
 class SearchResult:
     """A single search result from a vector store."""
+
     chunk: DocumentChunk
     score: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class VectorStore(ABC):
     """Abstract base class for vector storage."""
 
     @abstractmethod
-    async def add(self, chunks: List[DocumentChunk], embeddings: List[List[float]]) -> List[str]:
+    async def add(self, chunks: list[DocumentChunk], embeddings: list[list[float]]) -> list[str]:
         """Add chunks with embeddings. Returns chunk IDs."""
         ...
 
     @abstractmethod
     async def search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[SearchResult]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[SearchResult]:
         """Search for similar chunks."""
         ...
 
@@ -580,9 +629,9 @@ class MemoryVectorStore(VectorStore):
     """In-memory vector store using cosine similarity. Good for testing/small datasets."""
 
     def __init__(self):
-        self._chunks: Dict[str, Tuple[DocumentChunk, List[float]]] = {}
+        self._chunks: dict[str, tuple[DocumentChunk, list[float]]] = {}
 
-    async def add(self, chunks: List[DocumentChunk], embeddings: List[List[float]]) -> List[str]:
+    async def add(self, chunks: list[DocumentChunk], embeddings: list[list[float]]) -> list[str]:
         ids = []
         for chunk, embedding in zip(chunks, embeddings):
             self._chunks[chunk.chunk_id] = (chunk, embedding)
@@ -591,10 +640,10 @@ class MemoryVectorStore(VectorStore):
 
     async def search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[SearchResult]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[SearchResult]:
         results = []
         for chunk_id, (chunk, embedding) in self._chunks.items():
             # Apply filters
@@ -617,7 +666,7 @@ class MemoryVectorStore(VectorStore):
         return len(self._chunks)
 
     @staticmethod
-    def _cosine_similarity(a: List[float], b: List[float]) -> float:
+    def _cosine_similarity(a: list[float], b: list[float]) -> float:
         """Compute cosine similarity between two vectors."""
         if not a or not b:
             return 0.0
@@ -629,7 +678,7 @@ class MemoryVectorStore(VectorStore):
         return dot / (norm_a * norm_b)
 
     @staticmethod
-    def _matches_filters(metadata: Dict[str, Any], filters: Dict[str, Any]) -> bool:
+    def _matches_filters(metadata: dict[str, Any], filters: dict[str, Any]) -> bool:
         """Check if metadata matches all filters."""
         for key, value in filters.items():
             if key not in metadata:
@@ -644,6 +693,7 @@ class MemoryVectorStore(VectorStore):
 
 try:
     import chromadb
+
     _CHROMA_AVAILABLE = True
 except ImportError:
     _CHROMA_AVAILABLE = False
@@ -655,8 +705,8 @@ class ChromaVectorStore(VectorStore):
     def __init__(
         self,
         collection_name: str = "hiveflow_kb",
-        persist_dir: Optional[str] = None,
-        embedding_fn: Optional[Callable[[List[str]], List[List[float]]]] = None,
+        persist_dir: str | None = None,
+        embedding_fn: Callable[[list[str]], list[list[float]]] | None = None,
     ):
         if not _CHROMA_AVAILABLE:
             raise ImportError("chromadb is required for ChromaVectorStore")
@@ -672,7 +722,7 @@ class ChromaVectorStore(VectorStore):
         )
         self.embedding_fn = embedding_fn
 
-    async def add(self, chunks: List[DocumentChunk], embeddings: List[List[float]]) -> List[str]:
+    async def add(self, chunks: list[DocumentChunk], embeddings: list[list[float]]) -> list[str]:
         if self.embedding_fn and not embeddings:
             texts = [c.content for c in chunks]
             embeddings = self.embedding_fn(texts)
@@ -696,10 +746,10 @@ class ChromaVectorStore(VectorStore):
 
     async def search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[SearchResult]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[SearchResult]:
         where = None
         if filters:
             where = {
@@ -718,12 +768,14 @@ class ChromaVectorStore(VectorStore):
 
         search_results = []
         if results["ids"] and results["ids"][0]:
-            for i, (chunk_id, doc, meta, distance) in enumerate(zip(
-                results["ids"][0],
-                results["documents"][0],
-                results["metadatas"][0],
-                results["distances"][0],
-            )):
+            for i, (chunk_id, doc, meta, distance) in enumerate(
+                zip(
+                    results["ids"][0],
+                    results["documents"][0],
+                    results["metadatas"][0],
+                    results["distances"][0],
+                )
+            ):
                 chunk = DocumentChunk(
                     chunk_id=chunk_id,
                     doc_id=meta.get("doc_id", ""),
@@ -751,12 +803,14 @@ class ChromaVectorStore(VectorStore):
 
 # ======================== RAG Pipeline ========================
 
+
 @dataclass
 class RAGResult:
     """Result of a RAG query."""
+
     query: str
     answer: str
-    sources: List[SearchResult] = field(default_factory=list)
+    sources: list[SearchResult] = field(default_factory=list)
     context: str = ""
     latency_ms: float = 0.0
 
@@ -765,12 +819,10 @@ class EmbeddingModel(ABC):
     """Abstract embedding model."""
 
     @abstractmethod
-    async def embed(self, texts: List[str]) -> List[List[float]]:
-        ...
+    async def embed(self, texts: list[str]) -> list[list[float]]: ...
 
     @abstractmethod
-    async def embed_query(self, text: str) -> List[float]:
-        ...
+    async def embed_query(self, text: str) -> list[float]: ...
 
 
 class DummyEmbeddingModel(EmbeddingModel):
@@ -779,34 +831,35 @@ class DummyEmbeddingModel(EmbeddingModel):
     def __init__(self, dim: int = 128):
         self.dim = dim
 
-    def _hash_vector(self, text: str) -> List[float]:
+    def _hash_vector(self, text: str) -> list[float]:
         """Generate a deterministic vector from text hash."""
         import random
+
         seed = hash(text) & 0xFFFFFFFF
         rng = random.Random(seed)
         return [rng.gauss(0, 1) for _ in range(self.dim)]
 
-    async def embed(self, texts: List[str]) -> List[List[float]]:
+    async def embed(self, texts: list[str]) -> list[list[float]]:
         return [self._hash_vector(t) for t in texts]
 
-    async def embed_query(self, text: str) -> List[float]:
+    async def embed_query(self, text: str) -> list[float]:
         return self._hash_vector(text)
 
 
 class RAGPipeline:
     """
     Complete RAG pipeline: retrieve -> rerank -> generate answer.
-    
+
     Usage:
         pipeline = RAGPipeline(
             vector_store=MemoryVectorStore(),
             embedding_model=DummyEmbeddingModel(),
             llm_client=openai_client,
         )
-        
+
         # Add documents
         await pipeline.add_document(doc, chunker=TextChunker())
-        
+
         # Query
         result = await pipeline.query("What is the main topic?")
     """
@@ -818,7 +871,7 @@ class RAGPipeline:
         llm_client=None,  # Optional: for answer generation
         model: str = "",
         top_k: int = 5,
-        rerank_fn: Optional[Callable[[str, str], float]] = None,
+        rerank_fn: Callable[[str, str], float] | None = None,
     ):
         self.vector_store = vector_store
         self.embedding_model = embedding_model
@@ -827,7 +880,7 @@ class RAGPipeline:
         self.top_k = top_k
         self.rerank_fn = rerank_fn
 
-    async def add_document(self, doc: Document, chunker: Optional[TextChunker] = None) -> List[str]:
+    async def add_document(self, doc: Document, chunker: TextChunker | None = None) -> list[str]:
         """Process and add a document to the knowledge base."""
         if chunker is None:
             chunker = TextChunker()
@@ -849,12 +902,13 @@ class RAGPipeline:
     async def query(
         self,
         query: str,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: dict[str, Any] | None = None,
         top_k: int = 0,
         include_context: bool = True,
     ) -> RAGResult:
         """Execute a RAG query."""
         import time
+
         start = time.monotonic()
         k = top_k or self.top_k
 
@@ -869,25 +923,33 @@ class RAGPipeline:
         results = results[:k]
 
         # Build context
-        context = "\n\n".join(
-            f"[Source {i+1}] (score: {r.score:.3f})\n{r.chunk.content}"
-            for i, r in enumerate(results)
-        ) if results else "No relevant information found."
+        context = (
+            "\n\n".join(f"[Source {i + 1}] (score: {r.score:.3f})\n{r.chunk.content}" for i, r in enumerate(results))
+            if results
+            else "No relevant information found."
+        )
 
         # Generate answer
         answer = ""
         if self.llm_client:
             try:
                 from . import LLMMessage
+
                 messages = [
-                    LLMMessage(role="system", content=(
-                        "You are a helpful assistant. Answer the question based on the provided context. "
-                        "If the context doesn't contain relevant information, say so."
-                    )),
+                    LLMMessage(
+                        role="system",
+                        content=(
+                            "You are a helpful assistant. Answer the question based on the provided context. "
+                            "If the context doesn't contain relevant information, say so."
+                        ),
+                    ),
                     LLMMessage(role="user", content=f"Context:\n{context}\n\nQuestion: {query}"),
                 ]
                 response = await self.llm_client.chat(
-                    messages=messages, model=self.model, temperature=0.1, max_tokens=1024,
+                    messages=messages,
+                    model=self.model,
+                    temperature=0.1,
+                    max_tokens=1024,
                 )
                 answer = response.content
             except Exception as e:
@@ -907,9 +969,9 @@ class RAGPipeline:
     async def search(
         self,
         query: str,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: dict[str, Any] | None = None,
         top_k: int = 0,
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """Search without generating an answer (pure retrieval)."""
         k = top_k or self.top_k
         query_embedding = await self.embedding_model.embed_query(query)
@@ -920,20 +982,22 @@ class RAGPipeline:
 
         return results[:k]
 
-    def _rerank(self, query: str, results: List[SearchResult]) -> List[SearchResult]:
+    def _rerank(self, query: str, results: list[SearchResult]) -> list[SearchResult]:
         """Rerank results using provided rerank function."""
         reranked = []
         for r in results:
             score = self.rerank_fn(query, r.chunk.content)
-            reranked.append(SearchResult(
-                chunk=r.chunk,
-                score=score,
-                metadata=r.metadata,
-            ))
+            reranked.append(
+                SearchResult(
+                    chunk=r.chunk,
+                    score=score,
+                    metadata=r.metadata,
+                )
+            )
         reranked.sort(key=lambda r: r.score, reverse=True)
         return reranked
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get knowledge base statistics."""
         return {
             "total_chunks": await self.vector_store.count(),
@@ -942,23 +1006,35 @@ class RAGPipeline:
 
 # ======================== KnowledgeBase Manager ========================
 
+
 @dataclass
 class KnowledgeBase:
     """A knowledge base with its documents."""
+
     kb_id: str
     name: str
     description: str = ""
     doc_count: int = 0
     chunk_count: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    vector_store_type: str = "memory"
+    documents: dict[str, dict[str, Any]] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
+
+    @property
+    def document_store(self) -> list[dict[str, Any]]:
+        """Backward-compatible document listing for Studio API."""
+        return list(self.documents.values())
 
 
 class KnowledgeBaseManager:
     """
     Manages multiple knowledge bases.
-    
+
+    By default each knowledge base gets its own in-memory vector store (isolated).
+    Pass ``vector_store`` to share one store across KBs (chunks are tagged with ``kb_id``).
+
     Usage:
         mgr = KnowledgeBaseManager()
         kb = await mgr.create_kb("my_kb", "My Knowledge Base")
@@ -968,20 +1044,39 @@ class KnowledgeBaseManager:
 
     def __init__(
         self,
-        vector_store: Optional[VectorStore] = None,
-        embedding_model: Optional[EmbeddingModel] = None,
+        vector_store: VectorStore | None = None,
+        embedding_model: EmbeddingModel | None = None,
     ):
-        self._knowledge_bases: Dict[str, KnowledgeBase] = {}
-        self._pipelines: Dict[str, RAGPipeline] = {}
+        self._knowledge_bases: dict[str, KnowledgeBase] = {}
+        self._pipelines: dict[str, RAGPipeline] = {}
+        self._shared_vector_store = vector_store
+        self._embedding_model = embedding_model or DummyEmbeddingModel()
 
-        # Use defaults if not provided
-        if vector_store is None:
-            vector_store = MemoryVectorStore()
-        if embedding_model is None:
-            embedding_model = DummyEmbeddingModel()
+    @property
+    def _uses_shared_store(self) -> bool:
+        return self._shared_vector_store is not None
 
-        self._vector_store = vector_store
-        self._embedding_model = embedding_model
+    def _store_for_kb(self) -> VectorStore:
+        if self._uses_shared_store:
+            return self._shared_vector_store  # type: ignore[return-value]
+        return MemoryVectorStore()
+
+    @staticmethod
+    def _merge_kb_filters(kb_id: str, filters: dict[str, Any] | None) -> dict[str, Any]:
+        merged: dict[str, Any] = {"kb_id": kb_id}
+        if filters:
+            merged.update(filters)
+        return merged
+
+    @staticmethod
+    def _tag_document_for_kb(doc: Document, kb_id: str) -> Document:
+        metadata = {**doc.metadata, "kb_id": kb_id}
+        return Document(
+            doc_id=doc.doc_id,
+            content=doc.content,
+            doc_type=doc.doc_type,
+            metadata=metadata,
+        )
 
     async def create_kb(
         self,
@@ -990,11 +1085,14 @@ class KnowledgeBaseManager:
         description: str = "",
     ) -> KnowledgeBase:
         """Create a new knowledge base."""
+        if kb_id in self._knowledge_bases:
+            raise ValueError(f"Knowledge base already exists: {kb_id}")
+
         kb = KnowledgeBase(kb_id=kb_id, name=name, description=description)
         self._knowledge_bases[kb_id] = kb
 
         pipeline = RAGPipeline(
-            vector_store=self._vector_store,
+            vector_store=self._store_for_kb(),
             embedding_model=self._embedding_model,
         )
         self._pipelines[kb_id] = pipeline
@@ -1002,27 +1100,49 @@ class KnowledgeBaseManager:
         return kb
 
     async def delete_kb(self, kb_id: str) -> bool:
-        """Delete a knowledge base."""
-        if kb_id in self._knowledge_bases:
-            del self._knowledge_bases[kb_id]
-            self._pipelines.pop(kb_id, None)
-            return True
-        return False
+        """Delete a knowledge base and remove its vectors."""
+        kb = self._knowledge_bases.get(kb_id)
+        if kb is None:
+            return False
 
-    async def list_kbs(self) -> List[KnowledgeBase]:
+        pipeline = self._pipelines.get(kb_id)
+        if pipeline is not None:
+            for doc_id in list(kb.documents.keys()):
+                await pipeline.vector_store.delete(doc_id)
+
+        del self._knowledge_bases[kb_id]
+        self._pipelines.pop(kb_id, None)
+        return True
+
+    async def list_kbs(self) -> list[KnowledgeBase]:
         """List all knowledge bases."""
         return list(self._knowledge_bases.values())
 
-    async def add_document(self, kb_id: str, doc: Document, chunker: Optional[TextChunker] = None) -> List[str]:
+    def get_kb(self, kb_id: str) -> KnowledgeBase | None:
+        """Get a knowledge base by ID."""
+        return self._knowledge_bases.get(kb_id)
+
+    async def add_document(self, kb_id: str, doc: Document, chunker: TextChunker | None = None) -> list[str]:
         """Add a document to a knowledge base."""
         pipeline = self._pipelines.get(kb_id)
         if not pipeline:
             raise ValueError(f"Knowledge base not found: {kb_id}")
 
+        if self._uses_shared_store:
+            doc = self._tag_document_for_kb(doc, kb_id)
+
         ids = await pipeline.add_document(doc, chunker)
         kb = self._knowledge_bases[kb_id]
         kb.doc_count += 1
         kb.chunk_count += len(ids)
+        preview = doc.content[:500] if isinstance(doc.content, str) else str(doc.content)[:500]
+        kb.documents[doc.doc_id] = {
+            "doc_id": doc.doc_id,
+            "doc_type": doc.doc_type.value if hasattr(doc.doc_type, "value") else str(doc.doc_type),
+            "metadata": doc.metadata,
+            "preview": preview,
+            "chunk_count": len(ids),
+        }
         kb.updated_at = time.time()
         return ids
 
@@ -1032,8 +1152,9 @@ class KnowledgeBaseManager:
         if not pipeline:
             raise ValueError(f"Knowledge base not found: {kb_id}")
 
-        count = await self._vector_store.delete(doc_id)
+        count = await pipeline.vector_store.delete(doc_id)
         kb = self._knowledge_bases[kb_id]
+        kb.documents.pop(doc_id, None)
         kb.doc_count = max(0, kb.doc_count - 1)
         kb.chunk_count = max(0, kb.chunk_count - count)
         kb.updated_at = time.time()
@@ -1044,13 +1165,15 @@ class KnowledgeBaseManager:
         kb_id: str,
         query: str,
         top_k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: dict[str, Any] | None = None,
     ) -> RAGResult:
         """Query a knowledge base."""
         pipeline = self._pipelines.get(kb_id)
         if not pipeline:
             raise ValueError(f"Knowledge base not found: {kb_id}")
 
+        if self._uses_shared_store:
+            filters = self._merge_kb_filters(kb_id, filters)
         return await pipeline.query(query, filters=filters, top_k=top_k)
 
     async def search(
@@ -1058,13 +1181,13 @@ class KnowledgeBaseManager:
         kb_id: str,
         query: str,
         top_k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[SearchResult]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[SearchResult]:
         """Search a knowledge base without answer generation."""
         pipeline = self._pipelines.get(kb_id)
         if not pipeline:
             raise ValueError(f"Knowledge base not found: {kb_id}")
 
-        # No doc_id filter - search all chunks in the shared vector store
-        # (In production, you'd use per-KB collections or prefix filtering)
+        if self._uses_shared_store:
+            filters = self._merge_kb_filters(kb_id, filters)
         return await pipeline.search(query, filters=filters, top_k=top_k)

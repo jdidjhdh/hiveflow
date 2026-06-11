@@ -30,10 +30,11 @@ Context: {json.dumps(context or {}, ensure_ascii=False)}"""},
             {"role": "user", "content": user_input}
         ]
         data = await self.llm.complete_json(messages)
+        intent_id = str(uuid.uuid4())
         return CognitiveECM(
-            trace_id=str(uuid.uuid4()),
+            trace_id=intent_id,
             intent=data.get("intent", "user_request"),
-            intent_id=str(uuid.uuid4()),
+            intent_id=intent_id,
             emitter="intent_parser",
             required_skills=data.get("required_skills", []),
             payload=data.get("payload", {}),

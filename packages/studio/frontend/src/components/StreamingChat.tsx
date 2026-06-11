@@ -18,7 +18,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Card, Typography, Spin, Space, Tag, Button, Collapse,
-  Alert, Badge, Divider, List, Progress, Tooltip,
+  Alert, Badge, Divider, List, Tooltip,
 } from 'antd';
 import {
   LoadingOutlined, ThunderboltOutlined, ToolOutlined,
@@ -210,7 +210,7 @@ export default function StreamingChat({
               onDone?.(events);
               break;
           }
-        } catch (err) {
+        } catch {
           // Ignore parse errors for raw text tokens
           if (eventType === 'token') {
             setAccumulatedText((prev) => prev + e.data);

@@ -10,10 +10,11 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import Response
 
-# Add HiveFlow engine to path
-_engine_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-if _engine_dir not in sys.path:
-    sys.path.insert(0, _engine_dir)
+# Add HiveFlow Core package to path (packages/core)
+_packages_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+_core_dir = os.path.join(_packages_dir, "core")
+if _core_dir not in sys.path:
+    sys.path.insert(0, _core_dir)
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,6 +34,10 @@ from app.api.variables_api import router as variables_router
 from app.api.analytics import router as analytics_router
 from app.api.prompt_templates import router as prompt_templates_router
 from app.api.streaming_api import router as streaming_router
+from app.api.hitl import router as hitl_router
+from app.api.checkpoints import router as checkpoints_router
+from app.api.agent import router as agent_router
+from app.api.replay import router as replay_router
 from app.core.engine_service import get_engine
 from app.db.config import init_storage, close_storage
 from app.api.validation import setup_security_middleware, setup_error_handler, RateLimiter
@@ -140,7 +145,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestLoggingMiddleware)
 
 # 安全 CORS 配置
-allowed_origins = os.environ.get("HIVEFLOW_ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+allowed_origins = os.environ.get("HIVEFLOW_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -172,6 +177,10 @@ app.include_router(variables_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api")
 app.include_router(prompt_templates_router, prefix="/api")
 app.include_router(streaming_router, prefix="/api")
+app.include_router(hitl_router, prefix="/api")
+app.include_router(checkpoints_router, prefix="/api")
+app.include_router(agent_router, prefix="/api")
+app.include_router(replay_router, prefix="/api")
 
 
 @app.get("/api/health")
