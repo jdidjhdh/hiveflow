@@ -86,7 +86,7 @@ jobs:
           twine upload dist/*
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           body_path: docs/en/release-notes/${{ github.ref_name }}.md
           draft: false
