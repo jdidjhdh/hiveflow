@@ -4,7 +4,7 @@ HiveFlow 在 **Alpha**（0.y.z）阶段遵循 [Semantic Versioning 2.0.0](https:
 
 ## 当前状态：0.1.x Alpha
 
-- **0.1.x** — 初始公开发布；minor 版本间 API 可能变更，迁移说明见 [CHANGELOG](https://github.com/hiveflow/hiveflow/blob/main/CHANGELOG.md)。
+- **0.1.x** — 初始公开发布；minor 版本间 API 可能变更，迁移说明见 [CHANGELOG](https://github.com/jdidjhdh/hiveflow/blob/main/CHANGELOG.md)。
 - **0.2.x** — 开发者体验重点：统一高层 API、OpenTelemetry 文档、覆盖率目标。
 - **1.0.0** — Core + Studio 稳定 6 个月后 API 冻结（[路线图](roadmap.md)）。
 
@@ -39,6 +39,6 @@ HiveFlow 在 **Alpha**（0.y.z）阶段遵循 [Semantic Versioning 2.0.0](https:
 
 ## 升级检查清单
 
-1. 阅读 [CHANGELOG](https://github.com/hiveflow/hiveflow/blob/main/CHANGELOG.md)。
+1. 阅读 [CHANGELOG](https://github.com/jdidjhdh/hiveflow/blob/main/CHANGELOG.md)。
 2. 运行测试套件与 `examples/run_smoke_tests.py`。
 3. Studio：检查 [Studio Agent 运维](studio-agent-ops.md) 中的 env 变量。

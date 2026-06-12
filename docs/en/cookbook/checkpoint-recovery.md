@@ -10,7 +10,7 @@ Save and restore workflow blackboard state for time-travel debugging and failure
 
 ## Minimal code
 
-See [`examples/04_checkpoint.py`](https://github.com/hiveflow/hiveflow/blob/main/examples/04_checkpoint.py):
+See [`examples/04_checkpoint.py`](https://github.com/jdidjhdh/hiveflow/blob/main/examples/04_checkpoint.py):
 
 ```python
 from hiveflow import HiveFlow, HiveFlowConfig, CheckpointManager

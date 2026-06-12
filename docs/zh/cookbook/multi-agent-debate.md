@@ -17,7 +17,7 @@ Intent → Scheduler → [Researcher, Critic, FactChecker] (parallel)
 
 ## 示例
 
-运行 [examples/02_multi_agent.py](https://github.com/hiveflow/hiveflow/blob/main/examples/02_multi_agent.py)：
+运行 [examples/02_multi_agent.py](https://github.com/jdidjhdh/hiveflow/blob/main/examples/02_multi_agent.py)：
 
 ```bash
 cd packages/core && pip install -e ".[all]"
@@ -37,4 +37,4 @@ python ../../examples/02_multi_agent.py
 ## 相关
 
 - [概念 — 多智能体](../concepts.md)
-- [示例 12 — 自定义调度器](https://github.com/hiveflow/hiveflow/blob/main/examples/12_custom_scheduler.py)
+- [示例 12 — 自定义调度器](https://github.com/jdidjhdh/hiveflow/blob/main/examples/12_custom_scheduler.py)

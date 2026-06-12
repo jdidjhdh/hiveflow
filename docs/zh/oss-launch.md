@@ -1,6 +1,6 @@
 # 开源发布清单
 
-完整清单见仓库根目录 [OSS_LAUNCH.md](https://github.com/hiveflow/hiveflow/blob/main/OSS_LAUNCH.md)。
+完整清单见仓库根目录 [OSS_LAUNCH.md](https://github.com/jdidjhdh/hiveflow/blob/main/OSS_LAUNCH.md)。
 
 ## Phase 0 — 第 1～3 天（公开分发）
 

@@ -60,8 +60,8 @@ asyncio.run(main())
 
 ## Community
 
-- [GitHub Repository](https://github.com/hiveflow/hiveflow)
-- [Issue Tracker](https://github.com/hiveflow/hiveflow/issues)
-- [Discussions](https://github.com/hiveflow/hiveflow/discussions) (enable in repo settings)
-- [Contributing](https://github.com/hiveflow/hiveflow/blob/main/CONTRIBUTING.md)
-- [Governance](https://github.com/hiveflow/hiveflow/blob/main/GOVERNANCE.md)
+- [GitHub Repository](https://github.com/jdidjhdh/hiveflow)
+- [Issue Tracker](https://github.com/jdidjhdh/hiveflow/issues)
+- [Discussions](https://github.com/jdidjhdh/hiveflow/discussions) (enable in repo settings)
+- [Contributing](https://github.com/jdidjhdh/hiveflow/blob/main/CONTRIBUTING.md)
+- [Governance](https://github.com/jdidjhdh/hiveflow/blob/main/GOVERNANCE.md)

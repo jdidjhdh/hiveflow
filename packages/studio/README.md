@@ -130,13 +130,13 @@ Studio is **not** published as standalone PyPI/npm packages in 0.1.x — consume
 
 Vitest excludes `src/pages/**` and orchestrator hooks; those routes are covered by **17 Playwright E2E** scenarios and labeled in the UI. See **[CAPABILITIES.md](CAPABILITIES.md)** for Stable / Beta / Preview / Demo pages.
 
-Full quality matrix: [Quality Gates](https://hiveflow.github.io/hiveflow/en/quality-gates/).
+Full quality matrix: [Quality Gates](https://jdidjhdh.github.io/hiveflow/en/quality-gates/).
 
 ## Documentation
 
-- [Studio Agent operations](https://hiveflow.github.io/hiveflow/studio-agent-ops/)
-- [Studio Agent cookbook](https://hiveflow.github.io/hiveflow/cookbook/studio-agent-mode/)
-- [Architecture — Studio layer](https://hiveflow.github.io/hiveflow/architecture/)
+- [Studio Agent operations](https://jdidjhdh.github.io/hiveflow/studio-agent-ops/)
+- [Studio Agent cookbook](https://jdidjhdh.github.io/hiveflow/cookbook/studio-agent-mode/)
+- [Architecture — Studio layer](https://jdidjhdh.github.io/hiveflow/architecture/)
 - [Main repository README](../../README.md)
 
 ## License

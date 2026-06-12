@@ -5,7 +5,7 @@ Synthetic benchmarks for HiveFlow Core orchestration overhead. **Alpha disclaime
 ## Methodology
 
 - **Environment:** CPython 3.10+, in-memory blackboard, no network I/O, no LLM.
-- **Tool:** [`benchmarks/run_orchestration_latency.py`](https://github.com/hiveflow/hiveflow/blob/main/benchmarks/run_orchestration_latency.py)
+- **Tool:** [`benchmarks/run_orchestration_latency.py`](https://github.com/jdidjhdh/hiveflow/blob/main/benchmarks/run_orchestration_latency.py)
 - **Metrics:** p50 / p95 / mean end-to-end latency (milliseconds) per scenario.
 - **CI:** `--quick` (10 iterations) runs on every push via GitHub Actions.
 

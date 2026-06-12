@@ -17,7 +17,7 @@ Intent → Scheduler → [Researcher, Critic, FactChecker] (parallel)
 
 ## Example
 
-Run [examples/02_multi_agent.py](https://github.com/hiveflow/hiveflow/blob/main/examples/02_multi_agent.py):
+Run [examples/02_multi_agent.py](https://github.com/jdidjhdh/hiveflow/blob/main/examples/02_multi_agent.py):
 
 ```bash
 cd packages/core && pip install -e ".[all]"
@@ -37,4 +37,4 @@ Load the **debate_decision** template from Orchestrator → Templates.
 ## Related
 
 - [Concepts — Multi-Agent](../concepts.md)
-- [Example 12 — custom scheduler](https://github.com/hiveflow/hiveflow/blob/main/examples/12_custom_scheduler.py)
+- [Example 12 — custom scheduler](https://github.com/jdidjhdh/hiveflow/blob/main/examples/12_custom_scheduler.py)

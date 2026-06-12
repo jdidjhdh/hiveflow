@@ -27,4 +27,4 @@ pip install "hiveflow[all]"        # everything above
 3. Add a page under `docs/integrations/` and link from this index
 4. Add an example under `examples/` and register in `run_smoke_tests.py`
 
-See [CONTRIBUTING.md](https://github.com/hiveflow/hiveflow/blob/main/CONTRIBUTING.md) for PR requirements.
+See [CONTRIBUTING.md](https://github.com/jdidjhdh/hiveflow/blob/main/CONTRIBUTING.md) for PR requirements.

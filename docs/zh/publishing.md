@@ -18,9 +18,9 @@ git tag v0.1.0
 git push origin main --tags
 ```
 
-参见 [Release workflow](https://github.com/hiveflow/hiveflow/blob/main/.github/workflows/release.yml) 与 [Docs workflow](https://github.com/hiveflow/hiveflow/blob/main/.github/workflows/docs.yml)。
+参见 [Release workflow](https://github.com/jdidjhdh/hiveflow/blob/main/.github/workflows/release.yml) 与 [Docs workflow](https://github.com/jdidjhdh/hiveflow/blob/main/.github/workflows/docs.yml)。
 
-Release notes 通过 [release-drafter.yml](https://github.com/hiveflow/hiveflow/blob/main/.github/release-drafter.yml) 自动生成草稿。
+Release notes 通过 [release-drafter.yml](https://github.com/jdidjhdh/hiveflow/blob/main/.github/release-drafter.yml) 自动生成草稿。
 
 ## 验证安装
 
@@ -34,7 +34,7 @@ python examples/01_hello_hiveflow.py
 
 ## GitHub Pages（文档）
 
-推送至 `main` 后，文档通过 [Docs workflow](https://github.com/hiveflow/hiveflow/blob/main/.github/workflows/docs.yml) 自动部署。
+推送至 `main` 后，文档通过 [Docs workflow](https://github.com/jdidjhdh/hiveflow/blob/main/.github/workflows/docs.yml) 自动部署。
 
 在仓库 **Settings → Pages → Build and deployment → GitHub Actions** 中启用。
 
@@ -46,4 +46,4 @@ python examples/01_hello_hiveflow.py
 
 ## Release Drafter
 
-合并的 PR 通过 [release-drafter](https://github.com/hiveflow/hiveflow/blob/main/.github/release-drafter.yml) 更新草稿 release notes。打 tag 前将相关章节复制到 `CHANGELOG.md`。
+合并的 PR 通过 [release-drafter](https://github.com/jdidjhdh/hiveflow/blob/main/.github/release-drafter.yml) 更新草稿 release notes。打 tag 前将相关章节复制到 `CHANGELOG.md`。

@@ -111,13 +111,13 @@ export DEEPSEEK_API_KEY=...
 pytest tests/test_real_llm.py -v -m real_llm
 ```
 
-**发版耦合：** 同一 git tag 同时发布 `hiveflow` 与 `hiveflow-agent`。见 [质量门禁](https://hiveflow.github.io/hiveflow/zh/quality-gates/)。
+**发版耦合：** 同一 git tag 同时发布 `hiveflow` 与 `hiveflow-agent`。见 [质量门禁](https://jdidjhdh.github.io/hiveflow/zh/quality-gates/)。
 
 ## 文档
 
-- [Studio Agent cookbook](https://hiveflow.github.io/hiveflow/cookbook/studio-agent-mode/)
-- [Studio Agent ops](https://hiveflow.github.io/hiveflow/studio-agent-ops/)
-- [Architecture — Layer 2](https://hiveflow.github.io/hiveflow/architecture/)
+- [Studio Agent cookbook](https://jdidjhdh.github.io/hiveflow/cookbook/studio-agent-mode/)
+- [Studio Agent ops](https://jdidjhdh.github.io/hiveflow/studio-agent-ops/)
+- [Architecture — Layer 2](https://jdidjhdh.github.io/hiveflow/architecture/)
 - [Main repository README](../../README.md)
 
 ## 许可证

@@ -5,7 +5,7 @@ HiveFlow Core 编排开销的合成基准测试。**Alpha 免责声明：** 数�
 ## 方法论
 
 - **环境：** CPython 3.10+、内存黑板、无网络 I/O、无 LLM。
-- **工具：** [`benchmarks/run_orchestration_latency.py`](https://github.com/hiveflow/hiveflow/blob/main/benchmarks/run_orchestration_latency.py)
+- **工具：** [`benchmarks/run_orchestration_latency.py`](https://github.com/jdidjhdh/hiveflow/blob/main/benchmarks/run_orchestration_latency.py)
 - **指标：** 各场景的 p50 / p95 / 平均端到端延迟（毫秒）。
 - **CI：** 每次 push 通过 GitHub Actions 运行 `--quick`（10 次迭代）。
 

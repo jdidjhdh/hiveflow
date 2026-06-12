@@ -68,7 +68,7 @@ Public roadmap for reaching production-ready open source. Timelines are approxim
 ## How to influence the roadmap
 
 1. Open a [Feature Request](.github/ISSUE_TEMPLATE/feature_request.yml) issue
-2. Comment on [GitHub Discussions](https://github.com/hiveflow/hiveflow/discussions) (when enabled)
+2. Comment on [GitHub Discussions](https://github.com/jdidjhdh/hiveflow/discussions) (when enabled)
 3. Submit a PR with tests and docs
 
 Priority: **security / data-loss bugs** > **DX / docs** > **new integrations** > **nice-to-have UI**.

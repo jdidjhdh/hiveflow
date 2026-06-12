@@ -27,4 +27,4 @@ pip install "hiveflow[all]"        # everything above
 3. 在 `docs/integrations/` 下新增页面，并从此索引链接
 4. 在 `examples/` 下添加示例，并在 `run_smoke_tests.py` 中注册
 
-PR 要求见 [CONTRIBUTING.md](https://github.com/hiveflow/hiveflow/blob/main/CONTRIBUTING.md)。
+PR 要求见 [CONTRIBUTING.md](https://github.com/jdidjhdh/hiveflow/blob/main/CONTRIBUTING.md)。

@@ -107,7 +107,7 @@ Vitest 阈值约 **24%** 行覆盖，针对 `src/`，并有意排除：
 
 ### 演示 / 预览页面
 
-并非所有路由均为生产级。见 **[CAPABILITIES.md](https://github.com/hiveflow/hiveflow/blob/main/packages/studio/CAPABILITIES.md)**（Stable / Beta / Preview / Demo）。
+并非所有路由均为生产级。见 **[CAPABILITIES.md](https://github.com/jdidjhdh/hiveflow/blob/main/packages/studio/CAPABILITIES.md)**（Stable / Beta / Preview / Demo）。
 
 示例：**A/B 测试** = Demo；**执行分析** = Preview。
 

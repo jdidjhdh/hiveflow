@@ -28,7 +28,7 @@ sequenceDiagram
 
 ## 最小代码
 
-参见 [examples/03_hitl_approval.py](https://github.com/hiveflow/hiveflow/blob/main/examples/03_hitl_approval.py)：
+参见 [examples/03_hitl_approval.py](https://github.com/jdidjhdh/hiveflow/blob/main/examples/03_hitl_approval.py)：
 
 ```python
 from hiveflow import HiveFlow, HiveFlowConfig, ECM, HITLManager
@@ -49,4 +49,4 @@ hitl = HITLManager(hf.blackboard)
 ## 相关
 
 - [API 参考 — HITL](../api-reference.md)
-- [示例 03](https://github.com/hiveflow/hiveflow/blob/main/examples/03_hitl_approval.py)
+- [示例 03](https://github.com/jdidjhdh/hiveflow/blob/main/examples/03_hitl_approval.py)

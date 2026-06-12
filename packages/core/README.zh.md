@@ -105,13 +105,13 @@ mypy
 | 测试覆盖率 | **≥ 60%**（`hiveflow/`，CI 强制） |
 | MyPy | `pyproject.toml` 中列出的公开模块 |
 
-RAG、multimodal、完整 `llm_client` 类型检查不在 0.1.x 范围内。详见 [质量门禁](https://hiveflow.github.io/hiveflow/zh/quality-gates/)。
+RAG、multimodal、完整 `llm_client` 类型检查不在 0.1.x 范围内。详见 [质量门禁](https://jdidjhdh.github.io/hiveflow/zh/quality-gates/)。
 
 ## 文档
 
-- [Getting Started](https://hiveflow.github.io/hiveflow/getting-started/)
-- [API Reference](https://hiveflow.github.io/hiveflow/api/)
-- [Architecture — Layer 1](https://hiveflow.github.io/hiveflow/architecture/)
+- [Getting Started](https://jdidjhdh.github.io/hiveflow/getting-started/)
+- [API Reference](https://jdidjhdh.github.io/hiveflow/api/)
+- [Architecture — Layer 1](https://jdidjhdh.github.io/hiveflow/architecture/)
 - [Main repository README](../../README.md)
 
 ## 许可证

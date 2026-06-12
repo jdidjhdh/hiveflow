@@ -62,4 +62,4 @@
 2. 在 GitHub Discussions 中评论（启用后）
 3. 提交带测试与文档的 PR
 
-参见 [ROADMAP.md](https://github.com/hiveflow/hiveflow/blob/main/ROADMAP.md) 与 [OSS 发布清单](oss-launch.md)。
+参见 [ROADMAP.md](https://github.com/jdidjhdh/hiveflow/blob/main/ROADMAP.md) 与 [OSS 发布清单](oss-launch.md)。

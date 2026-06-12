@@ -9,7 +9,7 @@ The fastest way to see HiveFlow: run Studio with Agent runtime, generate a plan 
 ### Docker (recommended)
 
 ```bash
-git clone https://github.com/hiveflow/hiveflow.git
+git clone https://github.com/jdidjhdh/hiveflow.git
 cd hiveflow
 docker compose up --build
 ```
@@ -49,7 +49,7 @@ pip install "hiveflow[all]"           # all optional extras
 ### From Source
 
 ```bash
-git clone https://github.com/hiveflow/hiveflow.git
+git clone https://github.com/jdidjhdh/hiveflow.git
 cd hiveflow/packages/core
 pip install -e ".[dev]"
 ```
@@ -217,7 +217,7 @@ docker run -d -p 6379:6379 redis:7-alpine
 - [Studio Agent cookbook](cookbook/studio-agent-mode.md)
 - [Architecture](architecture.md)
 - [Deployment](deployment.md)
-- [Contributing](https://github.com/hiveflow/hiveflow/blob/main/CONTRIBUTING.md)
+- [Contributing](https://github.com/jdidjhdh/hiveflow/blob/main/CONTRIBUTING.md)
 
 ## Troubleshooting
 

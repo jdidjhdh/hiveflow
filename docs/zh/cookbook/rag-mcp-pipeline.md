@@ -17,8 +17,8 @@
 
 ## 示例
 
-- Core：[examples/06_rag_pipeline.py](https://github.com/hiveflow/hiveflow/blob/main/examples/06_rag_pipeline.py)
-- MCP：[examples/07_mcp_tools.py](https://github.com/hiveflow/hiveflow/blob/main/examples/07_mcp_tools.py)
+- Core：[examples/06_rag_pipeline.py](https://github.com/jdidjhdh/hiveflow/blob/main/examples/06_rag_pipeline.py)
+- MCP：[examples/07_mcp_tools.py](https://github.com/jdidjhdh/hiveflow/blob/main/examples/07_mcp_tools.py)
 - 组合 Studio 模板：`packages/studio/examples/rag_pipeline.json`
 
 ## 最小 RAG
@@ -50,4 +50,4 @@ await mgr.register_plugin(
 ## 相关
 
 - [OpenAI 集成](../integrations/openai.md)
-- [示例 06](https://github.com/hiveflow/hiveflow/blob/main/examples/06_rag_pipeline.py)
+- [示例 06](https://github.com/jdidjhdh/hiveflow/blob/main/examples/06_rag_pipeline.py)

@@ -28,7 +28,7 @@ sequenceDiagram
 
 ## Minimal code
 
-See [examples/03_hitl_approval.py](https://github.com/hiveflow/hiveflow/blob/main/examples/03_hitl_approval.py):
+See [examples/03_hitl_approval.py](https://github.com/jdidjhdh/hiveflow/blob/main/examples/03_hitl_approval.py):
 
 ```python
 from hiveflow import HiveFlow, HiveFlowConfig, ECM, HITLManager
@@ -49,4 +49,4 @@ hitl = HITLManager(hf.blackboard)
 ## Related
 
 - [API Reference — HITL](../api-reference.md)
-- [example 03](https://github.com/hiveflow/hiveflow/blob/main/examples/03_hitl_approval.py)
+- [example 03](https://github.com/jdidjhdh/hiveflow/blob/main/examples/03_hitl_approval.py)

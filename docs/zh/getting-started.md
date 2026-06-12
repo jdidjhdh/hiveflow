@@ -9,7 +9,7 @@
 ### Docker（推荐）
 
 ```bash
-git clone https://github.com/hiveflow/hiveflow.git
+git clone https://github.com/jdidjhdh/hiveflow.git
 cd hiveflow
 docker compose up --build
 ```
@@ -49,7 +49,7 @@ pip install "hiveflow[all]"           # all optional extras
 ### 从源码安装
 
 ```bash
-git clone https://github.com/hiveflow/hiveflow.git
+git clone https://github.com/jdidjhdh/hiveflow.git
 cd hiveflow/packages/core
 pip install -e ".[dev]"
 ```
@@ -217,7 +217,7 @@ docker run -d -p 6379:6379 redis:7-alpine
 - [Studio Agent 指南](cookbook/studio-agent-mode.md)
 - [架构](architecture.md)
 - [部署](deployment.md)
-- [贡献指南](https://github.com/hiveflow/hiveflow/blob/main/CONTRIBUTING.md)
+- [贡献指南](https://github.com/jdidjhdh/hiveflow/blob/main/CONTRIBUTING.md)
 
 ## 故障排查
 

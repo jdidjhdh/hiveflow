@@ -16,12 +16,12 @@
   <a href="https://pypi.org/project/hiveflow/"><img src="https://img.shields.io/pypi/v/hiveflow.svg" alt="PyPI"/></a>
   <a href="https://pypi.org/project/hiveflow/"><img src="https://img.shields.io/pypi/pyversions/hiveflow.svg" alt="Python"/></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"/></a>
-  <a href="https://github.com/hiveflow/hiveflow/actions/workflows/test.yml"><img src="https://github.com/hiveflow/hiveflow/actions/workflows/test.yml/badge.svg" alt="Tests"/></a>
-  <a href="https://hiveflow.github.io/hiveflow/en/"><img src="https://img.shields.io/badge/docs-English-blue" alt="Docs EN"/></a>
-  <a href="https://hiveflow.github.io/hiveflow/zh/"><img src="https://img.shields.io/badge/docs-中文-blue" alt="Docs ZH"/></a>
+  <a href="https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml"><img src="https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml/badge.svg" alt="Tests"/></a>
+  <a href="https://jdidjhdh.github.io/hiveflow/en/"><img src="https://img.shields.io/badge/docs-English-blue" alt="Docs EN"/></a>
+  <a href="https://jdidjhdh.github.io/hiveflow/zh/"><img src="https://img.shields.io/badge/docs-中文-blue" alt="Docs ZH"/></a>
 </p>
 
-> **0.1.x Alpha** — See [versioning policy](docs/en/versioning.md) · [OSS launch checklist](OSS_LAUNCH.md).
+> **0.1.x Alpha** — See [versioning policy](docs/en/versioning.md) · [OSS launch checklist](OSS_LAUNCH.md) · [Post-launch steps](docs/en/post-launch.md).
 
 HiveFlow is the **multi-agent coordination and HITL layer** for teams that need human approval, audited shared state, and a self-hosted ops UI — while staying compatible with runtimes like LangGraph via the [sidecar pattern](docs/en/cookbook/langgraph-sidecar.md).
 
@@ -44,7 +44,7 @@ HiveFlow is the **multi-agent coordination and HITL layer** for teams that need 
 ### 1. Docker (recommended)
 
 ```bash
-git clone https://github.com/hiveflow/hiveflow.git
+git clone https://github.com/jdidjhdh/hiveflow.git
 cd hiveflow
 docker compose up --build
 ```
@@ -184,7 +184,7 @@ The **visual operations platform**. Orchestrator and Chatflow for workflow desig
 
 | Resource | English | 中文 |
 |----------|---------|------|
-| Documentation site | [en/](https://hiveflow.github.io/hiveflow/en/) | [zh/](https://hiveflow.github.io/hiveflow/zh/) |
+| Documentation site | [en/](https://jdidjhdh.github.io/hiveflow/en/) | [zh/](https://jdidjhdh.github.io/hiveflow/zh/) |
 | Getting Started | [docs/en/getting-started.md](docs/en/getting-started.md) | [docs/zh/getting-started.md](docs/zh/getting-started.md) |
 | Three modules | [Core](packages/core/README.md) · [Agent](packages/agent/README.md) · [Studio](packages/studio/README.md) | [Core](packages/core/README.zh.md) · [Agent](packages/agent/README.zh.md) · [Studio](packages/studio/README.zh.md) |
 | Cookbook | [docs/en/cookbook/](docs/en/cookbook/) | [docs/zh/cookbook/](docs/zh/cookbook/) |

@@ -18,9 +18,9 @@ git tag v0.1.0
 git push origin main --tags
 ```
 
-See [Release workflow](https://github.com/hiveflow/hiveflow/blob/main/.github/workflows/release.yml) and [Docs workflow](https://github.com/hiveflow/hiveflow/blob/main/.github/workflows/docs.yml).
+See [Release workflow](https://github.com/jdidjhdh/hiveflow/blob/main/.github/workflows/release.yml) and [Docs workflow](https://github.com/jdidjhdh/hiveflow/blob/main/.github/workflows/docs.yml).
 
-Release notes are drafted via [release-drafter.yml](https://github.com/hiveflow/hiveflow/blob/main/.github/release-drafter.yml).
+Release notes are drafted via [release-drafter.yml](https://github.com/jdidjhdh/hiveflow/blob/main/.github/release-drafter.yml).
 
 ## Verify install
 
@@ -34,7 +34,7 @@ python examples/01_hello_hiveflow.py
 
 ## GitHub Pages (docs)
 
-Docs deploy automatically on push to `main` via the [Docs workflow](https://github.com/hiveflow/hiveflow/blob/main/.github/workflows/docs.yml).
+Docs deploy automatically on push to `main` via the [Docs workflow](https://github.com/jdidjhdh/hiveflow/blob/main/.github/workflows/docs.yml).
 
 Enable in repo **Settings → Pages → Build and deployment → GitHub Actions**.
 
@@ -46,4 +46,4 @@ Repo **Settings → General → Features → Discussions** — use for Q&A and s
 
 ## Release Drafter
 
-Merged PRs update the draft release notes via [release-drafter](https://github.com/hiveflow/hiveflow/blob/main/.github/release-drafter.yml). Copy relevant sections into `CHANGELOG.md` before tagging.
+Merged PRs update the draft release notes via [release-drafter](https://github.com/jdidjhdh/hiveflow/blob/main/.github/release-drafter.yml). Copy relevant sections into `CHANGELOG.md` before tagging.

@@ -71,11 +71,11 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/hiveflow/hiveflow"
-Documentation = "https://hiveflow.github.io/hiveflow/"
-Repository = "https://github.com/hiveflow/hiveflow"
-Issues = "https://github.com/hiveflow/hiveflow/issues"
-Changelog = "https://github.com/hiveflow/hiveflow/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/jdidjhdh/hiveflow"
+Documentation = "https://jdidjhdh.github.io/hiveflow/"
+Repository = "https://github.com/jdidjhdh/hiveflow"
+Issues = "https://github.com/jdidjhdh/hiveflow/issues"
+Changelog = "https://github.com/jdidjhdh/hiveflow/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["."]

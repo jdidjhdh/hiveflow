@@ -17,8 +17,8 @@ Combine retrieval-augmented generation with MCP tools in one orchestrated workfl
 
 ## Examples
 
-- Core: [examples/06_rag_pipeline.py](https://github.com/hiveflow/hiveflow/blob/main/examples/06_rag_pipeline.py)
-- MCP: [examples/07_mcp_tools.py](https://github.com/hiveflow/hiveflow/blob/main/examples/07_mcp_tools.py)
+- Core: [examples/06_rag_pipeline.py](https://github.com/jdidjhdh/hiveflow/blob/main/examples/06_rag_pipeline.py)
+- MCP: [examples/07_mcp_tools.py](https://github.com/jdidjhdh/hiveflow/blob/main/examples/07_mcp_tools.py)
 - Combined Studio template: `packages/studio/examples/rag_pipeline.json`
 
 ## Minimal RAG
@@ -50,4 +50,4 @@ await mgr.register_plugin(
 ## Related
 
 - [OpenAI integration](../integrations/openai.md)
-- [example 06](https://github.com/hiveflow/hiveflow/blob/main/examples/06_rag_pipeline.py)
+- [example 06](https://github.com/jdidjhdh/hiveflow/blob/main/examples/06_rag_pipeline.py)

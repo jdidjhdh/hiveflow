@@ -54,7 +54,7 @@ result = await app.run_query("What is on the blackboard?")
 pip install "hiveflow[all]"
 ```
 
-从 `hiveflow.multimodal` 使用 `OpenAIImageProcessor`、`OpenAIAudioProcessor`、`OpenAIVideoProcessor` — 见 [示例 15](https://github.com/hiveflow/hiveflow/blob/main/examples/15_multimodal_pipeline.py)。
+从 `hiveflow.multimodal` 使用 `OpenAIImageProcessor`、`OpenAIAudioProcessor`、`OpenAIVideoProcessor` — 见 [示例 15](https://github.com/jdidjhdh/hiveflow/blob/main/examples/15_multimodal_pipeline.py)。
 
 ## 故障排查
 

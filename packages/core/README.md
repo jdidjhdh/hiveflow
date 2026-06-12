@@ -105,13 +105,13 @@ mypy   # public API surface — see Quality below
 | Test coverage | **≥ 60%** on `hiveflow/` (CI enforced) |
 | MyPy | Documented public modules in `pyproject.toml` `[tool.mypy] files` |
 
-RAG internals, multimodal, and full `llm_client` typing are **out of scope** for 0.1.x and will expand toward 1.0. Full matrix: [Quality Gates](https://hiveflow.github.io/hiveflow/en/quality-gates/).
+RAG internals, multimodal, and full `llm_client` typing are **out of scope** for 0.1.x and will expand toward 1.0. Full matrix: [Quality Gates](https://jdidjhdh.github.io/hiveflow/en/quality-gates/).
 
 ## Documentation
 
-- [Getting Started](https://hiveflow.github.io/hiveflow/getting-started/)
-- [API Reference](https://hiveflow.github.io/hiveflow/api/)
-- [Architecture — Layer 1](https://hiveflow.github.io/hiveflow/architecture/)
+- [Getting Started](https://jdidjhdh.github.io/hiveflow/getting-started/)
+- [API Reference](https://jdidjhdh.github.io/hiveflow/api/)
+- [Architecture — Layer 1](https://jdidjhdh.github.io/hiveflow/architecture/)
 - [Main repository README](../../README.md)
 
 ## License

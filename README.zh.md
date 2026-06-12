@@ -16,12 +16,12 @@
   <a href="https://pypi.org/project/hiveflow/"><img src="https://img.shields.io/pypi/v/hiveflow.svg" alt="PyPI"/></a>
   <a href="https://pypi.org/project/hiveflow/"><img src="https://img.shields.io/pypi/pyversions/hiveflow.svg" alt="Python"/></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"/></a>
-  <a href="https://github.com/hiveflow/hiveflow/actions/workflows/test.yml"><img src="https://github.com/hiveflow/hiveflow/actions/workflows/test.yml/badge.svg" alt="Tests"/></a>
-  <a href="https://hiveflow.github.io/hiveflow/en/"><img src="https://img.shields.io/badge/docs-English-blue" alt="Docs EN"/></a>
-  <a href="https://hiveflow.github.io/hiveflow/zh/"><img src="https://img.shields.io/badge/docs-中文-blue" alt="Docs ZH"/></a>
+  <a href="https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml"><img src="https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml/badge.svg" alt="Tests"/></a>
+  <a href="https://jdidjhdh.github.io/hiveflow/en/"><img src="https://img.shields.io/badge/docs-English-blue" alt="Docs EN"/></a>
+  <a href="https://jdidjhdh.github.io/hiveflow/zh/"><img src="https://img.shields.io/badge/docs-中文-blue" alt="Docs ZH"/></a>
 </p>
 
-> **0.1.x Alpha** — 请参阅 [版本策略](docs/zh/versioning.md) · [开源上线清单](docs/zh/oss-launch.md)。
+> **0.1.x Alpha** — 请参阅 [版本策略](docs/zh/versioning.md) · [开源上线清单](docs/zh/oss-launch.md) · [发布后续](docs/zh/post-launch.md)。
 
 HiveFlow 是面向多 Agent 场景的**协调与 HITL 层**：人工审批、可审计共享状态、自托管运维 UI —— 并可通过 [LangGraph Sidecar](docs/zh/cookbook/langgraph-sidecar.md) 与 LangGraph 等运行时兼容共存。
 
@@ -44,7 +44,7 @@ HiveFlow 是面向多 Agent 场景的**协调与 HITL 层**：人工审批、可
 ### 1. Docker（推荐）
 
 ```bash
-git clone https://github.com/hiveflow/hiveflow.git
+git clone https://github.com/jdidjhdh/hiveflow.git
 cd hiveflow
 docker compose up --build
 ```
@@ -182,7 +182,7 @@ Core 之上的**认知运行时**。`HiveMindApp` 将自然语言转为 TaskGrap
 
 | 资源 | English | 中文 |
 |------|---------|------|
-| 文档站 | [en/](https://hiveflow.github.io/hiveflow/en/) | [zh/](https://hiveflow.github.io/hiveflow/zh/) |
+| 文档站 | [en/](https://jdidjhdh.github.io/hiveflow/en/) | [zh/](https://jdidjhdh.github.io/hiveflow/zh/) |
 | 快速入门 | [docs/en/getting-started.md](docs/en/getting-started.md) | [docs/zh/getting-started.md](docs/zh/getting-started.md) |
 | 三大模块 | [Core](packages/core/README.md) · [Agent](packages/agent/README.md) · [Studio](packages/studio/README.md) | [Core](packages/core/README.zh.md) · [Agent](packages/agent/README.zh.md) · [Studio](packages/studio/README.zh.md) |
 | 实践指南 | [docs/en/cookbook/](docs/en/cookbook/) | [docs/zh/cookbook/](docs/zh/cookbook/) |

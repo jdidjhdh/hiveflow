@@ -15,7 +15,7 @@ please report it responsibly.
 
 Instead, report via one of:
 
-1. **GitHub Security Advisories** (preferred): [Report a vulnerability](https://github.com/hiveflow/hiveflow/security/advisories/new)
+1. **GitHub Security Advisories** (preferred): [Report a vulnerability](https://github.com/jdidjhdh/hiveflow/security/advisories/new)
 2. **Email:** security@hiveflow.dev (if configured for your deployment)
 
 Include:

@@ -41,7 +41,7 @@ Embeddable Python engine: event bus, skill-based scheduler, audited blackboard, 
 
 **Use when:** you integrate orchestration into your own service and control agents/ECM directly.
 
-→ [Full Core README on GitHub](https://github.com/hiveflow/hiveflow/blob/main/packages/core/README.md) · [API](../api/index.md) · [Architecture](../architecture.md#layer-1-core-engine)
+→ [Full Core README on GitHub](https://github.com/jdidjhdh/hiveflow/blob/main/packages/core/README.md) · [API](../api/index.md) · [Architecture](../architecture.md#layer-1-core-engine)
 
 ---
 
@@ -55,7 +55,7 @@ Adds `HiveMindApp`: natural language → TaskGraph plan → Skill-bound ReAct wo
 
 **Use when:** users describe tasks in NL, or you want automatic planning/replanning on top of Core.
 
-→ [Full Agent README on GitHub](https://github.com/hiveflow/hiveflow/blob/main/packages/agent/README.md) · [Studio Agent cookbook](../cookbook/studio-agent-mode.md)
+→ [Full Agent README on GitHub](https://github.com/jdidjhdh/hiveflow/blob/main/packages/agent/README.md) · [Studio Agent cookbook](../cookbook/studio-agent-mode.md)
 
 ---
 
@@ -69,7 +69,7 @@ Self-hosted UI: Orchestrator, Chatflow, Approvals (HITL), Analytics, Tracer, Rep
 
 **Use when:** operators, reviewers, or demos need a browser-based control plane.
 
-→ [Full Studio README on GitHub](https://github.com/hiveflow/hiveflow/blob/main/packages/studio/README.md) · [Agent ops](../studio-agent-ops.md)
+→ [Full Studio README on GitHub](https://github.com/jdidjhdh/hiveflow/blob/main/packages/studio/README.md) · [Agent ops](../studio-agent-ops.md)
 
 ---
 

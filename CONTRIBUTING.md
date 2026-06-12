@@ -227,5 +227,5 @@ Releases are managed by maintainers:
 
 ## Questions?
 
-- Open a [GitHub Discussion](https://github.com/hiveflow/hiveflow/discussions)
-- Open an [Issue](https://github.com/hiveflow/hiveflow/issues)
+- Open a [GitHub Discussion](https://github.com/jdidjhdh/hiveflow/discussions)
+- Open an [Issue](https://github.com/jdidjhdh/hiveflow/issues)

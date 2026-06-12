@@ -20,4 +20,4 @@ pip install -e "packages/core[all]"
 python examples/run_smoke_tests.py
 ```
 
-See [examples/README.md](https://github.com/hiveflow/hiveflow/blob/main/examples/README.md) for the full list.
+See [examples/README.md](https://github.com/jdidjhdh/hiveflow/blob/main/examples/README.md) for the full list.

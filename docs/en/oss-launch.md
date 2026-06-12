@@ -1,6 +1,6 @@
 # Open Source Launch Checklist
 
-See the full checklist at [OSS_LAUNCH.md](https://github.com/hiveflow/hiveflow/blob/main/OSS_LAUNCH.md) in the repository root.
+See the full checklist at [OSS_LAUNCH.md](https://github.com/jdidjhdh/hiveflow/blob/main/OSS_LAUNCH.md) in the repository root.
 
 ## Quick status
 

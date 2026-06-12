@@ -98,7 +98,7 @@ Studio is **not** published to PyPI or npm as a standalone product in 0.1.x.
 | Backend only | `packages/studio/backend` + editable `core` + `agent` |
 | Frontend only | `packages/studio/frontend` (Vite dev server → API on `:8000`) |
 
-See [Studio README](https://github.com/hiveflow/hiveflow/tree/main/packages/studio#readme) and [Deployment](deployment.md).
+See [Studio README](https://github.com/jdidjhdh/hiveflow/tree/main/packages/studio#readme) and [Deployment](deployment.md).
 
 ### Frontend coverage policy
 
@@ -111,7 +111,7 @@ Raising unit coverage for pages is a **0.2.x** goal; do not block Alpha on 80% l
 
 ### Demo / preview pages
 
-Not all Studio routes are production-grade. See **[Studio CAPABILITIES.md](https://github.com/hiveflow/hiveflow/blob/main/packages/studio/CAPABILITIES.md)** for the maturity matrix (Stable / Beta / Preview / Demo).
+Not all Studio routes are production-grade. See **[Studio CAPABILITIES.md](https://github.com/jdidjhdh/hiveflow/blob/main/packages/studio/CAPABILITIES.md)** for the maturity matrix (Stable / Beta / Preview / Demo).
 
 Examples: **A/B testing** = Demo (in-memory only); **Analytics** = Preview.
 

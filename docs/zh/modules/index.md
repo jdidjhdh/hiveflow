@@ -41,7 +41,7 @@ flowchart TB
 
 **适用场景：** 将编排集成到自有服务，并直接控制 Agent/ECM。
 
-→ [GitHub 完整 Core README](https://github.com/hiveflow/hiveflow/blob/main/packages/core/README.md) · [API](../api/index.md) · [架构](../architecture.md#layer-1-core-engine)
+→ [GitHub 完整 Core README](https://github.com/jdidjhdh/hiveflow/blob/main/packages/core/README.md) · [API](../api/index.md) · [架构](../architecture.md#layer-1-core-engine)
 
 ---
 
@@ -55,7 +55,7 @@ flowchart TB
 
 **适用场景：** 用户以自然语言描述任务，或需要在 Core 之上自动规划/重规划。
 
-→ [GitHub 完整 Agent README](https://github.com/hiveflow/hiveflow/blob/main/packages/agent/README.md) · [Studio Agent 指南](../cookbook/studio-agent-mode.md)
+→ [GitHub 完整 Agent README](https://github.com/jdidjhdh/hiveflow/blob/main/packages/agent/README.md) · [Studio Agent 指南](../cookbook/studio-agent-mode.md)
 
 ---
 
@@ -69,7 +69,7 @@ flowchart TB
 
 **适用场景：** 运维人员、审阅者或演示需要基于浏览器的控制平面。
 
-→ [GitHub 完整 Studio README](https://github.com/hiveflow/hiveflow/blob/main/packages/studio/README.md) · [Agent 运维](../studio-agent-ops.md)
+→ [GitHub 完整 Studio README](https://github.com/jdidjhdh/hiveflow/blob/main/packages/studio/README.md) · [Agent 运维](../studio-agent-ops.md)
 
 ---
 

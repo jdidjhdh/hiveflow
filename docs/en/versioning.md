@@ -4,7 +4,7 @@ HiveFlow follows [Semantic Versioning 2.0.0](https://semver.org/) while in **Alp
 
 ## Current status: 0.1.x Alpha
 
-- **0.1.x** — Initial public releases; API may change between minors with migration notes in [CHANGELOG](https://github.com/hiveflow/hiveflow/blob/main/CHANGELOG.md).
+- **0.1.x** — Initial public releases; API may change between minors with migration notes in [CHANGELOG](https://github.com/jdidjhdh/hiveflow/blob/main/CHANGELOG.md).
 - **0.2.x** — Developer experience focus: unified high-level API, OpenTelemetry docs, coverage targets.
 - **1.0.0** — API freeze after Core + Studio stable for 6 months ([Roadmap](roadmap.md)).
 
@@ -39,6 +39,6 @@ Details: [Quality Gates](quality-gates.md).
 
 ## Upgrade checklist
 
-1. Read [CHANGELOG](https://github.com/hiveflow/hiveflow/blob/main/CHANGELOG.md).
+1. Read [CHANGELOG](https://github.com/jdidjhdh/hiveflow/blob/main/CHANGELOG.md).
 2. Run your test suite and `examples/run_smoke_tests.py`.
 3. For Studio: check [Studio Agent Operations](studio-agent-ops.md) env vars.

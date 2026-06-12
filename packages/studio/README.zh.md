@@ -130,13 +130,13 @@ Studio **不**作为独立 PyPI/npm 包发布（0.1.x），通过 **monorepo** �
 
 Vitest 排除 `src/pages/**` 与编排器 hooks；这些路由由 **17 个 Playwright E2E** 覆盖，UI 标注成熟度。见 **[CAPABILITIES.md](CAPABILITIES.md)**。
 
-完整矩阵：[质量门禁](https://hiveflow.github.io/hiveflow/zh/quality-gates/)。
+完整矩阵：[质量门禁](https://jdidjhdh.github.io/hiveflow/zh/quality-gates/)。
 
 ## 文档
 
-- [Studio Agent operations](https://hiveflow.github.io/hiveflow/studio-agent-ops/)
-- [Studio Agent cookbook](https://hiveflow.github.io/hiveflow/cookbook/studio-agent-mode/)
-- [Architecture — Studio layer](https://hiveflow.github.io/hiveflow/architecture/)
+- [Studio Agent operations](https://jdidjhdh.github.io/hiveflow/studio-agent-ops/)
+- [Studio Agent cookbook](https://jdidjhdh.github.io/hiveflow/cookbook/studio-agent-mode/)
+- [Architecture — Studio layer](https://jdidjhdh.github.io/hiveflow/architecture/)
 - [Main repository README](../../README.md)
 
 ## 许可证

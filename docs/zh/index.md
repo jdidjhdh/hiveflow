@@ -60,8 +60,8 @@ asyncio.run(main())
 
 ## 社区
 
-- [GitHub 仓库](https://github.com/hiveflow/hiveflow)
-- [Issue 跟踪](https://github.com/hiveflow/hiveflow/issues)
-- [Discussions](https://github.com/hiveflow/hiveflow/discussions)（需在仓库设置中启用）
-- [贡献指南](https://github.com/hiveflow/hiveflow/blob/main/CONTRIBUTING.md)
-- [治理](https://github.com/hiveflow/hiveflow/blob/main/GOVERNANCE.md)
+- [GitHub 仓库](https://github.com/jdidjhdh/hiveflow)
+- [Issue 跟踪](https://github.com/jdidjhdh/hiveflow/issues)
+- [Discussions](https://github.com/jdidjhdh/hiveflow/discussions)（需在仓库设置中启用）
+- [贡献指南](https://github.com/jdidjhdh/hiveflow/blob/main/CONTRIBUTING.md)
+- [治理](https://github.com/jdidjhdh/hiveflow/blob/main/GOVERNANCE.md)

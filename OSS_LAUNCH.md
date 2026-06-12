@@ -6,7 +6,7 @@ Track progress toward a LangChain-grade public launch. See [Roadmap](docs/en/roa
 
 | Day | Task | Owner | Status |
 |-----|------|-------|--------|
-| 1 | Create GitHub org `hiveflow`, public repo, push `main` | Maintainer | ⬜ |
+| 1 | Create GitHub repo and push `main` | Maintainer | ✅ `jdidjhdh/hiveflow` |
 | 1 | Enable **Discussions** + **Security Advisories** | Maintainer | ⬜ |
 | 1 | Repo Settings → Pages → **GitHub Actions** (uses `docs.yml`) | Maintainer | ⬜ |
 | 2 | Add secret `PYPI_API_TOKEN` (PyPI → Account → API tokens) | Maintainer | ⬜ |
@@ -74,7 +74,7 @@ See [docs/en/quality-gates.md](docs/en/quality-gates.md) for the full matrix.
 ## Phase 0 — Trustworthy launch (full)
 
 - [x] Remove internal dev files (`sitecustomize.py`, planning notes in `.gitignore`)
-- [ ] Create GitHub org `hiveflow` and public repo
+- [x] Public repo pushed (`https://github.com/jdidjhdh/hiveflow`)
 - [ ] Enable GitHub Discussions + Security Advisories
 - [ ] Configure secrets: `PYPI_API_TOKEN`, optional `CODECOV_TOKEN`
 - [ ] Tag `v0.1.0` and publish `hiveflow` + `hiveflow-agent` to PyPI

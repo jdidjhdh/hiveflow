@@ -27,9 +27,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/hiveflow/hiveflow"
-Documentation = "https://hiveflow.github.io/hiveflow/"
-Repository = "https://github.com/hiveflow/hiveflow"
+Homepage = "https://github.com/jdidjhdh/hiveflow"
+Documentation = "https://jdidjhdh.github.io/hiveflow/"
+Repository = "https://github.com/jdidjhdh/hiveflow"
 
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
