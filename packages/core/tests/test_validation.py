@@ -1,6 +1,18 @@
+import importlib.util
+
 import pytest
 
 from hiveflow import Expectation, ValidationPipeline
+
+
+def _has_module(name: str) -> bool:
+    try:
+        return importlib.util.find_spec(name) is not None
+    except ModuleNotFoundError:
+        return False
+
+
+_JSONSCHEMA_AVAILABLE = _has_module("jsonschema")
 
 
 @pytest.fixture
@@ -9,6 +21,7 @@ def pipeline():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not _JSONSCHEMA_AVAILABLE, reason="jsonschema package not installed")
 async def test_json_schema_validation(pipeline):
     expectation = Expectation(
         state_key="test",

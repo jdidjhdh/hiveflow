@@ -50,9 +50,17 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-_FERNET_AVAILABLE = importlib.util.find_spec("cryptography.fernet") is not None
-_JSONSCHEMA_AVAILABLE = importlib.util.find_spec("jsonschema") is not None
-_REDIS_AVAILABLE = importlib.util.find_spec("redis") is not None
+
+def _has_module(name: str) -> bool:
+    try:
+        return importlib.util.find_spec(name) is not None
+    except ModuleNotFoundError:
+        return False
+
+
+_FERNET_AVAILABLE = _has_module("cryptography.fernet")
+_JSONSCHEMA_AVAILABLE = _has_module("jsonschema")
+_REDIS_AVAILABLE = _has_module("redis")
 
 
 def _serialize_capability(cap) -> dict[str, Any]:
