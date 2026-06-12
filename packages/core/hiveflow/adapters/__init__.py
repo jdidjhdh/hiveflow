@@ -9,5 +9,5 @@ from hiveflow.adapters.langgraph import (
 __all__ = [
     "langgraph_to_taskgraph",
     "render_langgraph_python",
-    "taskgraph_to_taskgraph",
+    "taskgraph_to_langgraph",
 ]

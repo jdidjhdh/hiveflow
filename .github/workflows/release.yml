@@ -91,6 +91,9 @@ jobs:
           body_path: CHANGELOG.md
           draft: false
           prerelease: true
+          files: |
+            packages/core/dist/*
+            packages/agent/dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

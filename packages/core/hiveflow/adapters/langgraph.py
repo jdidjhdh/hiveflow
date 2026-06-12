@@ -52,7 +52,7 @@ def taskgraph_to_langgraph(
     roots = [n for n in node_ids if not incoming[n]]
     if not roots:
         raise ValueError("plan has no entry nodes (cycle or empty depends_on)")
-    entry_point = roots[0] if len(roots) == 1 else roots[0]
+    entry_point = roots[0]
 
     leaves = [n for n in node_ids if not any(e["from"] == n for e in edges)]
     terminal = leaves[0] if len(leaves) == 1 else (leaves[-1] if leaves else node_ids[-1])
@@ -99,7 +99,6 @@ def langgraph_to_taskgraph(spec: LangGraphSpec) -> TaskGraphPlan:
     if not spec.get("nodes"):
         raise ValueError("spec.nodes is required")
 
-    node_ids = {n["id"] for n in spec["nodes"]}
     plan: TaskGraphPlan = {}
 
     for node in spec["nodes"]:

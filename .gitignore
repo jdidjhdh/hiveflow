@@ -31,6 +31,8 @@ packages/agent/build/
 # Virtual environments
 .venv/
 .tmp-ci-venv/
+.tmp-agent-ci/
+.tmp-studio-ci/
 venv/
 ENV/
 env/
