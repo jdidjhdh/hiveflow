@@ -80,7 +80,7 @@ pytest tests/test_real_llm.py -v -m real_llm
 
 ### 发版耦合
 
-`hiveflow-agent` 依赖 `hiveflow>=0.1.0`。**同一 git tag 必须同时发布两个包**（如 `v0.1.0`）。见 [发布指南](publishing.md)。
+`hiveflow-agent` 依赖 `hiveflow-core>=0.1.0`。**同一 git tag 必须同时发布两个包**（如 `v0.1.0`）。见 [发布指南](publishing.md)。
 
 ---
 

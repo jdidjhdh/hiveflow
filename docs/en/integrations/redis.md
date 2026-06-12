@@ -5,7 +5,7 @@ Redis backs distributed event bus and blackboard for multi-process / multi-node 
 ## Install
 
 ```bash
-pip install "hiveflow[redis]"
+pip install "hiveflow-core[redis]"
 ```
 
 ## Event bus (RedisEventBus)

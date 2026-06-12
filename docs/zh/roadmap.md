@@ -28,7 +28,7 @@
 | GitHub Discussions | 维护者操作 |
 | Demo GIF + Discord | 规划中 |
 
-**退出标准：** 新用户可 `pip install hiveflow`、运行示例，并阅读在线文档，无需阅读源码。
+**退出标准：** 新用户可 `pip install hiveflow-core`、运行示例，并阅读在线文档，无需阅读源码。
 
 ---
 

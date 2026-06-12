@@ -2,7 +2,7 @@
 
 [English](README.md) · **简体中文**
 
-**PyPI：** [`hiveflow-agent`](https://pypi.org/project/hiveflow-agent/) · **路径：** `packages/agent` · **依赖：** `hiveflow>=0.1`
+**PyPI：** [`hiveflow-agent`](https://pypi.org/project/hiveflow-agent/) · **路径：** `packages/agent` · **依赖：** `hiveflow-core>=0.1`
 
 The cognitive runtime layer. Agent sits on [Core](../core/README.md) and adds natural-language intent parsing, dynamic TaskGraph planning, ReAct workers, memory, guardrails, and MCP skill registration — exposed primarily through `HiveMindApp`.
 

@@ -1,10 +1,12 @@
 # Publishing to PyPI
 
-Maintainer checklist for releasing `hiveflow` and `hiveflow-agent`.
+Maintainer checklist for releasing `hiveflow-core` and `hiveflow-agent`.
+
+> **Note:** PyPI name `hiveflow` is owned by another project ([py-HiveFlow](https://pypi.org/project/HiveFlow/)). Our core package publishes as **`hiveflow-core`**; Python import remains `import hiveflow`.
 
 ## Prerequisites
 
-1. PyPI account and project names reserved (`hiveflow`, `hiveflow-agent`)
+1. PyPI account; names **`hiveflow-core`** (available) and **`hiveflow-agent`** (available)
 2. GitHub secret `PYPI_API_TOKEN` with upload scope
 3. All CI jobs green on `main`
 
@@ -27,7 +29,7 @@ Release notes are drafted via [release-drafter.yml](https://github.com/jdidjhdh/
 ```bash
 python -m venv /tmp/hf-verify
 source /tmp/hf-verify/bin/activate  # Windows: Scripts\activate
-pip install hiveflow hiveflow-agent
+pip install hiveflow-core hiveflow-agent
 python -c "import hiveflow; print(hiveflow.__name__)"
 python examples/01_hello_hiveflow.py
 ```

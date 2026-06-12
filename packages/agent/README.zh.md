@@ -2,7 +2,7 @@
 
 [English](README.md) · **简体中文**
 
-**PyPI：** [`hiveflow-agent`](https://pypi.org/project/hiveflow-agent/) · **路径：** `packages/agent` · **依赖：** `hiveflow>=0.1`
+**PyPI：** [`hiveflow-agent`](https://pypi.org/project/hiveflow-agent/) · **路径：** `packages/agent` · **依赖：** `hiveflow-core>=0.1`
 
 认知运行时层。Agent 基于 [Core](../core/README.md) 构建，新增自然语言意图解析、动态 TaskGraph 规划、ReAct Worker、记忆、护栏与 MCP 技能注册——主要通过 `HiveMindApp` 对外暴露。
 

@@ -50,7 +50,7 @@ git push origin v0.1.0
 | # | 任务 | 操作 |
 |---|------|------|
 | 1 | **盲测 Golden Path** | 新人 `docker compose up --build` → Studio plan-only → 执行（≤30 分钟） |
-| 2 | **PyPI 路径** | `pip install hiveflow` → 跑 `examples/01_hello_hiveflow.py` |
+| 2 | **PyPI 路径** | `pip install hiveflow-core` → 跑 `examples/01_hello_hiveflow.py` |
 | 3 | **Dependabot** **（网页）** | 批量依赖 PR 可先关闭，按需再合并 |
 
 ---

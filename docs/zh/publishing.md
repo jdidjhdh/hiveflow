@@ -1,10 +1,12 @@
 # 发布到 PyPI
 
-维护者发布 `hiveflow` 与 `hiveflow-agent` 的检查清单。
+维护者发布 `hiveflow-core` 与 `hiveflow-agent` 的检查清单。
+
+> **说明：** PyPI 上的 `hiveflow` 已被其他项目占用（[py-HiveFlow](https://pypi.org/project/HiveFlow/)）。Core 包以 **`hiveflow-core`** 发布；Python 导入仍为 `import hiveflow`。
 
 ## 前置条件
 
-1. PyPI 账号及已预留的项目名（`hiveflow`、`hiveflow-agent`）
+1. PyPI 账号；包名 **`hiveflow-core`**（可用）、**`hiveflow-agent`**（可用）
 2. GitHub secret `PYPI_API_TOKEN`（具备上传权限）
 3. `main` 分支上所有 CI 任务通过
 
@@ -27,7 +29,7 @@ Release notes 通过 [release-drafter.yml](https://github.com/jdidjhdh/hiveflow/
 ```bash
 python -m venv /tmp/hf-verify
 source /tmp/hf-verify/bin/activate  # Windows: Scripts\activate
-pip install hiveflow hiveflow-agent
+pip install hiveflow-core hiveflow-agent
 python -c "import hiveflow; print(hiveflow.__name__)"
 python examples/01_hello_hiveflow.py
 ```

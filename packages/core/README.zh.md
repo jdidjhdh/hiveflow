@@ -2,7 +2,7 @@
 
 [English](README.md) · **简体中文**
 
-**PyPI：** [`hiveflow`](https://pypi.org/project/hiveflow/) · **路径：** `packages/core`
+**PyPI：** [`hiveflow`](https://pypi.org/project/hiveflow-core/) · **路径：** `packages/core`
 
 HiveFlow 的可嵌入编排内核。Core 提供在 Python 中构建多智能体系统所需的基础原语，不依赖 UI 或 LLM——你提供任务处理器，Core 负责调度、共享状态与工作流结构。
 
@@ -23,18 +23,18 @@ HiveFlow 的可嵌入编排内核。Core 提供在 Python 中构建多智能体�
 - 在你自己的服务或框架中嵌入编排能力
 - 需要对智能体、黑板键与调度策略拥有完全控制权
 - 构建自定义 HITL 或 DAG 逻辑，无需 Studio 或自然语言规划
-- 以最小依赖（`pip install hiveflow`）交付，不引入 Agent/LLM 栈
+- 以最小依赖（`pip install hiveflow-core`）交付，不引入 Agent/LLM 栈
 
 如需自然语言规划与 Skill 图，请添加 [`hiveflow-agent`](../agent/README.md)。如需可视化运维 UI，请使用 [Studio](../studio/README.md)。
 
 ## 安装
 
 ```bash
-pip install hiveflow
-pip install "hiveflow[security]"   # encryption + JSON schema
-pip install "hiveflow[llm]"        # OpenAI + Anthropic clients
-pip install "hiveflow[rag]"        # RAG utilities
-pip install "hiveflow[all]"        # all optional extras
+pip install hiveflow-core
+pip install "hiveflow-core[security]"   # encryption + JSON schema
+pip install "hiveflow-core[llm]"        # OpenAI + Anthropic clients
+pip install "hiveflow-core[rag]"        # RAG utilities
+pip install "hiveflow-core[all]"        # all optional extras
 ```
 
 从源码安装：

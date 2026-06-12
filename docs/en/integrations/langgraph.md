@@ -5,7 +5,7 @@
 ## Install
 
 ```bash
-pip install hiveflow
+pip install hiveflow-core
 # Optional, to run generated code:
 pip install langgraph langchain-core
 ```

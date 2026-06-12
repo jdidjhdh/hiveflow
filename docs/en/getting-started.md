@@ -21,7 +21,7 @@ See [Studio Agent cookbook](cookbook/studio-agent-mode.md) for API details and e
 ### PyPI quick check
 
 ```bash
-pip install hiveflow hiveflow-agent
+pip install hiveflow-core hiveflow-agent
 python examples/01_hello_hiveflow.py
 ```
 
@@ -39,11 +39,11 @@ python examples/01_hello_hiveflow.py
 ### From PyPI
 
 ```bash
-pip install hiveflow                  # core
-pip install "hiveflow[security]"      # encryption + JSON schema
-pip install "hiveflow[llm]"           # OpenAI + Anthropic clients
-pip install "hiveflow[rag]"           # RAG utilities
-pip install "hiveflow[all]"           # all optional extras
+pip install hiveflow-core                  # core
+pip install "hiveflow-core[security]"      # encryption + JSON schema
+pip install "hiveflow-core[llm]"           # OpenAI + Anthropic clients
+pip install "hiveflow-core[rag]"           # RAG utilities
+pip install "hiveflow-core[all]"           # all optional extras
 ```
 
 ### From Source
@@ -223,7 +223,7 @@ docker run -d -p 6379:6379 redis:7-alpine
 
 **`No module named 'hiveflow'`** — Install from source with `pip install -e ".[dev]"` in `packages/core`.
 
-**Optional feature ImportError** — Install the matching extra, e.g. `pip install "hiveflow[security]"`.
+**Optional feature ImportError** — Install the matching extra, e.g. `pip install "hiveflow-core[security]"`.
 
 **Redis connection errors** — Ensure Redis is running (`redis-cli ping` → `PONG`).
 

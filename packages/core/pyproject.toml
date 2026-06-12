@@ -1,5 +1,5 @@
 [project]
-name = "hiveflow"
+name = "hiveflow-core"
 version = "0.1.0"
 description = "Lightweight multi-agent orchestration engine with HITL, RAG, MCP, and cognitive planning"
 readme = "README.md"
@@ -59,7 +59,7 @@ checkpoint = [
     "aiosqlite>=0.19",
 ]
 all = [
-    "hiveflow[security,redis,llm,rag,checkpoint]",
+    "hiveflow-core[security,redis,llm,rag,checkpoint]",
 ]
 dev = [
     "pytest>=7.0",

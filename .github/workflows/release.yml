@@ -24,7 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install build twine
 
-      - name: Build hiveflow (core)
+      - name: Build hiveflow-core
         run: |
           cd packages/core
           python -m build
@@ -40,7 +40,7 @@ jobs:
           pip install -e ".[dev]"
           python -m pytest --cov=hiveflow --cov-fail-under=60
 
-      - name: Publish hiveflow to PyPI
+      - name: Publish hiveflow-core to PyPI
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}

@@ -13,8 +13,8 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/hiveflow/"><img src="https://img.shields.io/pypi/v/hiveflow.svg" alt="PyPI"/></a>
-  <a href="https://pypi.org/project/hiveflow/"><img src="https://img.shields.io/pypi/pyversions/hiveflow.svg" alt="Python"/></a>
+  <a href="https://pypi.org/project/hiveflow-core/"><img src="https://img.shields.io/pypi/v/hiveflow-core.svg" alt="PyPI"/></a>
+  <a href="https://pypi.org/project/hiveflow-core/"><img src="https://img.shields.io/pypi/pyversions/hiveflow-core.svg" alt="Python"/></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"/></a>
   <a href="https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml"><img src="https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml/badge.svg" alt="Tests"/></a>
   <a href="https://jdidjhdh.github.io/hiveflow/en/"><img src="https://img.shields.io/badge/docs-English-blue" alt="Docs EN"/></a>
@@ -62,11 +62,11 @@ APIs: `POST /api/agent/plan-only` · `execute-plan` · `query` — see [Studio A
 ### 2. PyPI (library / scripts)
 
 ```bash
-pip install hiveflow hiveflow-agent
+pip install hiveflow-core hiveflow-agent
 python examples/01_hello_hiveflow.py
 ```
 
-Optional extras: `pip install "hiveflow[all]"` (security, llm, rag, redis).
+Optional extras: `pip install "hiveflow-core[all]"` (security, llm, rag, redis).
 
 ### Advanced — embed Core engine only
 
@@ -157,7 +157,7 @@ HiveFlow is a monorepo with three packages. Pick the layer that matches your int
 
 The **embeddable engine**. You register workers with skills, schedule `ECM` tasks, and coordinate through a shared blackboard. Includes static/dynamic DAG orchestrators, HITL gates, checkpoints, dual guards, RAG, MCP plugin hooks, and Prometheus-friendly metrics — with no UI dependency.
 
-- **Install:** `pip install hiveflow` · **Docs:** [Core README](packages/core/README.md) · [API](docs/en/api/index.md)
+- **Install:** `pip install hiveflow-core` · **Docs:** [Core README](packages/core/README.md) · [API](docs/en/api/index.md)
 - **Examples:** `examples/01_hello_hiveflow.py` … `15_multimodal_pipeline.py`
 
 ### Agent — `packages/agent` (`hiveflow-agent`)

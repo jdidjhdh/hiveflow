@@ -4,7 +4,7 @@ HiveFlow - 10: Secure Blackboard
 This example demonstrates encrypted blackboard with audit logging.
 
 Usage:
-    pip install "hiveflow[security]"
+    pip install "hiveflow-core[security]"
     python 10_secure_blackboard.py
 """
 import asyncio

@@ -34,7 +34,7 @@ python scripts/verify_launch_readiness.py
 | 1 | Create PyPI account + API token | https://pypi.org/manage/account/token/ (scope: entire account or project) |
 | 2 | Add secret **(web)** | Repo → Settings → Secrets → `PYPI_API_TOKEN` |
 | 3 | Tag release **(local)** | See commands below |
-| 4 | Confirm packages | https://pypi.org/project/hiveflow/ and `hiveflow-agent` |
+| 4 | Confirm packages | https://pypi.org/project/hiveflow-core/ and `hiveflow-agent` |
 
 ```bash
 cd E:\HiveFlow
@@ -54,7 +54,7 @@ This triggers [`.github/workflows/release.yml`](https://github.com/jdidjhdh/hive
 | # | Task | How |
 |---|------|-----|
 | 1 | **Golden Path blind test** | Someone new: `docker compose up --build` → Studio → plan-only → execute (≤30 min) |
-| 2 | **PyPI path** | `pip install hiveflow` → `python examples/01_hello_hiveflow.py` (after Day 2) |
+| 2 | **PyPI path** | `pip install hiveflow-core` → `python examples/01_hello_hiveflow.py` (after Day 2) |
 | 3 | **Close Dependabot noise** **(web)** | Review or close bulk dependency PRs until you want upgrades |
 | 4 | **Pin README clone URL** | Already `github.com/jdidjhdh/hiveflow` after URL sync commit |
 

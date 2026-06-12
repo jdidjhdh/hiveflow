@@ -5,7 +5,7 @@
 ## 安装
 
 ```bash
-pip install "hiveflow[llm]"
+pip install "hiveflow-core[llm]"
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 

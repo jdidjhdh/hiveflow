@@ -22,7 +22,7 @@ HiveFlow 在 **Alpha**（0.y.z）阶段遵循 [Semantic Versioning 2.0.0](https:
 | PyPI 名称 | 范围 |
 |-----------|-------|
 | `hiveflow` | Core 引擎 |
-| `hiveflow-agent` | Agent 运行时（依赖 `hiveflow>=0.1`） |
+| `hiveflow-agent` | Agent 运行时（依赖 `hiveflow-core>=0.1`） |
 
 发布时版本号保持同步（`v0.1.0` tag 同时发布两者）。
 

@@ -149,7 +149,7 @@ Helm chart support is planned for a future release.
 4. **Enable encryption**:
    ```bash
    HIVEFLOW_ENCRYPTION_KEY=<min-32-characters>
-   pip install "hiveflow[security]"
+   pip install "hiveflow-core[security]"
    ```
 
 ### Scalability

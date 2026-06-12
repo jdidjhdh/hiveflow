@@ -30,6 +30,7 @@ packages/agent/build/
 
 # Virtual environments
 .venv/
+.tmp-ci-venv/
 venv/
 ENV/
 env/

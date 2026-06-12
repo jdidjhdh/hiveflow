@@ -13,11 +13,11 @@ HiveFlow 通过可选依赖组与 Studio 配置连接外部系统。
 ## 可选依赖组
 
 ```bash
-pip install "hiveflow[security]"   # cryptography, jsonschema
-pip install "hiveflow[redis]"      # redis
-pip install "hiveflow[llm]"        # openai, anthropic
-pip install "hiveflow[rag]"        # numpy, scikit-learn
-pip install "hiveflow[all]"        # everything above
+pip install "hiveflow-core[security]"   # cryptography, jsonschema
+pip install "hiveflow-core[redis]"      # redis
+pip install "hiveflow-core[llm]"        # openai, anthropic
+pip install "hiveflow-core[rag]"        # numpy, scikit-learn
+pip install "hiveflow-core[all]"        # everything above
 ```
 
 ## 贡献新集成

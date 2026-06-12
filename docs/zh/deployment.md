@@ -149,7 +149,7 @@ Helm Chart 支持计划在未来版本中提供。
 4. **启用加密**：
    ```bash
    HIVEFLOW_ENCRYPTION_KEY=<min-32-characters>
-   pip install "hiveflow[security]"
+   pip install "hiveflow-core[security]"
    ```
 
 ### 可扩展性

@@ -21,7 +21,7 @@ docker compose up --build
 ### PyPI 快速验证
 
 ```bash
-pip install hiveflow hiveflow-agent
+pip install hiveflow-core hiveflow-agent
 python examples/01_hello_hiveflow.py
 ```
 
@@ -39,11 +39,11 @@ python examples/01_hello_hiveflow.py
 ### 从 PyPI 安装
 
 ```bash
-pip install hiveflow                  # core
-pip install "hiveflow[security]"      # encryption + JSON schema
-pip install "hiveflow[llm]"           # OpenAI + Anthropic clients
-pip install "hiveflow[rag]"           # RAG utilities
-pip install "hiveflow[all]"           # all optional extras
+pip install hiveflow-core                  # core
+pip install "hiveflow-core[security]"      # encryption + JSON schema
+pip install "hiveflow-core[llm]"           # OpenAI + Anthropic clients
+pip install "hiveflow-core[rag]"           # RAG utilities
+pip install "hiveflow-core[all]"           # all optional extras
 ```
 
 ### 从源码安装
@@ -223,7 +223,7 @@ docker run -d -p 6379:6379 redis:7-alpine
 
 **`No module named 'hiveflow'`** — 在 `packages/core` 目录下使用 `pip install -e ".[dev]"` 从源码安装。
 
-**可选功能 ImportError** — 安装对应的 extra，例如 `pip install "hiveflow[security]"`。
+**可选功能 ImportError** — 安装对应的 extra，例如 `pip install "hiveflow-core[security]"`。
 
 **Redis 连接错误** — 确保 Redis 正在运行（`redis-cli ping` → `PONG`）。
 

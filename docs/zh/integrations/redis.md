@@ -5,7 +5,7 @@ Redis 为多进程 / 多节点部署提供分布式事件总线与黑板。
 ## 安装
 
 ```bash
-pip install "hiveflow[redis]"
+pip install "hiveflow-core[redis]"
 ```
 
 ## 事件总线（RedisEventBus）

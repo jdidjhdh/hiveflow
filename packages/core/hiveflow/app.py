@@ -294,7 +294,7 @@ class HiveFlow:
                 if SQLiteCheckpointBackend is None:
                     raise ImportError(
                         "aiosqlite is required for sqlite checkpoint backend. "
-                        "Install with: pip install hiveflow[checkpoint]"
+                        "Install with: pip install hiveflow-core[checkpoint]"
                     )
                 cp_backend = SQLiteCheckpointBackend(self.config.checkpoint_db_path)
             else:

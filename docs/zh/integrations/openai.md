@@ -5,7 +5,7 @@ HiveFlow 通过可选 extra 与共享 `LLMClient` 抽象集成 OpenAI。
 ## 安装
 
 ```bash
-pip install "hiveflow[llm]"
+pip install "hiveflow-core[llm]"
 export OPENAI_API_KEY=sk-...
 ```
 
@@ -51,7 +51,7 @@ result = await app.run_query("What is on the blackboard?")
 ## 多模态（可选）
 
 ```bash
-pip install "hiveflow[all]"
+pip install "hiveflow-core[all]"
 ```
 
 从 `hiveflow.multimodal` 使用 `OpenAIImageProcessor`、`OpenAIAudioProcessor`、`OpenAIVideoProcessor` — 见 [示例 15](https://github.com/jdidjhdh/hiveflow/blob/main/examples/15_multimodal_pipeline.py)。
@@ -60,6 +60,6 @@ pip install "hiveflow[all]"
 
 | 问题 | 处理 |
 |-------|-----|
-| `ImportError: openai` | `pip install "hiveflow[llm]"` |
+| `ImportError: openai` | `pip install "hiveflow-core[llm]"` |
 | 401 Unauthorized | 检查 `OPENAI_API_KEY` |
 | Rate limits | 降低调度器并发或在自定义 handler 中添加重试 |

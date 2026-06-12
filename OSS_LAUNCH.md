@@ -16,7 +16,7 @@ Track progress toward a LangChain-grade public launch. See [Roadmap](docs/en/roa
 | 3 | `docker compose up --build` as default dev path | Repo | ✅ |
 | 3 | 2-person blind test (≤30 min to first plan on canvas) | Team | ⬜ |
 
-**Day 3 exit criteria:** stranger clones repo → `docker compose up` → Studio plan-only → execute, **or** `pip install hiveflow` → `examples/01_hello_hiveflow.py`.
+**Day 3 exit criteria:** stranger clones repo → `docker compose up` → Studio plan-only → execute, **or** `pip install hiveflow-core` → `examples/01_hello_hiveflow.py`.
 
 ### Local readiness (automated)
 
@@ -86,7 +86,7 @@ See [docs/en/quality-gates.md](docs/en/quality-gates.md) for the full matrix.
 - [x] Monorepo-aware Studio Dockerfile + `docker compose`
 - [ ] Verify `security@hiveflow.dev` or use GitHub Advisories only
 
-**Exit criteria:** `pip install hiveflow` → run `examples/01_hello_hiveflow.py` → docs site live.
+**Exit criteria:** `pip install hiveflow-core` → run `examples/01_hello_hiveflow.py` → docs site live.
 
 ## Phase 1 — Professional polish
 
@@ -142,7 +142,7 @@ cd packages/agent && pip install -e ../core && python -m build && python -m twin
 ### 3. Verify after publish
 
 ```bash
-pip install hiveflow==0.1.0 hiveflow-agent==0.1.0
+pip install hiveflow-core==0.1.0 hiveflow-agent==0.1.0
 python -c "import hiveflow; print(hiveflow.__version__)"
 ```
 

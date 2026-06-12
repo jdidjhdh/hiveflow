@@ -5,7 +5,7 @@ HiveFlow integrates with OpenAI via optional extras and the shared `LLMClient` a
 ## Install
 
 ```bash
-pip install "hiveflow[llm]"
+pip install "hiveflow-core[llm]"
 export OPENAI_API_KEY=sk-...
 ```
 
@@ -51,7 +51,7 @@ result = await app.run_query("What is on the blackboard?")
 ## Multimodal (optional)
 
 ```bash
-pip install "hiveflow[all]"
+pip install "hiveflow-core[all]"
 ```
 
 Use `OpenAIImageProcessor`, `OpenAIAudioProcessor`, and `OpenAIVideoProcessor` from `hiveflow.multimodal` — see [example 15](https://github.com/jdidjhdh/hiveflow/blob/main/examples/15_multimodal_pipeline.py).
@@ -60,6 +60,6 @@ Use `OpenAIImageProcessor`, `OpenAIAudioProcessor`, and `OpenAIVideoProcessor` f
 
 | Issue | Fix |
 |-------|-----|
-| `ImportError: openai` | `pip install "hiveflow[llm]"` |
+| `ImportError: openai` | `pip install "hiveflow-core[llm]"` |
 | 401 Unauthorized | Check `OPENAI_API_KEY` |
 | Rate limits | Lower concurrency in scheduler or add retries in custom handler |

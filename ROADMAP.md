@@ -28,7 +28,7 @@ Public roadmap for reaching production-ready open source. Timelines are approxim
 | GitHub Discussions enabled | Maintainer action — template added |
 | Demo GIF + Discord | Planned |
 
-**Exit criteria:** A new user can `pip install hiveflow`, run an example, and read live docs without reading source code.
+**Exit criteria:** A new user can `pip install hiveflow-core`, run an example, and read live docs without reading source code.
 
 ---
 

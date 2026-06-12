@@ -82,7 +82,7 @@ Mark: `@pytest.mark.real_llm` — never required for merge.
 
 ### Release coupling
 
-`hiveflow-agent` declares `hiveflow>=0.1.0`. **Always publish both packages from the same git tag** (`v0.1.0` → `hiveflow==0.1.0` + `hiveflow-agent==0.1.0`). See [Publishing](publishing.md).
+`hiveflow-agent` declares `hiveflow-core>=0.1.0`. **Always publish both packages from the same git tag** (`v0.1.0` → `hiveflow-core==0.1.0` + `hiveflow-agent==0.1.0`). See [Publishing](publishing.md).
 
 ---
 

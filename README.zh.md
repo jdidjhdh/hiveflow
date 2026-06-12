@@ -13,8 +13,8 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/hiveflow/"><img src="https://img.shields.io/pypi/v/hiveflow.svg" alt="PyPI"/></a>
-  <a href="https://pypi.org/project/hiveflow/"><img src="https://img.shields.io/pypi/pyversions/hiveflow.svg" alt="Python"/></a>
+  <a href="https://pypi.org/project/hiveflow-core/"><img src="https://img.shields.io/pypi/v/hiveflow-core.svg" alt="PyPI"/></a>
+  <a href="https://pypi.org/project/hiveflow-core/"><img src="https://img.shields.io/pypi/pyversions/hiveflow-core.svg" alt="Python"/></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"/></a>
   <a href="https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml"><img src="https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml/badge.svg" alt="Tests"/></a>
   <a href="https://jdidjhdh.github.io/hiveflow/en/"><img src="https://img.shields.io/badge/docs-English-blue" alt="Docs EN"/></a>
@@ -62,11 +62,11 @@ API：`POST /api/agent/plan-only` · `execute-plan` · `query` — 见 [Studio A
 ### 2. PyPI（库 / 脚本）
 
 ```bash
-pip install hiveflow hiveflow-agent
+pip install hiveflow-core hiveflow-agent
 python examples/01_hello_hiveflow.py
 ```
 
-可选扩展：`pip install "hiveflow[all]"`（security、llm、rag、redis）。
+可选扩展：`pip install "hiveflow-core[all]"`（security、llm、rag、redis）。
 
 ### 进阶 — 仅嵌入 Core 引擎
 
@@ -157,7 +157,7 @@ HiveFlow 是包含三个包的 monorepo。按集成深度选择层级。
 
 **可嵌入引擎**。注册带 Skill 的 Worker，调度 `ECM`，通过共享黑板协同。含静态/动态 DAG、HITL、Checkpoint、双 Guard、RAG、MCP 与指标 — 不依赖 UI。
 
-- **安装：** `pip install hiveflow` · **文档：** [Core README（中文）](packages/core/README.zh.md) · [API](docs/zh/api/index.md)
+- **安装：** `pip install hiveflow-core` · **文档：** [Core README（中文）](packages/core/README.zh.md) · [API](docs/zh/api/index.md)
 
 ### Agent — `packages/agent`（`hiveflow-agent`）
 

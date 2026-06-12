@@ -2,7 +2,7 @@
 
 [English](README.md) · **简体中文**
 
-**PyPI：** [`hiveflow`](https://pypi.org/project/hiveflow/) · **路径：** `packages/core`
+**PyPI：** [`hiveflow`](https://pypi.org/project/hiveflow-core/) · **路径：** `packages/core`
 
 The embeddable orchestration kernel of HiveFlow. Core provides the primitives to build multi-agent systems in Python without a UI or LLM dependency — you bring task handlers, Core handles scheduling, shared state, and workflow structure.
 
@@ -23,18 +23,18 @@ The embeddable orchestration kernel of HiveFlow. Core provides the primitives to
 - Embed orchestration inside your own service or framework
 - Need full control over agents, blackboard keys, and scheduler policy
 - Build custom HITL or DAG logic without Studio or NL planning
-- Ship a minimal dependency (`pip install hiveflow`) without Agent/LLM stack
+- Ship a minimal dependency (`pip install hiveflow-core`) without Agent/LLM stack
 
 For natural-language planning and Skill graphs, add [`hiveflow-agent`](../agent/README.md). For a visual ops UI, use [Studio](../studio/README.md).
 
 ## Installation
 
 ```bash
-pip install hiveflow
-pip install "hiveflow[security]"   # encryption + JSON schema
-pip install "hiveflow[llm]"        # OpenAI + Anthropic clients
-pip install "hiveflow[rag]"        # RAG utilities
-pip install "hiveflow[all]"        # all optional extras
+pip install hiveflow-core
+pip install "hiveflow-core[security]"   # encryption + JSON schema
+pip install "hiveflow-core[llm]"        # OpenAI + Anthropic clients
+pip install "hiveflow-core[rag]"        # RAG utilities
+pip install "hiveflow-core[all]"        # all optional extras
 ```
 
 From source:

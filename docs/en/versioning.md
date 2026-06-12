@@ -22,7 +22,7 @@ HiveFlow follows [Semantic Versioning 2.0.0](https://semver.org/) while in **Alp
 | PyPI name | Scope |
 |-----------|-------|
 | `hiveflow` | Core engine |
-| `hiveflow-agent` | Agent runtime (depends on `hiveflow>=0.1`) |
+| `hiveflow-agent` | Agent runtime (depends on `hiveflow-core>=0.1`) |
 
 Version numbers are kept in sync for releases (`v0.1.0` tag publishes both).
 
