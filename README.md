@@ -21,7 +21,7 @@
   <a href="https://jdidjhdh.github.io/hiveflow/zh/"><img src="https://img.shields.io/badge/docs-中文-blue" alt="Docs ZH"/></a>
 </p>
 
-> **0.1.x Alpha** — See [versioning policy](docs/en/versioning.md) · [OSS launch checklist](OSS_LAUNCH.md) · [Post-launch steps](docs/en/post-launch.md).
+> **0.1.x Alpha** — [v0.1.0 release](https://github.com/jdidjhdh/hiveflow/releases/tag/v0.1.0) · [versioning policy](docs/en/versioning.md) · [docs](https://jdidjhdh.github.io/hiveflow/)
 
 HiveFlow is the **multi-agent coordination and HITL layer** for teams that need human approval, audited shared state, and a self-hosted ops UI — while staying compatible with runtimes like LangGraph via the [sidecar pattern](docs/en/cookbook/langgraph-sidecar.md).
 

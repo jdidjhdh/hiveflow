@@ -7,17 +7,26 @@ on:
     types: [opened, reopened, synchronize]
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 jobs:
   update_release_draft:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
-      - uses: release-drafter/release-drafter@v6
+      - name: Draft next release (main push)
+        if: github.event_name == 'push'
+        uses: release-drafter/release-drafter@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Label pull requests
+        if: github.event_name == 'pull_request'
+        uses: release-drafter/release-drafter@v6
+        with:
+          disable-releaser: true
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

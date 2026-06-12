@@ -21,7 +21,7 @@
   <a href="https://jdidjhdh.github.io/hiveflow/zh/"><img src="https://img.shields.io/badge/docs-中文-blue" alt="Docs ZH"/></a>
 </p>
 
-> **0.1.x Alpha** — 请参阅 [版本策略](docs/zh/versioning.md) · [开源上线清单](docs/zh/oss-launch.md) · [发布后续](docs/zh/post-launch.md)。
+> **0.1.x Alpha** — [v0.1.0 发布](https://github.com/jdidjhdh/hiveflow/releases/tag/v0.1.0) · [版本策略](docs/zh/versioning.md) · [文档](https://jdidjhdh.github.io/hiveflow/zh/)
 
 HiveFlow 是面向多 Agent 场景的**协调与 HITL 层**：人工审批、可审计共享状态、自托管运维 UI —— 并可通过 [LangGraph Sidecar](docs/zh/cookbook/langgraph-sidecar.md) 与 LangGraph 等运行时兼容共存。
 
