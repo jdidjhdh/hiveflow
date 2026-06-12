@@ -19,6 +19,7 @@ jobs:
       - name: Draft next release (main push)
         if: github.event_name == 'push'
         uses: release-drafter/release-drafter@v6
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
