@@ -1,0 +1,144 @@
+export type OrchestratorLocales = {
+  toolbar: {
+    newCanvas: string;
+    template: string;
+    save: string;
+    import: string;
+    export: string;
+    batch: string;
+    layout: string;
+    undo: string;
+    redo: string;
+    agentQuery: string;
+    stop: string;
+    execute: string;
+    executeDag: string;
+    nodesProgress: string;
+    tooltipAgentQuery: string;
+    tooltipDagExecute: string;
+    tooltipCoreExecute: string;
+  };
+  nodeLibrary: {
+    title: string;
+    doubleClickHint: string;
+  };
+  canvas: {
+    emptyTitle: string;
+    emptyDesc: string;
+  };
+  agentModeBanner: string;
+  nodeTypes: {
+    task: string;
+    dynamic: string;
+    subgraph: string;
+    condition: string;
+    loop: string;
+    code: string;
+    http: string;
+    trigger: string;
+    hitl: string;
+  };
+  defaults: {
+    newTask: string;
+    branchYes: string;
+    branchNo: string;
+    hitlPrompt: string;
+    codePlaceholder: string;
+  };
+  nodeDrawer: {
+    title: string;
+    deleteNode: string;
+    nodeName: string;
+    taskFn: string;
+    taskFnPlaceholder: string;
+    skills: string;
+    skillsPlaceholder: string;
+    conditionExpr: string;
+    conditionPlaceholder: string;
+    varSyntaxAlert: string;
+    language: string;
+    code: string;
+    hitlPrompt: string;
+    hitlAction: string;
+    hitlTimeout: string;
+    hitlOnTimeout: string;
+    stateKey: string;
+    stateKeyPlaceholder: string;
+    deadline: string;
+    maxRetries: string;
+    onFailure: string;
+    onFailurePlaceholder: string;
+    onFailureAbort: string;
+    onFailureSkip: string;
+    saveConfig: string;
+    hitlActionApproval: string;
+    hitlActionReview: string;
+    hitlActionInput: string;
+    timeoutFail: string;
+    timeoutApprove: string;
+    timeoutSkip: string;
+  };
+  agentDrawer: {
+    title: string;
+    info: string;
+    registeredSkills: string;
+    queryPlaceholder: string;
+    planOnly: string;
+    runQuery: string;
+    executionPlan: string;
+    answer: string;
+    importToCanvas: string;
+    exportLangGraph: string;
+    exportLangGraphPython: string;
+  };
+  taskNode: {
+    branches: string;
+    statusRunning: string;
+    statusCompleted: string;
+    statusFailed: string;
+    statusIdle: string;
+  };
+  edge: {
+    deleted: string;
+  };
+  templates: {
+    rag: { label: string; description: string };
+    debate: { label: string; description: string };
+    hierarchical: { label: string; description: string };
+    e2e: { label: string; description: string };
+    loaded: string;
+  };
+  confirm: {
+    overwriteTitle: string;
+    overwriteContent: string;
+    overwriteOk: string;
+  };
+  messages: {
+    nodeSaved: string;
+    runtimeAgent: string;
+    runtimeCore: string;
+    exported: string;
+    imported: string;
+    invalidWorkflow: string;
+    batchExportRealMode: string;
+    batchExported: string;
+    batchExportFailed: string;
+    newCanvas: string;
+    workflowSaved: string;
+    addNodesFirst: string;
+    executing: string;
+    agentExecuted: string;
+    workflowCompleted: string;
+    executeFailed: string;
+    workflowAborted: string;
+    workflowFailed: string;
+    stopped: string;
+    agentQueryDone: string;
+    planGenerated: string;
+    planEmpty: string;
+    planImported: string;
+    noPlanExport: string;
+    canvasEmptyExport: string;
+    langGraphExported: string;
+  };
+};

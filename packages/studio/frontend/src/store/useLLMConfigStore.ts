@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { LLMProviderConfig } from '@/types';
-import { apiFetch } from '@/utils/api';
+import { apiFetch } from '@/api';
 
 interface LLMConfigState {
   providers: LLMProviderConfig[];

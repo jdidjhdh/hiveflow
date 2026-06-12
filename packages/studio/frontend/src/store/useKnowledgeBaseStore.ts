@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { KnowledgeBase, DocumentDef } from '@/types';
-import { apiFetch } from '@/utils/api';
+import { apiFetch } from '@/api';
 import { useEngineStore } from '@/store/useEngineStore';
 
 interface KnowledgeBaseState {

@@ -1,16 +1,24 @@
 # ==============================================
 # HiveFlow Studio Backend - Dockerfile
+# Build context: repository root (see docker-compose.yml)
 # ==============================================
 FROM python:3.12-slim
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# 安装依赖
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY packages/core /packages/core
+COPY packages/agent /packages/agent
+RUN pip install --no-cache-dir -e /packages/core -e /packages/agent
 
-# 复制应用代码
-COPY . .
+COPY packages/studio/backend/requirements.txt /tmp/requirements.txt
+RUN grep -v '^-e' /tmp/requirements.txt > /tmp/requirements-pip.txt \
+    && pip install --no-cache-dir -r /tmp/requirements-pip.txt
+
+COPY packages/studio/backend /app
 
 # 暴露端口
 EXPOSE 8000

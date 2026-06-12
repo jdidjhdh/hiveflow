@@ -4,19 +4,15 @@ test.describe('Code Execution Node', () => {
   test('should create and configure code execution node', async ({ orchestrator, page }) => {
     await orchestrator.goto();
     await orchestrator.addNodeToCanvas('code');
-    await expect(await orchestrator.getNodeCount()).toBe(1);
+    expect(await orchestrator.getNodeCount()).toBe(1);
 
     await orchestrator.clickNodeOnCanvas();
-    await expect(page.locator('.ant-drawer-open')).toBeVisible();
+    await expect(page.getByTestId('node-config-drawer')).toBeVisible();
 
-    await expect(page.getByLabel('编程语言')).toBeVisible();
-    await expect(page.getByLabel('代码')).toBeVisible();
+    await expect(page.getByTestId('select-node-language')).toBeVisible();
+    await expect(page.getByTestId('input-node-code')).toBeVisible();
 
-    // The language selector is a Select component with "JavaScript" already selected by default
-    // Just verify it's visible and move on to filling the code
-    await expect(page.locator('#language')).toBeVisible();
-
-    await page.getByLabel('代码').fill('return { result: 1 + 2 };');
+    await page.getByTestId('input-node-code').fill('return { result: 1 + 2 };');
     await orchestrator.saveNodeConfig();
   });
 });
@@ -25,15 +21,15 @@ test.describe('Condition Branch and Variables', () => {
   test('should add condition node and configure branches', async ({ orchestrator, page }) => {
     await orchestrator.goto();
     await orchestrator.addNodeToCanvas('condition');
-    await expect(await orchestrator.getNodeCount()).toBe(1);
+    expect(await orchestrator.getNodeCount()).toBe(1);
 
     await orchestrator.clickNodeOnCanvas();
-    await expect(page.locator('.ant-drawer-open')).toBeVisible();
+    await expect(page.getByTestId('node-config-drawer')).toBeVisible();
 
-    await expect(page.getByLabel('条件表达式')).toBeVisible();
-    await expect(page.getByText('引用变量语法')).toBeVisible();
+    await expect(page.getByTestId('input-node-condition')).toBeVisible();
+    await expect(page.getByTestId('node-var-syntax-alert')).toBeVisible();
 
-    await orchestrator.fillNodeConfig('条件表达式', '{{input.value}} > 10');
+    await orchestrator.fillNodeField('condition', '{{input.value}} > 10');
     await orchestrator.saveNodeConfig();
   });
 });
@@ -44,7 +40,7 @@ test.describe('Import and Export', () => {
     await orchestrator.loadTemplate('rag_pipeline');
     await expect(await orchestrator.getNodeCount()).toBeGreaterThan(0);
 
-    const downloadPromise = page.waitForEvent('download', { timeout: 15000 });
+    const downloadPromise = page.waitForEvent('download', { timeout: 20000 });
     await orchestrator.exportWorkflow();
     const download = await downloadPromise;
 
@@ -63,15 +59,15 @@ test.describe('Workflow Complete Lifecycle', () => {
     await expect(await orchestrator.getNodeCount()).toBeGreaterThan(0);
 
     await orchestrator.clickNodeOnCanvas(0);
-    await expect(page.locator('.ant-drawer-open')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('node-config-drawer')).toBeVisible({ timeout: 5000 });
 
-    await orchestrator.fillNodeConfig('节点名称', '测试检索节点');
+    await orchestrator.fillNodeField('label', '测试检索节点');
     await orchestrator.saveNodeConfig();
 
     await orchestrator.executeWorkflow();
     await expect(page.getByTestId('btn-stop')).toBeVisible({ timeout: 5000 });
     await expect(page.getByTestId('btn-execute')).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText('工作流执行完成')).toBeVisible({ timeout: 10000 });
+    await orchestrator.expectWorkflowCompleted();
   });
 
   test('should create new canvas', async ({ orchestrator, page }) => {

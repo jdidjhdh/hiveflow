@@ -86,21 +86,30 @@ jobs:
           HIVEFLOW_AGENT_ECHO_LLM: "true"
         run: |
           cd packages/studio/backend
-          python -m pytest tests/ --ignore=tests/test_api_comprehensive.py -v
+          python -m pytest tests/ --ignore=tests/test_api_comprehensive.py -v \
+            --cov=app --cov-report=term-missing:skip-covered --cov-report=xml
 
       - name: Run Agent API integration tests
         env:
           HIVEFLOW_AGENT_ECHO_LLM: "true"
         run: |
           cd packages/studio/backend
-          python -m pytest tests/test_agent_api.py -v
+          python -m pytest tests/test_agent_api.py -v --cov=app --cov-append --cov-report=xml
 
       - name: Run comprehensive tests separately
         env:
           HIVEFLOW_AGENT_ECHO_LLM: "true"
         run: |
           cd packages/studio/backend
-          python -m pytest tests/test_api_comprehensive.py -v
+          python -m pytest tests/test_api_comprehensive.py -v --cov=app --cov-append \
+            --cov-report=term-missing:skip-covered --cov-report=xml --cov-fail-under=60
+
+      - name: Upload Studio backend coverage
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.12'
+        with:
+          file: ./packages/studio/backend/coverage.xml
+          flags: studio-backend
 
   test-agent:
     runs-on: ubuntu-latest
@@ -121,12 +130,22 @@ jobs:
           cd packages/agent
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-timeout
+          pip install pytest pytest-asyncio pytest-timeout pytest-cov
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: |
           cd packages/agent
-          python -m pytest tests/ --ignore=tests/test_real_llm.py --ignore=tests/test_llm_connection.py -v
+          python -m pytest tests/ \
+            --ignore=tests/test_real_llm.py \
+            --ignore=tests/test_llm_connection.py \
+            -v --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=60
+
+      - name: Upload Agent coverage
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.12'
+        with:
+          file: ./packages/agent/coverage.xml
+          flags: agent
 
   test-examples:
     runs-on: ubuntu-latest
@@ -202,10 +221,16 @@ jobs:
           cd packages/studio/frontend
           npm run lint
 
-      - name: Unit tests
+      - name: Unit tests with coverage
         run: |
           cd packages/studio/frontend
-          npm run test:unit
+          npm run test:coverage
+
+      - name: Upload Studio frontend coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./packages/studio/frontend/coverage/lcov.info
+          flags: studio-frontend
 
       - name: Build
         run: |

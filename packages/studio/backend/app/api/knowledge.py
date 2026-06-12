@@ -111,6 +111,21 @@ async def get_knowledge_base(kb_id: str):
     }
 
 
+@router.put("/{kb_id}")
+async def update_knowledge_base(kb_id: str, req: KBUpdateRequest):
+    """更新知识库名称与描述"""
+    engine = get_engine()
+    kb_manager = engine.get_kb_manager()
+    kb = kb_manager.get_kb(kb_id)
+    if not kb:
+        raise HTTPException(status_code=404, detail=f"Knowledge base '{kb_id}' not found")
+    if req.name is not None:
+        kb.name = req.name
+    if req.description is not None:
+        kb.description = req.description
+    return {"kb_id": kb_id, "name": kb.name, "description": kb.description, "status": "updated"}
+
+
 @router.post("/{kb_id}/query")
 async def query_knowledge_base(kb_id: str, req: QueryRequest):
     """Query knowledge base (RAG retrieval + answer assembly)."""

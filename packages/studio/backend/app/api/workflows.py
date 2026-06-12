@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from datetime import datetime
 
 from app.core.engine_service import get_engine
+from app.core.workflow_graph_builder import build_taskgraph_from_workflow, normalize_studio_node
 from app.db.config import get_storage
 from app.db.base import WorkflowRecord
 
@@ -135,20 +136,11 @@ async def execute_workflow(wf_id: str, body: Optional[dict] = None):
 
     engine = get_engine()
 
-    # Build TaskGraph from workflow definition
-    graph = {}
-    for node in workflow.nodes:
-        node_id = node.get("id")
-        if not node_id:
-            continue
-        node_data = {
-            "task": _make_task_fn(node),
-            "depends_on": node.get("depends_on", []),
-            "on_failure": node.get("on_failure", "abort"),
-            "retry_policy": node.get("retry_policy", {}),
-            "dynamic": node.get("dynamic", False),
-        }
-        graph[node_id] = node_data
+    graph = build_taskgraph_from_workflow(
+        workflow.nodes,
+        workflow.edges,
+        _make_task_fn_from_node,
+    )
 
     mode = "dag"
     global_timeout = (body or {}).get("global_timeout")
@@ -263,8 +255,6 @@ async def stop_workflow(wf_id: str):
 @router.post("/workflows/execute")
 async def execute_workflow_direct(body: dict):
     """直接执行工作流图（来自前端的实时编排）"""
-    from app.main import _broadcast_workflow_status
-
     graph_spec = body.get("graph", {})
     if not graph_spec:
         raise HTTPException(status_code=400, detail="Empty graph")
@@ -272,7 +262,6 @@ async def execute_workflow_direct(body: dict):
     engine = get_engine()
     wf_id = f"wf_{uuid.uuid4().hex[:8]}"
 
-    # Build TaskGraph
     graph = {}
     for node_id, node_data in graph_spec.items():
         graph[node_id] = {
@@ -294,7 +283,13 @@ async def execute_workflow_direct(body: dict):
             enable_guard=body.get("enable_guard", True),
             enable_checkpoint=body.get("enable_checkpoint", True),
         )
-        return {"wf_id": wf_id, "status": "completed", "result": result}
+        outer_status = result.get("status", "completed")
+        return {
+            "wf_id": wf_id,
+            "status": outer_status,
+            "result": result,
+            "results": result.get("results") if isinstance(result, dict) else result,
+        }
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -376,50 +371,43 @@ async def rollback_workflow(wf_id: str, version: int):
 # ========== 辅助函数 ==========
 
 def _make_task_fn_from_spec(node_id: str, node_data: dict):
-    """Create an async task function from a node specification."""
-    task_name = node_data.get("task", node_id)
-    variant = node_data.get("variant", "task")
+    """Create an async task function from a TaskGraph node specification."""
+    normalized = {
+        "id": node_id,
+        "task": node_data.get("task", node_id),
+        "variant": node_data.get("variant", "task"),
+        "code": node_data.get("code", ""),
+        "config": node_data.get("config", {}),
+    }
+    return _make_task_fn_from_node(normalized)
+
+
+def _make_task_fn_from_node(node: dict):
+    """Create an async task function from a normalized Studio node."""
+    node_id = node.get("id") or "unknown"
+    task_name = node.get("task") or node_id
+    variant = node.get("variant", "task")
+    code = node.get("code") or ""
+    config = node.get("config") or {}
 
     async def task_fn(deps, blackboard):
         if variant == "hitl":
-            # Execution is handled by EngineService HITL wrapper
             return {"node": node_id, "task": task_name, "awaiting": "hitl"}
 
-        if variant == "code":
-            code = node_data.get("code", "")
-            if code.strip():
-                local_vars: dict = {"deps": deps, "result": None}
-                exec(code, {"__builtins__": {}}, local_vars)  # noqa: S102
-                return local_vars.get("result", {"node": node_id, "executed": True})
-            return {"node": node_id, "task": task_name, "variant": "code"}
+        if variant == "code" and code.strip():
+            local_vars: dict = {"deps": deps, "result": None}
+            exec(code, {"__builtins__": {}}, local_vars)  # noqa: S102
+            return local_vars.get("result", {"node": node_id, "executed": True})
 
-        await asyncio.sleep(0.1)
+        if config.get("value") is not None:
+            return {"output": config.get("value"), "node": node_id, "task": task_name}
+
+        await asyncio.sleep(0.05)
         return {"node": node_id, "task": task_name, "deps": list(deps.keys())}
 
     return task_fn
 
 
 def _make_task_fn(node: dict):
-    """Create an async task function from a node definition."""
-    node_type = node.get("type", "echo")
-    config = node.get("config", {})
-
-    async def task_fn(deps, blackboard):
-        # Simple task implementation based on node type
-        if node_type == "echo":
-            return {"output": config.get("value", "ok"), "node": node.get("id")}
-        elif node_type == "transform":
-            # Try to get deps and transform
-            combined = {}
-            for dep_name, dep_val in deps.items():
-                if dep_val is not None and not isinstance(dep_val, object):
-                    combined[dep_name] = dep_val
-            return {"input": combined, "transform": config.get("operation", "passthrough")}
-        elif node_type == "sleep":
-            duration = config.get("duration", 0.1)
-            await asyncio.sleep(duration)
-            return {"node": node.get("id"), "duration": duration}
-        else:
-            return {"node": node.get("id"), "type": node_type}
-
-    return task_fn
+    """Legacy entry: normalize ReactFlow node then build task."""
+    return _make_task_fn_from_node(normalize_studio_node(node))

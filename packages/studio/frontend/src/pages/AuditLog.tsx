@@ -21,7 +21,10 @@ import {
   ClockCircleOutlined, UserOutlined, KeyOutlined,
   ReloadOutlined, ExportOutlined,
 } from '@ant-design/icons';
-import { apiFetch } from '@/utils/api';
+import { apiFetch } from '@/api';
+import PageMaturityNotice from '@/components/PageMaturityNotice';
+import { useI18n } from '@/i18n';
+import type { MessageKey } from '@/i18n';
 
 const { Text } = Typography;
 
@@ -67,47 +70,59 @@ interface AuditStats {
   operations_by_hour: Record<string, number>;
 }
 
-const ACTION_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode; category: 'read' | 'write' | 'wait' | 'system' }> = {
-  get:        { label: '读取',    color: 'blue',   icon: <DatabaseOutlined />,  category: 'read' },
-  put:        { label: '写入',    color: 'green',  icon: <DatabaseOutlined />,  category: 'write' },
-  wait:       { label: '等待',    color: 'orange', icon: <ClockCircleOutlined />, category: 'wait' },
-  sys_get:    { label: '系统读取', color: 'cyan',  icon: <DatabaseOutlined />,  category: 'system' },
-  sys_wait:   { label: '系统等待', color: 'geekblue', icon: <ClockCircleOutlined />, category: 'system' },
-  sys_put:    { label: '系统写入', color: 'lime',  icon: <DatabaseOutlined />,  category: 'system' },
-  sys_delete: { label: '系统删除', color: 'red',   icon: <StopOutlined />,      category: 'system' },
+const ACTION_META: Record<string, { color: string; icon: React.ReactNode; category: 'read' | 'write' | 'wait' | 'system' }> = {
+  get:        { color: 'blue',   icon: <DatabaseOutlined />,  category: 'read' },
+  put:        { color: 'green',  icon: <DatabaseOutlined />,  category: 'write' },
+  wait:       { color: 'orange', icon: <ClockCircleOutlined />, category: 'wait' },
+  sys_get:    { color: 'cyan',  icon: <DatabaseOutlined />,  category: 'system' },
+  sys_wait:   { color: 'geekblue', icon: <ClockCircleOutlined />, category: 'system' },
+  sys_put:    { color: 'lime',  icon: <DatabaseOutlined />,  category: 'system' },
+  sys_delete: { color: 'red',   icon: <StopOutlined />,      category: 'system' },
+};
+
+const ACTION_LABEL_KEYS: Record<string, MessageKey> = {
+  get: 'pages.auditLog.actions.get',
+  put: 'pages.auditLog.actions.put',
+  wait: 'pages.auditLog.actions.wait',
+  sys_get: 'pages.auditLog.actions.sysGet',
+  sys_wait: 'pages.auditLog.actions.sysWait',
+  sys_put: 'pages.auditLog.actions.sysPut',
+  sys_delete: 'pages.auditLog.actions.sysDelete',
 };
 
 // ======================== Stats Card ========================
 
 function AuditStatsCard({ stats, loading }: { stats: AuditStats | null; loading: boolean }) {
+  const { t } = useI18n();
+
   if (loading || !stats) return null;
 
   return (
     <Row gutter={16} style={{ marginBottom: 16 }}>
       <Col span={4}>
         <Card>
-          <Statistic title="总操作数" value={stats.total_operations} prefix={<DatabaseOutlined />} />
+          <Statistic title={t('pages.auditLog.stats.total')} value={stats.total_operations} prefix={<DatabaseOutlined />} />
         </Card>
       </Col>
       <Col span={4}>
         <Card>
-          <Statistic title="读取" value={stats.read_count} valueStyle={{ color: '#1890ff' }} />
+          <Statistic title={t('pages.auditLog.stats.read')} value={stats.read_count} valueStyle={{ color: '#1890ff' }} />
         </Card>
       </Col>
       <Col span={4}>
         <Card>
-          <Statistic title="写入" value={stats.write_count} valueStyle={{ color: '#52c41a' }} />
+          <Statistic title={t('pages.auditLog.stats.write')} value={stats.write_count} valueStyle={{ color: '#52c41a' }} />
         </Card>
       </Col>
       <Col span={4}>
         <Card>
-          <Statistic title="等待" value={stats.wait_count} valueStyle={{ color: '#fa8c16' }} />
+          <Statistic title={t('pages.auditLog.stats.wait')} value={stats.wait_count} valueStyle={{ color: '#fa8c16' }} />
         </Card>
       </Col>
       <Col span={4}>
         <Card>
           <Statistic
-            title="活跃 Agent"
+            title={t('pages.auditLog.stats.activeAgents')}
             value={stats.unique_agents}
             prefix={<UserOutlined />}
           />
@@ -116,7 +131,7 @@ function AuditStatsCard({ stats, loading }: { stats: AuditStats | null; loading:
       <Col span={4}>
         <Card>
           <Statistic
-            title="权限拒绝"
+            title={t('pages.auditLog.stats.permissionDenied')}
             value={stats.permission_denied_count}
             valueStyle={{ color: stats.permission_denied_count > 0 ? '#ff4d4f' : '#52c41a' }}
             prefix={stats.permission_denied_count > 0 ? <WarningOutlined /> : <CheckCircleOutlined />}
@@ -130,6 +145,7 @@ function AuditStatsCard({ stats, loading }: { stats: AuditStats | null; loading:
 // ======================== Main Page ========================
 
 export default function AuditLogPage() {
+  const { t } = useI18n();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<AuditStats | null>(null);
@@ -137,6 +153,12 @@ export default function AuditLogPage() {
   const [filterKey, setFilterKey] = useState<string>();
   const [filterAction, setFilterAction] = useState<string>();
   const [searchText, setSearchText] = useState('');
+
+  const getActionLabel = useCallback((action: string) => {
+    const key = ACTION_LABEL_KEYS[action];
+    return key ? t(key) : action;
+  }, [t]);
+
   const fetchAuditLog = useCallback(async () => {
     setLoading(true);
     try {
@@ -206,7 +228,7 @@ export default function AuditLogPage() {
 
   const columns: ColumnsType<AuditEntry> = [
     {
-      title: '时间',
+      title: t('pages.auditLog.columns.time'),
       dataIndex: 'timestamp',
       key: 'timestamp',
       width: 180,
@@ -218,21 +240,21 @@ export default function AuditLogPage() {
       ),
     },
     {
-      title: '操作',
+      title: t('pages.auditLog.columns.action'),
       dataIndex: 'action',
       key: 'action',
       width: 100,
       render: (action: string) => {
-        const cfg = ACTION_CONFIG[action] || { label: action, color: 'default', icon: null, category: 'read' };
+        const cfg = ACTION_META[action] || { color: 'default', icon: null, category: 'read' as const };
         return (
           <Tooltip title={action}>
-            <Tag color={cfg.color} icon={cfg.icon}>{cfg.label}</Tag>
+            <Tag color={cfg.color} icon={cfg.icon}>{getActionLabel(action)}</Tag>
           </Tooltip>
         );
       },
     },
     {
-      title: 'Agent',
+      title: t('pages.auditLog.columns.agent'),
       dataIndex: 'agent',
       key: 'agent',
       width: 150,
@@ -246,7 +268,7 @@ export default function AuditLogPage() {
       ),
     },
     {
-      title: 'Key',
+      title: t('pages.auditLog.columns.key'),
       dataIndex: 'key',
       key: 'key',
       width: 200,
@@ -260,17 +282,17 @@ export default function AuditLogPage() {
       ),
     },
     {
-      title: '状态',
+      title: t('pages.auditLog.columns.status'),
       key: 'status',
       width: 100,
       render: (_, record: AuditEntry) => (
         record.permission_denied
-          ? <Badge status="error" text="权限拒绝" />
-          : <Badge status="success" text="成功" />
+          ? <Badge status="error" text={t('pages.auditLog.status.denied')} />
+          : <Badge status="success" text={t('pages.auditLog.status.success')} />
       ),
     },
     {
-      title: '详情',
+      title: t('pages.auditLog.columns.details'),
       dataIndex: 'details',
       key: 'details',
       render: (details: string) => details ? (
@@ -283,15 +305,16 @@ export default function AuditLogPage() {
 
   return (
     <div style={{ padding: 24 }}>
+      <PageMaturityNotice pageKey="auditLog" />
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Space>
-          <Typography.Title level={4} style={{ margin: 0 }}>审计日志</Typography.Title>
-          <Text type="secondary">黑板操作审计追踪</Text>
+          <Typography.Title level={4} style={{ margin: 0 }}>{t('pages.auditLog.title')}</Typography.Title>
+          <Text type="secondary">{t('pages.auditLog.subtitle')}</Text>
         </Space>
         <Space>
-          <Button icon={<ExportOutlined />} onClick={handleExport}>导出日志</Button>
-          <Button icon={<ReloadOutlined />} onClick={fetchAuditLog}>刷新</Button>
+          <Button icon={<ExportOutlined />} onClick={handleExport}>{t('pages.auditLog.export')}</Button>
+          <Button icon={<ReloadOutlined />} onClick={fetchAuditLog}>{t('pages.auditLog.refresh')}</Button>
         </Space>
       </div>
 
@@ -301,8 +324,8 @@ export default function AuditLogPage() {
       {/* Permission Warning */}
       {stats && stats.permission_denied_count > 0 && (
         <Alert
-          message="权限告警"
-          description={`检测到 ${stats.permission_denied_count} 次权限拒绝操作，请检查 Agent 权限配置。`}
+          message={t('pages.auditLog.permissionAlert.title')}
+          description={t('pages.auditLog.permissionAlert.description', { count: stats.permission_denied_count })}
           type="warning"
           showIcon
           icon={<WarningOutlined />}
@@ -311,10 +334,10 @@ export default function AuditLogPage() {
       )}
 
       {/* Filters */}
-      <Card title="筛选条件" style={{ marginBottom: 16 }} size="small">
+      <Card title={t('pages.auditLog.filters.title')} style={{ marginBottom: 16 }} size="small">
         <Space wrap>
           <Input
-            placeholder="搜索 Agent 或 Key..."
+            placeholder={t('pages.auditLog.filters.searchPlaceholder')}
             prefix={<SearchOutlined />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
@@ -322,7 +345,7 @@ export default function AuditLogPage() {
             style={{ width: 250 }}
           />
           <Select
-            placeholder="所有 Agent"
+            placeholder={t('pages.auditLog.filters.allAgents')}
             value={filterAgent}
             onChange={setFilterAgent}
             allowClear
@@ -330,7 +353,7 @@ export default function AuditLogPage() {
             options={uniqueAgents.map(a => ({ label: a, value: a }))}
           />
           <Select
-            placeholder="所有 Key"
+            placeholder={t('pages.auditLog.filters.allKeys')}
             value={filterKey}
             onChange={setFilterKey}
             allowClear
@@ -338,19 +361,19 @@ export default function AuditLogPage() {
             options={uniqueKeys.map(k => ({ label: k, value: k }))}
           />
           <Select
-            placeholder="所有操作"
+            placeholder={t('pages.auditLog.filters.allActions')}
             value={filterAction}
             onChange={setFilterAction}
             allowClear
             style={{ width: 150 }}
-            options={Object.entries(ACTION_CONFIG).map(([k, v]) => ({ label: v.label, value: k }))}
+            options={Object.keys(ACTION_META).map((k) => ({ label: getActionLabel(k), value: k }))}
           />
         </Space>
       </Card>
 
       {/* Agent Activity Summary */}
       {stats && Object.keys(stats.operations_by_agent).length > 0 && (
-        <Card title="Agent 活动统计" style={{ marginBottom: 16 }} size="small">
+        <Card title={t('pages.auditLog.agentActivity')} style={{ marginBottom: 16 }} size="small">
           <Space wrap>
             {Object.entries(stats.operations_by_agent)
               .sort((a, b) => b[1] - a[1])
@@ -362,7 +385,7 @@ export default function AuditLogPage() {
                   style={{ cursor: 'pointer' }}
                   onClick={() => setFilterAgent(agent)}
                 >
-                  {agent}: {count} 次
+                  {t('pages.auditLog.agentActivityCount', { agent, count })}
                 </Tag>
               ))}
           </Space>
@@ -370,13 +393,13 @@ export default function AuditLogPage() {
       )}
 
       {/* Audit Log Table */}
-      <Card title="操作记录" size="small">
+      <Card title={t('pages.auditLog.records')} size="small">
         <Table<AuditEntry>
           columns={columns}
           dataSource={filteredEntries}
           rowKey={(record) => `${record.timestamp}-${record.agent}-${record.key}`}
           loading={loading}
-          pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 条记录` }}
+          pagination={{ pageSize: 20, showTotal: (total) => t('pages.auditLog.totalRecords', { count: total }) }}
           size="small"
           scroll={{ y: 500 }}
         />
@@ -384,18 +407,18 @@ export default function AuditLogPage() {
 
       {/* Recent Activity Timeline */}
       {filteredEntries.length > 0 && (
-        <Card title="最近活动时间线" style={{ marginTop: 16 }} size="small">
+        <Card title={t('pages.auditLog.timeline.title')} style={{ marginTop: 16 }} size="small">
           <Timeline
             items={filteredEntries.slice(0, 10).map(entry => {
-              const cfg = ACTION_CONFIG[entry.action] || { label: entry.action, color: 'blue', icon: null, category: 'read' };
+              const cfg = ACTION_META[entry.action] || { color: 'blue', icon: null, category: 'read' as const };
               return {
                 color: entry.permission_denied ? 'red' : cfg.color,
                 children: (
                   <Space direction="vertical" size={0}>
                     <Space>
-                      <Tag color={cfg.color}>{cfg.label}</Tag>
+                      <Tag color={cfg.color}>{getActionLabel(entry.action)}</Tag>
                       <Text strong>{entry.agent}</Text>
-                      <Text type="secondary">操作了</Text>
+                      <Text type="secondary">{t('pages.auditLog.timeline.operated')}</Text>
                       <Text code>{entry.key}</Text>
                     </Space>
                     <Text type="secondary" style={{ fontSize: 12 }}>

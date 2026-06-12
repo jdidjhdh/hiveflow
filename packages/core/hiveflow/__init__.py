@@ -130,6 +130,14 @@ try:
         VideoSummaryResult,
     )
     from .orchestrator import DAGOrchestrator, DynamicOrchestrator
+    from .execution import (
+        ExecutionBackend,
+        ExecutionBackendNotReadyError,
+        GraphExecutionResult,
+        LangGraphExecutionBackend,
+        NativeExecutionBackend,
+        get_execution_backend,
+    )
     from .app import HiveFlow, HiveFlowConfig, configure_logging
     from .plugin_marketplace import PluginCategory, PluginMarketplace, PluginSpec
     from .rag import (
@@ -231,6 +239,14 @@ except ImportError:
         VideoSummaryResult,
     )
     from .orchestrator import DAGOrchestrator, DynamicOrchestrator
+    from .execution import (
+        ExecutionBackend,
+        ExecutionBackendNotReadyError,
+        GraphExecutionResult,
+        LangGraphExecutionBackend,
+        NativeExecutionBackend,
+        get_execution_backend,
+    )
     from .app import HiveFlow, HiveFlowConfig, configure_logging
     from .plugin_marketplace import PluginCategory, PluginMarketplace, PluginSpec
     from .rag import (
@@ -311,10 +327,13 @@ __all__ = [
     "EvaluationReport",
     "Evaluator",
     "EventBus",
+    "ExecutionBackend",
+    "ExecutionBackendNotReadyError",
     "ExecutionResult",
     "Expectation",
     "FileKeyProvider",
     "GlobalLoadAwareStrategy",
+    "GraphExecutionResult",
     "HITLAction",
     "HITLGate",
     "HITLManager",
@@ -333,6 +352,7 @@ __all__ = [
     "KeyProvider",
     "KnowledgeBase",
     "KnowledgeBaseManager",
+    "LangGraphExecutionBackend",
     "LLMClient",
     "LLMMessage",
     "LLMResponse",
@@ -360,6 +380,7 @@ __all__ = [
     "MockLLMClient",
     "MockVideoProcessor",
     "MultiModalPipeline",
+    "NativeExecutionBackend",
     "OpenAIAudioProcessor",
     "OpenAIClient",
     "OpenAIImageProcessor",
@@ -407,6 +428,7 @@ __all__ = [
     "create_span",
     "ensure_error_writes",
     "get_trace_logger",
+    "get_execution_backend",
     "setup_structured_logging",
     "setup_tracing",
     "trace_workflow_execution",

@@ -38,6 +38,10 @@ from app.api.hitl import router as hitl_router
 from app.api.checkpoints import router as checkpoints_router
 from app.api.agent import router as agent_router
 from app.api.replay import router as replay_router
+from app.api.triggers_api import router as triggers_router
+from app.api.settings_api import router as settings_router
+from app.api.llm_api import router as llm_router
+from app.api.capability_defs_api import router as capability_defs_router
 from app.core.engine_service import get_engine
 from app.db.config import init_storage, close_storage
 from app.api.validation import setup_security_middleware, setup_error_handler, RateLimiter
@@ -69,10 +73,18 @@ async def lifespan(app: FastAPI):
     
     # 初始化存储
     await init_storage()
+
+    from app.core.llm_settings import load_llm_settings
+    from app.api.capability_defs_api import load_capability_defs
+    load_llm_settings()
+    load_capability_defs()
     
     # 启动引擎
     engine = get_engine()
     await engine.start()
+    
+    from app.core.trigger_scheduler import start_trigger_scheduler
+    start_trigger_scheduler()
     
     # 注册指标更新回调
     engine.set_metrics_exporter(metrics_exporter)
@@ -87,6 +99,8 @@ async def lifespan(app: FastAPI):
     
     # 关闭
     logger.info("HiveFlow Studio shutting down")
+    from app.core.trigger_scheduler import stop_trigger_scheduler
+    await stop_trigger_scheduler()
     await engine.shutdown()
     await close_storage()
     logger.info("HiveFlow Studio stopped")
@@ -145,12 +159,15 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestLoggingMiddleware)
 
 # 安全 CORS 配置
-allowed_origins = os.environ.get("HIVEFLOW_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
+allowed_origins = os.environ.get(
+    "HIVEFLOW_ALLOWED_ORIGINS",
+    "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:5173",
+).split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
     max_age=3600,
 )
@@ -181,6 +198,10 @@ app.include_router(hitl_router, prefix="/api")
 app.include_router(checkpoints_router, prefix="/api")
 app.include_router(agent_router, prefix="/api")
 app.include_router(replay_router, prefix="/api")
+app.include_router(triggers_router, prefix="/api")
+app.include_router(settings_router, prefix="/api")
+app.include_router(llm_router, prefix="/api")
+app.include_router(capability_defs_router, prefix="/api")
 
 
 @app.get("/api/health")
@@ -217,8 +238,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     "metrics": metrics,
                 })
             elif msg_type == "engine.stop":
-                await engine.shutdown()
-                await websocket.send_json({"type": "engine.stopped"})
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "engine.stop is disabled in Studio; use workflow stop API instead",
+                })
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 

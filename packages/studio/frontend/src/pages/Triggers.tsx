@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Table, Button, Modal, Form, Input, Select, Space, Tag, Popconfirm,
   message, Switch, Card, Typography, Tooltip, Alert, Divider, Empty, Row, Col,
@@ -10,15 +10,20 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useTriggerStore } from '@/store/useTriggerStore';
-import { API_BASE_URL } from '@/utils/api';
+import { useEngineStore } from '@/store/useEngineStore';
+import { listTriggers, createTrigger, updateTriggerApi, deleteTriggerApi, toggleTriggerApi } from '@/api/triggers';
+import { getPublicApiBaseUrl, getErrorMessage } from '@/api';
+import ApiErrorAlert from '@/components/ApiErrorAlert';
+import { DemoDataBanner } from '@/components/RealModeRequired';
+import { useI18n } from '@/i18n';
 import type { TriggerDef } from '@/types';
 
 const { Text, Paragraph } = Typography;
 
-const typeConfig: Record<string, { icon: JSX.Element; color: string; label: string }> = {
-  webhook: { icon: <GlobalOutlined />, color: 'blue', label: 'Webhook' },
-  schedule: { icon: <ClockCircleOutlined />, color: 'orange', label: '定时触发' },
-  event: { icon: <ThunderboltOutlined />, color: 'green', label: '事件触发' },
+const typeConfig: Record<string, { icon: JSX.Element; color: string; labelKey: 'webhook' | 'schedule' | 'event' }> = {
+  webhook: { icon: <GlobalOutlined />, color: 'blue', labelKey: 'webhook' },
+  schedule: { icon: <ClockCircleOutlined />, color: 'orange', labelKey: 'schedule' },
+  event: { icon: <ThunderboltOutlined />, color: 'green', labelKey: 'event' },
 };
 
 const commonEvents = [
@@ -27,6 +32,16 @@ const commonEvents = [
   'task.assigned', 'task.completed',
   'data.imported', 'data.exported',
 ];
+
+function triggerConfigDefaults(type: string): Record<string, unknown> {
+  const base = getPublicApiBaseUrl();
+  const defaults: Record<string, Record<string, unknown>> = {
+    webhook: { method: 'POST', path: `${base}/api/webhook/{id}` },
+    schedule: { cron: '0 */6 * * *', timezone: 'Asia/Shanghai' },
+    event: { event_name: 'user.created' },
+  };
+  return defaults[type] || {};
+}
 
 function renderConfig(config: Record<string, unknown>, type: string): string {
   if (type === 'webhook') {
@@ -42,6 +57,8 @@ function renderConfig(config: Record<string, unknown>, type: string): string {
 }
 
 export default function TriggersPage() {
+  const { t } = useI18n();
+  const engineMode = useEngineStore((s) => s.mode);
   const triggers = useTriggerStore((s) => s.triggers);
   const addTrigger = useTriggerStore((s) => s.addTrigger);
   const updateTrigger = useTriggerStore((s) => s.updateTrigger);
@@ -52,24 +69,47 @@ export default function TriggersPage() {
   const [editingTrigger, setEditingTrigger] = useState<TriggerDef | null>(null);
   const [form] = Form.useForm();
   const [triggerType, setTriggerType] = useState<string>('webhook');
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleOpenModal = useCallback((record?: TriggerDef) => {
+  const loadFromApi = useCallback(async () => {
+    if (engineMode !== 'real') return;
+    setLoading(true);
+    setApiError(null);
+    try {
+      const items = await listTriggers();
+      useTriggerStore.setState({ triggers: items });
+    } catch (e) {
+      setApiError(getErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [engineMode]);
+
+  useEffect(() => {
+    void loadFromApi();
+  }, [loadFromApi]);
+
+  const handleOpenModal = useCallback((record?: TriggerDef, presetType?: string) => {
     if (record) {
       setEditingTrigger(record);
       setTriggerType(record.type);
       form.setFieldsValue({
-        ...record,
-        configJson: JSON.stringify(record.config, null, 2),
+        name: record.name,
+        type: record.type,
+        workflow_id: record.workflow_id,
+        enabled: record.enabled,
+        configJson: record.config,
       });
     } else {
+      const type = presetType || 'webhook';
       setEditingTrigger(null);
-      setTriggerType('webhook');
+      setTriggerType(type);
       form.resetFields();
       form.setFieldsValue({
-        type: 'webhook',
+        type,
         enabled: true,
-        method: 'POST',
-        configJson: '{}',
+        configJson: triggerConfigDefaults(type),
       });
     }
     setModalOpen(true);
@@ -77,12 +117,7 @@ export default function TriggersPage() {
 
   const handleTypeChange = useCallback((type: string) => {
     setTriggerType(type);
-    const defaults: Record<string, Record<string, unknown>> = {
-      webhook: { method: 'POST', path: `${API_BASE_URL}/api/webhook/{id}` },
-      schedule: { cron: '0 */6 * * *', timezone: 'Asia/Shanghai' },
-      event: { event_name: 'user.created' },
-    };
-    form.setFieldsValue({ configJson: JSON.stringify(defaults[type] || {}, null, 2) });
+    form.setFieldsValue({ configJson: triggerConfigDefaults(type) });
   }, [form]);
 
   const handleSave = useCallback(async () => {
@@ -92,15 +127,43 @@ export default function TriggersPage() {
       try {
         parsedConfig = typeof values.configJson === 'string'
           ? JSON.parse(values.configJson)
-          : values.configJson;
+          : (values.configJson || {});
       } catch {
-        message.error('配置必须是有效的 JSON');
+        message.error(t('pages.triggers.messages.invalidConfigJson'));
         return;
       }
 
-      // Add webhook URL generation
+      const base = getPublicApiBaseUrl();
       if (values.type === 'webhook' && !parsedConfig.url) {
-        parsedConfig.url = `${API_BASE_URL}/api/webhook/${editingTrigger?.id || 'new'}`;
+        parsedConfig.url = `${base}/api/webhook/${editingTrigger?.id || 'new'}`;
+      }
+
+      if (engineMode === 'real') {
+        try {
+          if (editingTrigger) {
+            await updateTriggerApi(editingTrigger.id, {
+              name: values.name,
+              type: values.type,
+              config: parsedConfig,
+              workflow_id: values.workflow_id,
+            });
+            message.success(t('pages.triggers.messages.updated'));
+          } else {
+            await createTrigger({
+              name: values.name,
+              type: values.type,
+              config: parsedConfig,
+              enabled: values.enabled ?? true,
+              workflow_id: values.workflow_id,
+            });
+            message.success(t('pages.triggers.messages.added'));
+          }
+          setModalOpen(false);
+          await loadFromApi();
+        } catch (e) {
+          message.error(getErrorMessage(e));
+        }
+        return;
       }
 
       if (editingTrigger) {
@@ -110,7 +173,7 @@ export default function TriggersPage() {
           config: parsedConfig,
           workflow_id: values.workflow_id,
         });
-        message.success('触发器已更新');
+        message.success(t('pages.triggers.messages.updated'));
       } else {
         addTrigger({
           name: values.name,
@@ -119,38 +182,57 @@ export default function TriggersPage() {
           enabled: values.enabled ?? true,
           workflow_id: values.workflow_id,
         });
-        message.success('触发器已添加');
+        message.success(t('pages.triggers.messages.added'));
       }
       setModalOpen(false);
     } catch (err) {
       console.error('Validation failed:', err);
     }
-  }, [form, editingTrigger, addTrigger, updateTrigger]);
+  }, [form, editingTrigger, addTrigger, updateTrigger, engineMode, loadFromApi, t]);
 
-  const handleDelete = useCallback((id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
+    if (engineMode === 'real') {
+      try {
+        await deleteTriggerApi(id);
+        message.success(t('pages.triggers.messages.deleted'));
+        await loadFromApi();
+      } catch (e) {
+        message.error(getErrorMessage(e));
+      }
+      return;
+    }
     deleteTrigger(id);
-    message.success('触发器已删除');
-  }, [deleteTrigger]);
+    message.success(t('pages.triggers.messages.deleted'));
+  }, [deleteTrigger, engineMode, loadFromApi, t]);
 
-  const handleToggle = useCallback((id: string) => {
+  const handleToggle = useCallback(async (id: string) => {
+    if (engineMode === 'real') {
+      try {
+        await toggleTriggerApi(id);
+        await loadFromApi();
+      } catch (e) {
+        message.error(getErrorMessage(e));
+      }
+      return;
+    }
     toggleTrigger(id);
-  }, [toggleTrigger]);
+  }, [toggleTrigger, engineMode, loadFromApi]);
 
   const handleCopyWebhookUrl = useCallback((url: string) => {
     navigator.clipboard.writeText(url).then(() => {
-      message.success('Webhook URL 已复制到剪贴板');
+      message.success(t('pages.triggers.messages.webhookCopied'));
     });
   }, []);
 
   const columns: ColumnsType<TriggerDef> = [
     {
-      title: '名称',
+      title: t('pages.triggers.columns.name'),
       dataIndex: 'name',
       key: 'name',
       render: (text: string) => <Text strong>{text}</Text>,
     },
     {
-      title: '类型',
+      title: t('pages.triggers.columns.type'),
       dataIndex: 'type',
       key: 'type',
       width: 120,
@@ -158,13 +240,13 @@ export default function TriggersPage() {
         const cfg = typeConfig[type] || typeConfig.webhook;
         return (
           <Tag color={cfg.color} icon={cfg.icon}>
-            {cfg.label}
+            {t(`pages.triggers.types.${cfg.labelKey}`)}
           </Tag>
         );
       },
     },
     {
-      title: '配置',
+      title: t('pages.triggers.columns.config'),
       dataIndex: 'config',
       key: 'config',
       ellipsis: true,
@@ -173,7 +255,7 @@ export default function TriggersPage() {
       ),
     },
     {
-      title: 'Webhook URL',
+      title: t('pages.triggers.columns.webhookUrl'),
       key: 'webhook_url',
       width: 200,
       render: (_: unknown, record: TriggerDef) => {
@@ -192,25 +274,25 @@ export default function TriggersPage() {
       },
     },
     {
-      title: '关联工作流',
+      title: t('pages.triggers.columns.workflowId'),
       dataIndex: 'workflow_id',
       key: 'workflow_id',
       width: 150,
       render: (id?: string) => id ? <Text code>{id}</Text> : '-',
     },
     {
-      title: '状态',
+      title: t('pages.triggers.columns.status'),
       dataIndex: 'enabled',
       key: 'enabled',
       width: 100,
       render: (enabled: boolean) => (
         <Tag color={enabled ? 'success' : 'default'}>
-          {enabled ? '已启用' : '已禁用'}
+          {enabled ? t('pages.triggers.status.enabled') : t('pages.triggers.status.disabled')}
         </Tag>
       ),
     },
     {
-      title: '操作',
+      title: t('pages.triggers.columns.actions'),
       key: 'action',
       width: 220,
       render: (_: unknown, record: TriggerDef) => (
@@ -218,8 +300,8 @@ export default function TriggersPage() {
           <Switch
             checked={record.enabled}
             onChange={() => handleToggle(record.id)}
-            checkedChildren="启用"
-            unCheckedChildren="禁用"
+            checkedChildren={t('pages.triggers.switch.on')}
+            unCheckedChildren={t('pages.triggers.switch.off')}
             size="small"
           />
           <Button
@@ -228,15 +310,15 @@ export default function TriggersPage() {
             icon={<EditOutlined />}
             onClick={() => handleOpenModal(record)}
           >
-            编辑
+            {t('pages.triggers.actions.edit')}
           </Button>
           <Popconfirm
-            title="确认删除"
-            description={`确定要删除触发器 "${record.name}" 吗？`}
+            title={t('pages.triggers.confirmDelete')}
+            description={t('pages.triggers.confirmDeleteDesc', { name: record.name })}
             onConfirm={() => handleDelete(record.id)}
           >
             <Button type="link" danger size="small" icon={<DeleteOutlined />}>
-              删除
+              {t('pages.triggers.actions.delete')}
             </Button>
           </Popconfirm>
         </Space>
@@ -248,42 +330,44 @@ export default function TriggersPage() {
     {
       type: 'webhook',
       icon: <GlobalOutlined style={{ fontSize: 24, color: '#1890ff' }} />,
-      title: 'Webhook 触发器',
-      description: '通过 HTTP POST 请求触发工作流执行',
+      title: t('pages.triggers.typeCards.webhook.title'),
+      description: t('pages.triggers.typeCards.webhook.description'),
       example: { url: 'https://your-server.com/webhook/{id}', method: 'POST' },
     },
     {
       type: 'schedule',
       icon: <ClockCircleOutlined style={{ fontSize: 24, color: '#fa8c16' }} />,
-      title: '定时触发器',
-      description: '按照 Cron 表达式定时触发工作流',
+      title: t('pages.triggers.typeCards.schedule.title'),
+      description: t('pages.triggers.typeCards.schedule.description'),
       example: { cron: '0 */6 * * *', timezone: 'Asia/Shanghai' },
     },
     {
       type: 'event',
       icon: <ThunderboltOutlined style={{ fontSize: 24, color: '#52c41a' }} />,
-      title: '事件触发器',
-      description: '监听系统事件触发工作流',
+      title: t('pages.triggers.typeCards.event.title'),
+      description: t('pages.triggers.typeCards.event.description'),
       example: { event_name: 'user.created' },
     },
   ];
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <DemoDataBanner message={t('pages.triggers.demoBanner')} />
+      <ApiErrorAlert error={apiError} onRetry={() => { void loadFromApi(); }} />
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 style={{ margin: 0 }}>触发器管理</h2>
-          <p style={{ color: '#888', margin: '4px 0 0' }}>配置工作流的触发条件，支持 Webhook、定时任务和事件驱动</p>
+          <h2 style={{ margin: 0 }}>{t('pages.triggers.title')}</h2>
+          <p style={{ color: '#888', margin: '4px 0 0' }}>{t('pages.triggers.subtitle')}</p>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>
-          新建触发器
+          {t('pages.triggers.create')}
         </Button>
       </div>
 
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         {typeConfigs.map((tc) => (
           <Col xs={24} sm={12} md={8} key={tc.type}>
-            <Card size="small" style={{ cursor: 'pointer', height: '100%' }} onClick={() => { form.resetFields(); handleTypeChange(tc.type); handleOpenModal(); }}>
+            <Card size="small" style={{ cursor: 'pointer', height: '100%' }} onClick={() => handleOpenModal(undefined, tc.type)}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                 {tc.icon}
                 <div>
@@ -306,48 +390,49 @@ export default function TriggersPage() {
         columns={columns}
         dataSource={triggers}
         rowKey="id"
-        pagination={{ pageSize: 10, showSizeChanger: true, showTotal: t => `共 ${t} 条触发规则` }}
+        loading={loading}
+        pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => t('pages.triggers.totalCount', { count: total }) }}
         scroll={{ x: 1100 }}
         locale={{
           emptyText: (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="暂无触发器，点击右上角按钮创建"
+              description={t('pages.triggers.empty')}
             />
           ),
         }}
       />
 
       <Modal
-        title={editingTrigger ? '编辑触发器' : '新建触发器'}
+        title={editingTrigger ? t('pages.triggers.modal.editTitle') : t('pages.triggers.modal.createTitle')}
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         onOk={handleSave}
         width={650}
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="name" label="触发器名称" rules={[{ required: true }]}>
-            <Input placeholder="例如: 每日数据同步、用户注册通知" />
+          <Form.Item name="name" label={t('pages.triggers.form.name')} rules={[{ required: true }]}>
+            <Input placeholder={t('pages.triggers.form.namePlaceholder')} />
           </Form.Item>
 
-          <Form.Item name="type" label="触发器类型" rules={[{ required: true }]}>
+          <Form.Item name="type" label={t('pages.triggers.form.type')} rules={[{ required: true }]}>
             <Select onChange={handleTypeChange}>
-              <Select.Option value="webhook">Webhook - HTTP 请求触发</Select.Option>
-              <Select.Option value="schedule">Schedule - 定时触发</Select.Option>
-              <Select.Option value="event">Event - 事件驱动触发</Select.Option>
+              <Select.Option value="webhook">{t('pages.triggers.form.typeWebhook')}</Select.Option>
+              <Select.Option value="schedule">{t('pages.triggers.form.typeSchedule')}</Select.Option>
+              <Select.Option value="event">{t('pages.triggers.form.typeEvent')}</Select.Option>
             </Select>
           </Form.Item>
 
           {triggerType === 'webhook' && (
             <>
               <Alert
-                message="Webhook 配置"
-                description="配置接收 HTTP 请求的 URL 和方法。支持请求体映射到工作流变量。"
+                message={t('pages.triggers.form.webhook.alertTitle')}
+                description={t('pages.triggers.form.webhook.alertDesc')}
                 type="info"
                 showIcon
                 style={{ marginBottom: 12 }}
               />
-              <Form.Item name={['configJson', 'method']} label="HTTP 方法">
+              <Form.Item name={['configJson', 'method']} label={t('pages.triggers.form.webhook.method')}>
                 <Select>
                   <Select.Option value="POST">POST</Select.Option>
                   <Select.Option value="GET">GET</Select.Option>
@@ -355,12 +440,12 @@ export default function TriggersPage() {
                   <Select.Option value="PATCH">PATCH</Select.Option>
                 </Select>
               </Form.Item>
-              <Form.Item name={['configJson', 'path']} label="Webhook 路径">
-                <Input placeholder="/api/webhook/{id}" />
+              <Form.Item name={['configJson', 'path']} label={t('pages.triggers.form.webhook.path')}>
+                <Input placeholder={t('pages.triggers.form.webhook.pathPlaceholder')} />
               </Form.Item>
-              <Divider plain style={{ borderColor: '#d9d9d9' }}>请求体映射</Divider>
-              <Form.Item name={['configJson', 'body_mapping']} label="请求体映射 (JSON)">
-                <Input.TextArea rows={3} placeholder='{"input_data": "$.body.data", "action": "$.body.action"}' />
+              <Divider plain style={{ borderColor: '#d9d9d9' }}>{t('pages.triggers.form.webhook.bodyMappingDivider')}</Divider>
+              <Form.Item name={['configJson', 'body_mapping']} label={t('pages.triggers.form.webhook.bodyMapping')}>
+                <Input.TextArea rows={3} placeholder={t('pages.triggers.form.webhook.bodyMappingPlaceholder')} />
               </Form.Item>
             </>
           )}
@@ -368,16 +453,16 @@ export default function TriggersPage() {
           {triggerType === 'schedule' && (
             <>
               <Alert
-                message="定时任务配置"
-                description="使用 Cron 表达式定义执行时间。支持标准 5 位 Cron 语法。"
+                message={t('pages.triggers.form.schedule.alertTitle')}
+                description={t('pages.triggers.form.schedule.alertDesc')}
                 type="info"
                 showIcon
                 style={{ marginBottom: 12 }}
               />
-              <Form.Item name={['configJson', 'cron']} label="Cron 表达式" rules={[{ required: true }]}>
-                <Input placeholder="0 */6 * * *" />
+              <Form.Item name={['configJson', 'cron']} label={t('pages.triggers.form.schedule.cron')} rules={[{ required: true }]}>
+                <Input placeholder={t('pages.triggers.form.schedule.cronPlaceholder')} />
               </Form.Item>
-              <Form.Item name={['configJson', 'timezone']} label="时区">
+              <Form.Item name={['configJson', 'timezone']} label={t('pages.triggers.form.schedule.timezone')}>
                 <Select>
                   <Select.Option value="Asia/Shanghai">Asia/Shanghai (UTC+8)</Select.Option>
                   <Select.Option value="UTC">UTC</Select.Option>
@@ -390,31 +475,31 @@ export default function TriggersPage() {
           {triggerType === 'event' && (
             <>
               <Alert
-                message="事件监听配置"
-                description="选择要监听的事件类型。当事件触发时，自动执行关联的工作流。"
+                message={t('pages.triggers.form.event.alertTitle')}
+                description={t('pages.triggers.form.event.alertDesc')}
                 type="info"
                 showIcon
                 style={{ marginBottom: 12 }}
               />
-              <Form.Item name={['configJson', 'event_name']} label="事件名称" rules={[{ required: true }]}>
+              <Form.Item name={['configJson', 'event_name']} label={t('pages.triggers.form.event.eventName')} rules={[{ required: true }]}>
                 <Select
                   showSearch
-                  placeholder="选择或输入事件名称"
+                  placeholder={t('pages.triggers.form.event.eventNamePlaceholder')}
                   options={commonEvents.map((e) => ({ value: e, label: e }))}
                 />
               </Form.Item>
-              <Form.Item name={['configJson', 'filter']} label="事件过滤 (JSON)">
-                <Input.TextArea rows={2} placeholder='{"source": "user-service"}' />
+              <Form.Item name={['configJson', 'filter']} label={t('pages.triggers.form.event.filter')}>
+                <Input.TextArea rows={2} placeholder={t('pages.triggers.form.event.filterPlaceholder')} />
               </Form.Item>
             </>
           )}
 
-          <Form.Item name="workflow_id" label="关联工作流 ID">
-            <Input placeholder="可选: 绑定到特定工作流" />
+          <Form.Item name="workflow_id" label={t('pages.triggers.form.workflowId')}>
+            <Input placeholder={t('pages.triggers.form.workflowIdPlaceholder')} />
           </Form.Item>
 
-          <Form.Item name="enabled" label="启用状态" valuePropName="checked" initialValue={true}>
-            <Switch checkedChildren="启用" unCheckedChildren="禁用" />
+          <Form.Item name="enabled" label={t('pages.triggers.form.enabled')} valuePropName="checked" initialValue={true}>
+            <Switch checkedChildren={t('pages.triggers.switch.on')} unCheckedChildren={t('pages.triggers.switch.off')} />
           </Form.Item>
         </Form>
       </Modal>

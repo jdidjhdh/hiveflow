@@ -1,0 +1,71 @@
+# HiveFlow Studio — production-style compose (pinned GHCR images)
+#
+# Usage:
+#   export HIVEFLOW_VERSION=0.1.0
+#   export HIVEFLOW_IMAGE_OWNER=your-github-org   # lowercase, e.g. hiveflow
+#   docker compose -f docker-compose.release.yml up -d
+#
+# Images are published on git tags (v*) to:
+#   ghcr.io/<owner>/hiveflow-studio-api:<version>
+#   ghcr.io/<owner>/hiveflow-studio-web:<version>
+
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hiveflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hiveflow}
+      POSTGRES_DB: hiveflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "hiveflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  studio-api:
+    image: ghcr.io/${HIVEFLOW_IMAGE_OWNER:-hiveflow}/hiveflow-studio-api:${HIVEFLOW_VERSION:-0.1.0}
+    restart: unless-stopped
+    ports:
+      - "${STUDIO_API_PORT:-8000}:8000"
+    environment:
+      REDIS_URL: redis://redis:6379
+      DB_URL: postgresql://hiveflow:${POSTGRES_PASSWORD:-hiveflow}@postgres:5432/hiveflow
+      HIVEFLOW_RUNTIME: agent
+      HIVEFLOW_PLAN_HITL: "true"
+      HIVEFLOW_AGENT_ECHO_LLM: "true"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  studio-web:
+    image: ghcr.io/${HIVEFLOW_IMAGE_OWNER:-hiveflow}/hiveflow-studio-web:${HIVEFLOW_VERSION:-0.1.0}
+    restart: unless-stopped
+    ports:
+      - "${STUDIO_WEB_PORT:-3000}:80"
+    depends_on:
+      - studio-api
+
+volumes:
+  redis_data:
+  postgres_data:

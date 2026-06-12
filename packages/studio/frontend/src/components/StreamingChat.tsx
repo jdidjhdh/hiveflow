@@ -26,7 +26,7 @@ import {
   StopOutlined, ClockCircleOutlined, FileTextOutlined,
   PauseCircleOutlined,
 } from '@ant-design/icons';
-import { API_BASE_URL } from '@/utils/api';
+import { API_BASE_URL } from '@/api';
 import ReactMarkdown from 'react-markdown';
 
 const { Text, Paragraph } = Typography;

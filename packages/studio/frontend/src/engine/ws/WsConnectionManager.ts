@@ -1,9 +1,22 @@
 import type { ECM, Capability, MetricsSnapshot } from '@/types';
-import { API_BASE_URL } from '@/utils/api';
+import { API_BASE_URL } from '@/api';
 
 // 将 HTTP URL 转为 WebSocket URL
 function httpToWs(url: string): string {
   return url.replace('http://', 'ws://').replace('https://', 'wss://');
+}
+
+/** Default WS endpoint (dev uses Vite proxy on same host). */
+export function resolveDefaultWsUrl(): string {
+  const envUrl = import.meta.env.VITE_WS_URL;
+  if (typeof envUrl === 'string' && envUrl.length > 0) {
+    return envUrl;
+  }
+  if (!API_BASE_URL && typeof window !== 'undefined') {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}/ws`;
+  }
+  return `${httpToWs(API_BASE_URL || 'http://127.0.0.1:8000')}/ws`;
 }
 
 // ========== 事件类型定义 ==========
@@ -53,7 +66,7 @@ class WsConnectionManager {
   private subscribedTopics: Set<string> = new Set();
 
   constructor(url?: string) {
-    this.url = url || `${httpToWs(API_BASE_URL)}/ws`;
+    this.url = url || resolveDefaultWsUrl();
   }
 
   async connect(): Promise<boolean> {

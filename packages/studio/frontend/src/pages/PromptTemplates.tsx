@@ -9,7 +9,9 @@ import {
   DiffOutlined, ThunderboltOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { apiFetch, getErrorMessage } from '@/utils/api';
+import { apiFetch, getErrorMessage } from '@/api';
+import PageMaturityNotice from '@/components/PageMaturityNotice';
+import { useI18n } from '@/i18n';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -84,9 +86,12 @@ const categoryColors: Record<string, string> = {
   tool: 'cyan',
 };
 
+const categoryKeys = ['general', 'chat', 'rag', 'agent', 'tool'] as const;
+
 // ======================== Main Component ========================
 
 export default function PromptTemplatesPage() {
+  const { t } = useI18n();
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateDetail | null>(null);
@@ -168,13 +173,13 @@ export default function PromptTemplatesPage() {
           method: 'PUT',
           body: JSON.stringify(body),
         });
-        message.success(`模板已更新 (v${editingTemplate.current_version + 1})`);
+        message.success(t('pages.promptTemplates.messages.updated', { version: editingTemplate.current_version + 1 }));
       } else {
         await apiFetch('/api/prompt-templates', {
           method: 'POST',
           body: JSON.stringify(body),
         });
-        message.success('模板已创建');
+        message.success(t('pages.promptTemplates.messages.created'));
       }
       setModalOpen(false);
       fetchTemplates();
@@ -183,17 +188,17 @@ export default function PromptTemplatesPage() {
         message.error(getErrorMessage(err));
       }
     }
-  }, [form, editingTemplate, fetchTemplates]);
+  }, [form, editingTemplate, fetchTemplates, t]);
 
   const handleDelete = useCallback(async (template: TemplateItem) => {
     try {
       await apiFetch(`/api/prompt-templates/${template.id}`, { method: 'DELETE' });
-      message.success('模板已删除');
+      message.success(t('pages.promptTemplates.messages.deleted'));
       fetchTemplates();
     } catch (err) {
       message.error(getErrorMessage(err));
     }
-  }, [fetchTemplates]);
+  }, [fetchTemplates, t]);
 
   // ======================== Version Management ========================
 
@@ -218,13 +223,13 @@ export default function PromptTemplatesPage() {
       await apiFetch(`/api/prompt-templates/${selectedTemplate.id}/rollback/${version}`, {
         method: 'POST',
       });
-      message.success(`已回滚到版本 ${version}`);
+      message.success(t('pages.promptTemplates.messages.rolledBack', { version }));
       setVersionDrawerOpen(false);
       fetchTemplates();
     } catch (err) {
       message.error(getErrorMessage(err));
     }
-  }, [selectedTemplate, fetchTemplates]);
+  }, [selectedTemplate, fetchTemplates, t]);
 
   // ======================== Test Template ========================
 
@@ -294,12 +299,12 @@ export default function PromptTemplatesPage() {
   const handleSeedTemplates = useCallback(async () => {
     try {
       const data = await apiFetch('/api/prompt-templates/seed', { method: 'POST' });
-      message.success(`已预置 ${data.seeded} 个常用模板`);
+      message.success(t('pages.promptTemplates.messages.seeded', { count: data.seeded }));
       fetchTemplates();
     } catch (err) {
       message.error(getErrorMessage(err));
     }
-  }, [fetchTemplates]);
+  }, [fetchTemplates, t]);
 
   // ======================== Copy Template ========================
 
@@ -307,7 +312,7 @@ export default function PromptTemplatesPage() {
     try {
       const detail = await apiFetch(`/api/prompt-templates/${template.id}`);
       const body = {
-        name: `${detail.name} (副本)`,
+        name: `${detail.name}${t('pages.promptTemplates.copySuffix')}`,
         content: detail.content,
         category: detail.category,
         description: detail.description,
@@ -319,18 +324,18 @@ export default function PromptTemplatesPage() {
         method: 'POST',
         body: JSON.stringify(body),
       });
-      message.success('模板已复制');
+      message.success(t('pages.promptTemplates.messages.copied'));
       fetchTemplates();
     } catch (err) {
       message.error(getErrorMessage(err));
     }
-  }, [fetchTemplates]);
+  }, [fetchTemplates, t]);
 
   // ======================== Columns ========================
 
   const columns: ColumnsType<TemplateItem> = [
     {
-      title: '名称',
+      title: t('pages.promptTemplates.columns.name'),
       dataIndex: 'name',
       key: 'name',
       width: 200,
@@ -342,31 +347,37 @@ export default function PromptTemplatesPage() {
       ),
     },
     {
-      title: '分类',
+      title: t('pages.promptTemplates.columns.category'),
       dataIndex: 'category',
       key: 'category',
       width: 100,
-      render: (cat: string) => <Tag color={categoryColors[cat] || 'default'}>{cat}</Tag>,
+      render: (cat: string) => (
+        <Tag color={categoryColors[cat] || 'default'}>
+          {categoryKeys.includes(cat as typeof categoryKeys[number])
+            ? t(`pages.promptTemplates.categories.${cat}` as 'pages.promptTemplates.categories.general')
+            : cat}
+        </Tag>
+      ),
     },
     {
-      title: '描述',
+      title: t('pages.promptTemplates.columns.description'),
       dataIndex: 'description',
       key: 'description',
       ellipsis: true,
     },
     {
-      title: '标签',
+      title: t('pages.promptTemplates.columns.tags'),
       dataIndex: 'tags',
       key: 'tags',
       width: 200,
       render: (tags: string[]) => (
         <Space wrap>
-          {tags.map((t) => <Tag key={t}>{t}</Tag>)}
+          {tags.map((tag) => <Tag key={tag}>{tag}</Tag>)}
         </Space>
       ),
     },
     {
-      title: '变量',
+      title: t('pages.promptTemplates.columns.variables'),
       dataIndex: 'variables',
       key: 'variables',
       width: 150,
@@ -375,35 +386,35 @@ export default function PromptTemplatesPage() {
       ),
     },
     {
-      title: '版本',
+      title: t('pages.promptTemplates.columns.version'),
       dataIndex: 'total_versions',
       key: 'total_versions',
       width: 80,
       align: 'center',
     },
     {
-      title: '操作',
+      title: t('pages.promptTemplates.columns.actions'),
       key: 'actions',
       width: 280,
       render: (_: unknown, record: TemplateItem) => (
         <Space>
-          <Tooltip title="编辑">
+          <Tooltip title={t('pages.promptTemplates.tooltips.edit')}>
             <Button size="small" icon={<EditOutlined />} onClick={() => handleOpenModal(record)} />
           </Tooltip>
-          <Tooltip title="版本历史">
+          <Tooltip title={t('pages.promptTemplates.tooltips.versions')}>
             <Button size="small" icon={<HistoryOutlined />} onClick={() => handleShowVersions(record)} />
           </Tooltip>
-          <Tooltip title="测试模板">
+          <Tooltip title={t('pages.promptTemplates.tooltips.test')}>
             <Button size="small" icon={<ExperimentOutlined />} onClick={() => handleTestTemplate(record)} />
           </Tooltip>
-          <Tooltip title="版本对比">
+          <Tooltip title={t('pages.promptTemplates.tooltips.compare')}>
             <Button size="small" icon={<DiffOutlined />} onClick={() => handleCompareVersions(record)} />
           </Tooltip>
-          <Tooltip title="复制">
+          <Tooltip title={t('pages.promptTemplates.tooltips.copy')}>
             <Button size="small" icon={<CopyOutlined />} onClick={() => handleCopyTemplate(record)} />
           </Tooltip>
-          <Popconfirm title="确认删除?" onConfirm={() => handleDelete(record)}>
-            <Tooltip title="删除">
+          <Popconfirm title={t('pages.promptTemplates.confirmDelete')} onConfirm={() => handleDelete(record)}>
+            <Tooltip title={t('pages.promptTemplates.tooltips.delete')}>
               <Button size="small" danger icon={<DeleteOutlined />} />
             </Tooltip>
           </Popconfirm>
@@ -416,24 +427,25 @@ export default function PromptTemplatesPage() {
 
   return (
     <div style={{ padding: 24 }}>
+      <PageMaturityNotice pageKey="promptTemplates" />
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Space>
-          <Title level={4} style={{ margin: 0 }}>Prompt 模板库</Title>
-          <Text type="secondary">管理和版本控制您的 Prompt 模板</Text>
+          <Title level={4} style={{ margin: 0 }}>{t('pages.promptTemplates.title')}</Title>
+          <Text type="secondary">{t('pages.promptTemplates.subtitle')}</Text>
         </Space>
         <Space>
           <Button icon={<PlusOutlined />} type="primary" onClick={() => handleOpenModal()}>
-            新建模板
+            {t('pages.promptTemplates.create')}
           </Button>
           <Button icon={<ThunderboltOutlined />} onClick={handleSeedTemplates}>
-            预置模板
+            {t('pages.promptTemplates.seed')}
           </Button>
         </Space>
       </div>
 
       <Space style={{ marginBottom: 16 }}>
         <Input
-          placeholder="搜索模板..."
+          placeholder={t('pages.promptTemplates.searchPlaceholder')}
           prefix={<SearchOutlined />}
           style={{ width: 250 }}
           value={searchText}
@@ -441,12 +453,15 @@ export default function PromptTemplatesPage() {
           onPressEnter={fetchTemplates}
         />
         <Select
-          placeholder="所有分类"
+          placeholder={t('pages.promptTemplates.allCategories')}
           style={{ width: 150 }}
           allowClear
           value={filterCategory}
           onChange={setFilterCategory}
-          options={Object.entries(categoryColors).map(([key, _]) => ({ label: key, value: key }))}
+          options={categoryKeys.map((key) => ({
+            label: t(`pages.promptTemplates.categories.${key}`),
+            value: key,
+          }))}
         />
       </Space>
 
@@ -460,62 +475,59 @@ export default function PromptTemplatesPage() {
 
       {/* Create/Edit Modal */}
       <Modal
-        title={editingTemplate ? '编辑模板' : '新建模板'}
+        title={editingTemplate ? t('pages.promptTemplates.modal.editTitle') : t('pages.promptTemplates.modal.createTitle')}
         open={modalOpen}
         onOk={handleSave}
         onCancel={() => setModalOpen(false)}
         width={800}
-        okText="保存"
-        cancelText="取消"
+        okText={t('pages.promptTemplates.modal.save')}
+        cancelText={t('pages.promptTemplates.modal.cancel')}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="name" label="名称" rules={[{ required: true }]}>
-            <Input placeholder="模板名称" />
+          <Form.Item name="name" label={t('pages.promptTemplates.form.name')} rules={[{ required: true }]}>
+            <Input placeholder={t('pages.promptTemplates.form.namePlaceholder')} />
           </Form.Item>
-          <Form.Item name="category" label="分类" rules={[{ required: true }]}>
-            <Select options={[
-              { label: '通用', value: 'general' },
-              { label: '对话', value: 'chat' },
-              { label: 'RAG', value: 'rag' },
-              { label: 'Agent', value: 'agent' },
-              { label: '工具', value: 'tool' },
-            ]} />
+          <Form.Item name="category" label={t('pages.promptTemplates.form.category')} rules={[{ required: true }]}>
+            <Select options={categoryKeys.map((key) => ({
+              label: t(`pages.promptTemplates.categories.${key}`),
+              value: key,
+            }))} />
           </Form.Item>
-          <Form.Item name="content" label="模板内容" rules={[{ required: true }]}>
-            <TextArea rows={10} placeholder={"使用 {{variable_name}} 定义变量"} style={{ fontFamily: 'monospace' }} />
+          <Form.Item name="content" label={t('pages.promptTemplates.form.content')} rules={[{ required: true }]}>
+            <TextArea rows={10} placeholder={t('pages.promptTemplates.form.contentPlaceholder')} style={{ fontFamily: 'monospace' }} />
           </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input placeholder="模板描述" />
+          <Form.Item name="description" label={t('pages.promptTemplates.form.description')}>
+            <Input placeholder={t('pages.promptTemplates.form.descriptionPlaceholder')} />
           </Form.Item>
-          <Form.Item name="tags" label="标签（逗号分隔）">
-            <Input placeholder="assistant, chat, qa" />
+          <Form.Item name="tags" label={t('pages.promptTemplates.form.tags')}>
+            <Input placeholder={t('pages.promptTemplates.form.tagsPlaceholder')} />
           </Form.Item>
-          <Form.Item name="variables" label="变量列表（逗号分隔）">
-            <Input placeholder="user_input, context, question" />
+          <Form.Item name="variables" label={t('pages.promptTemplates.form.variables')}>
+            <Input placeholder={t('pages.promptTemplates.form.variablesPlaceholder')} />
           </Form.Item>
-          <Form.Item name="model_hints" label="推荐模型（逗号分隔）">
-            <Input placeholder="gpt-4o, claude-3-sonnet" />
+          <Form.Item name="model_hints" label={t('pages.promptTemplates.form.modelHints')}>
+            <Input placeholder={t('pages.promptTemplates.form.modelHintsPlaceholder')} />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* Version History Drawer */}
       <Drawer
-        title={`版本历史 - ${selectedTemplate?.name || ''}`}
+        title={t('pages.promptTemplates.versionDrawer.title', { name: selectedTemplate?.name || '' })}
         open={versionDrawerOpen}
         onClose={() => setVersionDrawerOpen(false)}
         width={600}
       >
         {versions.length === 0 ? (
-          <Empty description="暂无版本记录" />
+          <Empty description={t('pages.promptTemplates.versionDrawer.noVersions')} />
         ) : (
           <List
             dataSource={[...versions].reverse()}
             renderItem={(v) => (
               <List.Item
                 actions={[
-                  <Popconfirm title={`确认回滚到 v${v.version}?`} onConfirm={() => handleRollback(v.version)}>
-                    <Button size="small" icon={<RollbackOutlined />} type="link">回滚</Button>
+                  <Popconfirm title={t('pages.promptTemplates.versionDrawer.confirmRollback', { version: v.version })} onConfirm={() => handleRollback(v.version)}>
+                    <Button size="small" icon={<RollbackOutlined />} type="link">{t('pages.promptTemplates.versionDrawer.rollback')}</Button>
                   </Popconfirm>,
                 ]}
               >
@@ -525,14 +537,14 @@ export default function PromptTemplatesPage() {
                       <Tag color={v.version === selectedTemplate?.current_version ? 'green' : 'default'}>
                         v{v.version}
                       </Tag>
-                      {v.version === selectedTemplate?.current_version && <Text type="success">当前版本</Text>}
+                      {v.version === selectedTemplate?.current_version && <Text type="success">{t('pages.promptTemplates.versionDrawer.currentVersion')}</Text>}
                     </Space>
                   }
                   description={
                     <Space direction="vertical" size={0}>
-                      <Text>{v.change_summary || '无变更说明'}</Text>
+                      <Text>{v.change_summary || t('pages.promptTemplates.versionDrawer.noChangeSummary')}</Text>
                       <Text type="secondary">
-                        {new Date(v.created_at * 1000).toLocaleString()} · {v.content_length} 字符
+                        {new Date(v.created_at * 1000).toLocaleString()} · {t('pages.promptTemplates.versionDrawer.characters', { count: v.content_length })}
                       </Text>
                     </Space>
                   }
@@ -545,20 +557,20 @@ export default function PromptTemplatesPage() {
 
       {/* Test Drawer */}
       <Drawer
-        title={`测试模板 - ${selectedTemplate?.name || ''}`}
+        title={t('pages.promptTemplates.testDrawer.title', { name: selectedTemplate?.name || '' })}
         open={testDrawerOpen}
         onClose={() => setTestDrawerOpen(false)}
         width={700}
       >
         <Form form={testForm} layout="vertical">
-          <Text strong>变量赋值：</Text>
+          <Text strong>{t('pages.promptTemplates.testDrawer.variableAssignment')}</Text>
           <Form.Item name="variables" style={{ marginTop: 8 }}>
             <Form.List name="variables">
               {(_fields) => (
                 <Space direction="vertical" style={{ width: '100%' }}>
                   {selectedTemplate?.variables?.map((v) => (
                     <Form.Item key={v} label={`{{${v}}}`} name={[v]}>
-                      <Input placeholder={`输入 ${v} 的值`} />
+                      <Input placeholder={t('pages.promptTemplates.testDrawer.inputValue', { name: v })} />
                     </Form.Item>
                   ))}
                 </Space>
@@ -566,24 +578,24 @@ export default function PromptTemplatesPage() {
             </Form.List>
           </Form.Item>
           <Button type="primary" onClick={handleRunTest}>
-            <ExperimentOutlined /> 运行测试
+            <ExperimentOutlined /> {t('pages.promptTemplates.testDrawer.runTest')}
           </Button>
         </Form>
 
         {testResult && (
           <div style={{ marginTop: 16 }}>
-            <Divider>测试结果</Divider>
+            <Divider>{t('pages.promptTemplates.testDrawer.results')}</Divider>
             <Descriptions bordered size="small" column={2}>
-              <Descriptions.Item label="版本">v{testResult.version}</Descriptions.Item>
-              <Descriptions.Item label="字符数">{testResult.character_count}</Descriptions.Item>
-              <Descriptions.Item label="Token 估算">{testResult.token_estimate}</Descriptions.Item>
-              <Descriptions.Item label="未替换变量">
+              <Descriptions.Item label={t('pages.promptTemplates.testDrawer.version')}>v{testResult.version}</Descriptions.Item>
+              <Descriptions.Item label={t('pages.promptTemplates.testDrawer.charCount')}>{testResult.character_count}</Descriptions.Item>
+              <Descriptions.Item label={t('pages.promptTemplates.testDrawer.tokenEstimate')}>{testResult.token_estimate}</Descriptions.Item>
+              <Descriptions.Item label={t('pages.promptTemplates.testDrawer.unreplacedVariables')}>
                 {testResult.unreplaced_variables.length > 0
                   ? testResult.unreplaced_variables.map((v) => `{{${v}}}`).join(', ')
-                  : '无'}
+                  : t('pages.promptTemplates.testDrawer.none')}
               </Descriptions.Item>
             </Descriptions>
-            <Divider>渲染结果</Divider>
+            <Divider>{t('pages.promptTemplates.testDrawer.rendered')}</Divider>
             <pre style={{
               background: '#f5f5f5',
               padding: 12,
@@ -601,20 +613,20 @@ export default function PromptTemplatesPage() {
 
       {/* Compare Drawer */}
       <Drawer
-        title={`版本对比 - ${selectedTemplate?.name || ''}`}
+        title={t('pages.promptTemplates.compareDrawer.title', { name: selectedTemplate?.name || '' })}
         open={compareDrawerOpen}
         onClose={() => setCompareDrawerOpen(false)}
         width={800}
       >
         <Form form={compareForm} layout="inline">
-          <Form.Item name="version_a" label="版本 A">
+          <Form.Item name="version_a" label={t('pages.promptTemplates.compareDrawer.versionA')}>
             <Select style={{ width: 120 }}>
               {versions.map((v) => (
                 <Select.Option key={v.version} value={v.version}>v{v.version}</Select.Option>
               ))}
             </Select>
           </Form.Item>
-          <Form.Item name="version_b" label="版本 B">
+          <Form.Item name="version_b" label={t('pages.promptTemplates.compareDrawer.versionB')}>
             <Select style={{ width: 120 }}>
               {versions.map((v) => (
                 <Select.Option key={v.version} value={v.version}>v{v.version}</Select.Option>
@@ -623,7 +635,7 @@ export default function PromptTemplatesPage() {
           </Form.Item>
           <Form.Item>
             <Button type="primary" onClick={handleRunCompare} icon={<DiffOutlined />}>
-              对比
+              {t('pages.promptTemplates.compareDrawer.compare')}
             </Button>
           </Form.Item>
         </Form>
@@ -631,13 +643,13 @@ export default function PromptTemplatesPage() {
         {compareResult && (
           <div style={{ marginTop: 16 }}>
             <Descriptions bordered size="small" column={3}>
-              <Descriptions.Item label="新增行">{compareResult.added_lines}</Descriptions.Item>
-              <Descriptions.Item label="删除行">{compareResult.removed_lines}</Descriptions.Item>
-              <Descriptions.Item label="相似度">
+              <Descriptions.Item label={t('pages.promptTemplates.compareDrawer.addedLines')}>{compareResult.added_lines}</Descriptions.Item>
+              <Descriptions.Item label={t('pages.promptTemplates.compareDrawer.removedLines')}>{compareResult.removed_lines}</Descriptions.Item>
+              <Descriptions.Item label={t('pages.promptTemplates.compareDrawer.similarity')}>
                 {(compareResult.similarity * 100).toFixed(1)}%
               </Descriptions.Item>
             </Descriptions>
-            <Divider>差异对比</Divider>
+            <Divider>{t('pages.promptTemplates.compareDrawer.diff')}</Divider>
             <pre style={{
               background: '#1e1e1e',
               color: '#d4d4d4',

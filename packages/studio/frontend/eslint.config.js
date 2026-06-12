@@ -45,6 +45,17 @@ export default tseslint.config(
         { vars: 'all', varsIgnorePattern: '^_', args: 'after-used', argsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/no-empty-object-type': 'off',
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@/utils/api',
+              message: 'Use `@/api` instead of the deprecated `@/utils/api` shim.',
+            },
+          ],
+        },
+      ],
     },
   },
 );

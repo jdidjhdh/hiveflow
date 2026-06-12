@@ -1,99 +1,87 @@
+import { lazy, Suspense, useMemo, useCallback } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Menu, Tag, Switch } from 'antd';
-import {
-  ApartmentOutlined,
-  RobotOutlined,
-  DashboardOutlined,
-  EyeOutlined,
-  DatabaseOutlined,
-  ThunderboltOutlined,
-  SettingOutlined,
-  ShopOutlined,
-  ShareAltOutlined,
-  BellOutlined,
-  CloudServerOutlined,
-  BookOutlined,
-  MessageOutlined,
-  BarChartOutlined,
-  BulbOutlined,
-  ExperimentOutlined,
-  FileSearchOutlined,
-  CheckOutlined,
-  HistoryOutlined,
-} from '@ant-design/icons';
-import type { MenuProps } from 'antd';
+import { Layout, Menu, Tag, Switch, Select, Space } from 'antd';
 import { useEngineStore } from '@/store/useEngineStore';
+import { useI18n } from '@/i18n';
+import { buildMenuItems } from '@/config/menuItems';
+import { applyStudioModeChange } from '@/engine/syncStudioMode';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import WsStatusIndicator from '@/components/WsStatusIndicator';
 import RuntimeStatusBar from '@/components/RuntimeStatusBar';
-import OrchestratorPage from '@/pages/Orchestrator';
-import AgentsPage from '@/pages/Agents';
-import DashboardPage from '@/pages/Dashboard';
-import TracerPage from '@/pages/Tracer';
-import BlackboardPage from '@/pages/Blackboard';
-import EventsPage from '@/pages/Events';
-import SettingsPage from '@/pages/Settings';
-import CapabilityMarketPage from '@/pages/CapabilityMarket';
-import VariablesPage from '@/pages/Variables';
-import TriggersPage from '@/pages/Triggers';
-import LLMConfigPage from '@/pages/LLMConfig';
-import KnowledgeBasePage from '@/pages/KnowledgeBase';
-import ChatflowPage from '@/pages/Chatflow';
-import AnalyticsPage from '@/pages/Analytics';
-import PromptTemplatesPage from '@/pages/PromptTemplates';
-import ABTestingPage from '@/pages/ABTesting';
-import AuditLogPage from '@/pages/AuditLog';
-import ApprovalsPage from '@/pages/Approvals';
-import ReplayPage from '@/pages/Replay';
+import PageLoading from '@/components/PageLoading';
 
-const menuItems: MenuProps['items'] = [
-  { key: '/orchestrator', icon: <ApartmentOutlined />, label: '编排器' },
-  { key: '/agents', icon: <RobotOutlined />, label: 'Agent 管理' },
-  { key: '/capabilities', icon: <ShopOutlined />, label: '能力市场' },
-  { key: '/knowledge', icon: <BookOutlined />, label: '知识库' },
-  { key: '/chatflow', icon: <MessageOutlined />, label: '对话式工作流' },
-  { key: '/analytics', icon: <BarChartOutlined />, label: '执行分析' },
-  { key: '/prompt-templates', icon: <BulbOutlined />, label: 'Prompt 模板' },
-  { key: '/ab-testing', icon: <ExperimentOutlined />, label: 'A/B 测试' },
-  { key: '/approvals', icon: <CheckOutlined />, label: '人工审批' },
-  { key: '/audit-log', icon: <FileSearchOutlined />, label: '审计日志' },
-  { key: '/dashboard', icon: <DashboardOutlined />, label: '仪表盘' },
-  { key: '/tracer', icon: <EyeOutlined />, label: '任务追踪' },
-  { key: '/replay', icon: <HistoryOutlined />, label: '执行回放' },
-  { key: '/blackboard', icon: <DatabaseOutlined />, label: '黑板' },
-  { key: '/events', icon: <ThunderboltOutlined />, label: '事件流' },
-  { key: '/variables', icon: <ShareAltOutlined />, label: '变量管理' },
-  { key: '/triggers', icon: <BellOutlined />, label: '触发器' },
-  { key: '/llm-config', icon: <CloudServerOutlined />, label: 'LLM 模型' },
-  { key: '/settings', icon: <SettingOutlined />, label: '设置' },
-];
+const OrchestratorPage = lazy(() => import('@/pages/Orchestrator'));
+const AgentsPage = lazy(() => import('@/pages/Agents'));
+const DashboardPage = lazy(() => import('@/pages/Dashboard'));
+const TracerPage = lazy(() => import('@/pages/Tracer'));
+const BlackboardPage = lazy(() => import('@/pages/Blackboard'));
+const EventsPage = lazy(() => import('@/pages/Events'));
+const SettingsPage = lazy(() => import('@/pages/Settings'));
+const CapabilityMarketPage = lazy(() => import('@/pages/CapabilityMarket'));
+const VariablesPage = lazy(() => import('@/pages/Variables'));
+const TriggersPage = lazy(() => import('@/pages/Triggers'));
+const LLMConfigPage = lazy(() => import('@/pages/LLMConfig'));
+const KnowledgeBasePage = lazy(() => import('@/pages/KnowledgeBase'));
+const ChatflowPage = lazy(() => import('@/pages/Chatflow'));
+const AnalyticsPage = lazy(() => import('@/pages/Analytics'));
+const PromptTemplatesPage = lazy(() => import('@/pages/PromptTemplates'));
+const ABTestingPage = lazy(() => import('@/pages/ABTesting'));
+const AuditLogPage = lazy(() => import('@/pages/AuditLog'));
+const ApprovalsPage = lazy(() => import('@/pages/Approvals'));
+const ReplayPage = lazy(() => import('@/pages/Replay'));
 
 const { Sider, Content, Header } = Layout;
+
+function LazyPage({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<PageLoading />}>{children}</Suspense>;
+}
 
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const { mode, setMode } = useEngineStore();
+  const { t, locale, setLocale } = useI18n();
+  const menuItems = useMemo(() => buildMenuItems(t), [t]);
 
-  const currentKey = '/' + location.pathname.split('/')[1] || '/orchestrator';
+  const currentKey = '/' + (location.pathname.split('/')[1] || 'orchestrator');
+
+  const handleModeChange = useCallback(async (checked: boolean) => {
+    const next = checked ? 'real' : 'mock';
+    setMode(next);
+    await applyStudioModeChange(next);
+  }, [setMode]);
 
   return (
     <Layout className="hf-layout">
       <Header className="hf-header">
         <div className="hf-header-left">
-          <span className="hf-logo">HiveFlow Studio</span>
+          <span className="hf-logo">{t('app.title')}</span>
           <Tag color={mode === 'mock' ? 'orange' : 'green'}>
-            {mode === 'mock' ? '模拟模式' : '真实模式'}
+            {mode === 'mock' ? t('app.mockMode') : t('app.realMode')}
           </Tag>
         </div>
         <div className="hf-header-right">
           <RuntimeStatusBar />
-          <Switch
-            checkedChildren="真实"
-            unCheckedChildren="模拟"
-            checked={mode === 'real'}
-            onChange={(checked) => setMode(checked ? 'real' : 'mock')}
-          />
+          <Space size="small">
+            <Select
+              size="small"
+              value={locale}
+              onChange={setLocale}
+              options={[
+                { value: 'zh', label: '中文' },
+                { value: 'en', label: 'English' },
+              ]}
+              style={{ width: 100 }}
+              aria-label={t('app.language')}
+            />
+            <Switch
+              data-testid="engine-mode-switch"
+              checkedChildren={t('app.realSwitch')}
+              unCheckedChildren={t('app.mockSwitch')}
+              checked={mode === 'real'}
+              onChange={(checked) => { void handleModeChange(checked); }}
+            />
+          </Space>
           <WsStatusIndicator />
         </div>
       </Header>
@@ -110,26 +98,26 @@ export default function App() {
         <Content className="hf-content">
           <ErrorBoundary>
             <Routes>
-              <Route path="/" element={<OrchestratorPage />} />
-              <Route path="/orchestrator" element={<OrchestratorPage />} />
-              <Route path="/agents" element={<AgentsPage />} />
-              <Route path="/capabilities" element={<CapabilityMarketPage />} />
-              <Route path="/knowledge" element={<KnowledgeBasePage />} />
-              <Route path="/chatflow" element={<ChatflowPage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/tracer" element={<TracerPage />} />
-              <Route path="/replay" element={<ReplayPage />} />
-              <Route path="/blackboard" element={<BlackboardPage />} />
-              <Route path="/events" element={<EventsPage />} />
-              <Route path="/variables" element={<VariablesPage />} />
-              <Route path="/triggers" element={<TriggersPage />} />
-              <Route path="/prompt-templates" element={<PromptTemplatesPage />} />
-              <Route path="/ab-testing" element={<ABTestingPage />} />
-              <Route path="/approvals" element={<ApprovalsPage />} />
-              <Route path="/audit-log" element={<AuditLogPage />} />
-              <Route path="/llm-config" element={<LLMConfigPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/" element={<LazyPage><OrchestratorPage /></LazyPage>} />
+              <Route path="/orchestrator" element={<LazyPage><OrchestratorPage /></LazyPage>} />
+              <Route path="/agents" element={<LazyPage><AgentsPage /></LazyPage>} />
+              <Route path="/capabilities" element={<LazyPage><CapabilityMarketPage /></LazyPage>} />
+              <Route path="/knowledge" element={<LazyPage><KnowledgeBasePage /></LazyPage>} />
+              <Route path="/chatflow" element={<LazyPage><ChatflowPage /></LazyPage>} />
+              <Route path="/analytics" element={<LazyPage><AnalyticsPage /></LazyPage>} />
+              <Route path="/dashboard" element={<LazyPage><DashboardPage /></LazyPage>} />
+              <Route path="/tracer" element={<LazyPage><TracerPage /></LazyPage>} />
+              <Route path="/replay" element={<LazyPage><ReplayPage /></LazyPage>} />
+              <Route path="/blackboard" element={<LazyPage><BlackboardPage /></LazyPage>} />
+              <Route path="/events" element={<LazyPage><EventsPage /></LazyPage>} />
+              <Route path="/variables" element={<LazyPage><VariablesPage /></LazyPage>} />
+              <Route path="/triggers" element={<LazyPage><TriggersPage /></LazyPage>} />
+              <Route path="/prompt-templates" element={<LazyPage><PromptTemplatesPage /></LazyPage>} />
+              <Route path="/ab-testing" element={<LazyPage><ABTestingPage /></LazyPage>} />
+              <Route path="/approvals" element={<LazyPage><ApprovalsPage /></LazyPage>} />
+              <Route path="/audit-log" element={<LazyPage><AuditLogPage /></LazyPage>} />
+              <Route path="/llm-config" element={<LazyPage><LLMConfigPage /></LazyPage>} />
+              <Route path="/settings" element={<LazyPage><SettingsPage /></LazyPage>} />
             </Routes>
           </ErrorBoundary>
         </Content>

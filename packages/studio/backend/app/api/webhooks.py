@@ -51,14 +51,22 @@ async def handle_webhook(webhook_id: str, request: Request):
 
     logger.info(f"Webhook {webhook_id} triggered workflow {workflow_id} (execution: {execution_id})")
 
-    # 记录 webhook 触发
     webhook["last_triggered"] = datetime.now().isoformat()
     webhook["trigger_count"] = webhook.get("trigger_count", 0) + 1
 
+    try:
+        from app.core.workflow_runner import execute_stored_workflow
+        run_result = await execute_stored_workflow(workflow_id, wf_id=f"wh_{execution_id}")
+        run_status = run_result.get("status", "completed")
+    except Exception as exc:
+        logger.exception("Webhook workflow execution failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
     return {
-        "status": "accepted",
+        "status": run_status,
         "execution_id": execution_id,
         "workflow_id": workflow_id,
+        "result": run_result,
         "message": f"Webhook {webhook_id} triggered workflow {workflow_id}",
     }
 

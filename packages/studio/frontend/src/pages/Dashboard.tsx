@@ -5,8 +5,10 @@ import ReactECharts from 'echarts-for-react';
 import { useEngineStore } from '@/store/useEngineStore';
 import { useEventStore } from '@/store/useEventStore';
 import { getWsManager } from '@/engine/ws/WsConnectionManager';
-import { apiFetch } from '@/utils/api';
+import { apiFetch } from '@/api';
 import type { MetricsSnapshot } from '@/types';
+import PageMaturityNotice from '@/components/PageMaturityNotice';
+import { useI18n } from '@/i18n';
 
 const MOCK_METRICS: MetricsSnapshot = {
   counters: { total_intents: 0, completed_intents: 0, failed_intents: 0, timed_out_intents: 0 },
@@ -30,6 +32,7 @@ function normalizeMetrics(raw: Record<string, unknown>): MetricsSnapshot {
 }
 
 export default function DashboardPage() {
+  const { t } = useI18n();
   const engineMode = useEngineStore(s => s.mode);
   const engine = useEngineStore().getEngine();
   const events = useEventStore(s => s.events);
@@ -87,21 +90,22 @@ export default function DashboardPage() {
   return (
     <Spin spinning={loading}>
       <div>
-        {loading && <div style={{ textAlign: 'center', padding: 8, color: '#888', fontSize: 13 }}>正在连接引擎...</div>}
+        {loading && <div style={{ textAlign: 'center', padding: 8, color: '#888', fontSize: 13 }}>{t('pages.dashboard.connecting')}</div>}
         {!loading && (
         <div>
-        <h3 style={{ marginBottom: 16 }}>实时仪表盘 {engineMode === 'real' && <span style={{ fontSize: 12, color: '#52c41a' }}>(实时模式)</span>}</h3>
+        <PageMaturityNotice pageKey="dashboard" />
+        <h3 style={{ marginBottom: 16 }}>{t('pages.dashboard.title')} {engineMode === 'real' && <span style={{ fontSize: 12, color: '#52c41a' }}>{t('pages.dashboard.liveMode')}</span>}</h3>
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={12} sm={12} md={6}>
           <Card className="stat-card">
-            <Statistic title="总意图数" value={m.counters?.total_intents ?? 0} prefix={<ThunderboltOutlined />} />
+            <Statistic title={t('pages.dashboard.stats.totalIntents')} value={m.counters?.total_intents ?? 0} prefix={<ThunderboltOutlined />} />
           </Card>
         </Col>
         <Col xs={12} sm={12} md={6}>
           <Card className="stat-card">
             <Statistic
-              title="成功率"
+              title={t('pages.dashboard.stats.successRate')}
               value={(m.counters?.total_intents ?? 0) > 0
                 ? Math.round(((m.counters?.completed_intents ?? 0) / (m.counters?.total_intents ?? 1)) * 100)
                 : 100}
@@ -113,21 +117,21 @@ export default function DashboardPage() {
         </Col>
         <Col xs={12} sm={12} md={6}>
           <Card className="stat-card">
-            <Statistic title="活跃 Agent" value={m.gauges?.active_agents ?? 0} prefix={<TeamOutlined />} />
+            <Statistic title={t('pages.dashboard.stats.activeAgents')} value={m.gauges?.active_agents ?? 0} prefix={<TeamOutlined />} />
           </Card>
         </Col>
         <Col xs={12} sm={12} md={6}>
           <Card className="stat-card">
-            <Statistic title="总负载" value={m.gauges?.total_load ?? 0} prefix={<ClockCircleOutlined />} />
+            <Statistic title={t('pages.dashboard.stats.totalLoad')} value={m.gauges?.total_load ?? 0} prefix={<ClockCircleOutlined />} />
           </Card>
         </Col>
       </Row>
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} lg={12}>
-          <Card title="Agent 负载分布">
+          <Card title={t('pages.dashboard.charts.agentLoad')}>
             {agents.length === 0 ? (
-              <Empty description="暂无 Agent 数据" style={{ padding: '40px 0' }} />
+              <Empty description={t('pages.dashboard.charts.noAgentData')} style={{ padding: '40px 0' }} />
             ) : (
               <ReactECharts
                 option={{
@@ -138,7 +142,7 @@ export default function DashboardPage() {
                     data: agents.map(a => a.agent_id),
                     axisLabel: { rotate: 30, interval: 0 },
                   },
-                  yAxis: { type: 'value', name: '负载' },
+                  yAxis: { type: 'value', name: t('pages.dashboard.charts.load') },
                   series: [{
                     type: 'bar',
                     data: agents.map(a => a.load),
@@ -151,7 +155,7 @@ export default function DashboardPage() {
           </Card>
         </Col>
         <Col xs={24} lg={12}>
-          <Card title="事件趋势">
+          <Card title={t('pages.dashboard.charts.eventTrend')}>
             <ReactECharts
               option={{
                 tooltip: { trigger: 'axis' },
@@ -160,7 +164,7 @@ export default function DashboardPage() {
                   type: 'category',
                   data: recentEvents.slice(-10).map((_, i) => `E-${i + 1}`),
                 },
-                yAxis: { type: 'value', name: '事件数' },
+                yAxis: { type: 'value', name: t('pages.dashboard.charts.eventCount') },
                 series: [{
                   type: 'line',
                   data: recentEvents.slice(-10).map(() => 1),
@@ -175,10 +179,10 @@ export default function DashboardPage() {
         </Col>
       </Row>
 
-      <Card title="实时事件流" size="small">
+      <Card title={t('pages.dashboard.eventStream')} size="small">
         {recentEvents.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#8c8c8c' }}>
-            暂无事件，执行工作流后将在此显示...
+            {t('pages.dashboard.noEvents')}
           </div>
         ) : (
           <div className="event-console" style={{ maxHeight: 250, overflow: 'auto' }}>

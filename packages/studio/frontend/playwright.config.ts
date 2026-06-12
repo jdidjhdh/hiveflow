@@ -11,7 +11,9 @@ export default defineConfig({
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    actionTimeout: 15_000,
   },
+  timeout: 60_000,
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
@@ -34,6 +36,9 @@ export default defineConfig({
       url: 'http://localhost:3000',
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
+      env: {
+        VITE_E2E: 'true',
+      },
     },
   ],
 });

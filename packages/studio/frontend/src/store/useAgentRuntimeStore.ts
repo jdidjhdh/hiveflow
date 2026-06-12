@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { apiFetch } from '@/utils/api';
+import { apiFetch } from '@/api';
 
 export type RuntimeMode = 'core' | 'agent';
 

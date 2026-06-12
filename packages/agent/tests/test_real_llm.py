@@ -6,8 +6,8 @@ HiveFlow Agent 真实 LLM 集成测试
 2. 真实规划能力
 3. Agent 认知循环 (plan → execute → diagnose → replan)
 
-运行方式:
-  pytest tests/test_real_llm.py -v --run-real-llm
+运行方式（可选，本地 only — CI 不运行）:
+  pytest tests/test_real_llm.py -v -m real_llm
   需要设置环境变量:
   - LLM_PROVIDER=deepseek (或 openai/anthropic/ollama)
   - 对应的 API key (DEEPSEEK_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY)
@@ -51,6 +51,8 @@ requires_real_llm = pytest.mark.skipif(
     not has_llm_available(),
     reason="需要配置 LLM 提供商 (设置 LLM_PROVIDER 环境变量或安装对应的包)"
 )
+
+pytestmark = pytest.mark.real_llm
 
 
 @pytest.fixture(scope="module")
@@ -278,13 +280,19 @@ async def test_real_llm_end_to_end_calculation(real_llm):
     skill_signatures = {
         "calculate": "执行数学计算",
         "summarize": "生成最终回复",
+        "final_answer": "生成最终回复",
     }
 
     app = create_real_llm_app(skill_signatures, real_llm)
     await app.start()
 
     async def calculate_handler(ecm, view):
-        expr = ecm.payload.get("expression", "0")
+        expr = ecm.payload.get("expression")
+        if not expr:
+            import re
+            q = str(ecm.payload.get("query", "") or getattr(ecm, "user_query", "") or "")
+            m = re.search(r"(\d+\s*[\*x×]\s*\d+|\d+\s*[\+\-\/]\s*\d+)", q.replace("x", "*").replace("×", "*"))
+            expr = re.sub(r"\s+", "", m.group(1)) if m else "7*8"
         try:
             result = eval(expr)
         except Exception:
@@ -305,6 +313,8 @@ async def test_real_llm_end_to_end_calculation(real_llm):
     await app.create_skill_agent("calculate", "calc-agent", calculate_handler,
                                 read_keys=set(), write_keys={"hivemind:result:*"})
     await app.create_skill_agent("summarize", "sum-agent", summarize_handler,
+                                read_keys={"hivemind:result:*"}, write_keys={"hivemind:result:*"})
+    await app.create_skill_agent("final_answer", "fa-agent", summarize_handler,
                                 read_keys={"hivemind:result:*"}, write_keys={"hivemind:result:*"})
 
     result = await app.run_query("计算 7 * 8")

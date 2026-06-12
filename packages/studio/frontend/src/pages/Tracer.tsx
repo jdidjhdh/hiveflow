@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Input, List, Timeline, Tag, Empty, Card, Row, Col, Alert } from 'antd';
 import { SearchOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined } from '@ant-design/icons';
 import { useEventStore } from '@/store/useEventStore';
 import { useEngineStore } from '@/store/useEngineStore';
-import { apiFetch } from '@/utils/api';
+import { apiFetch, getErrorMessage } from '@/api';
+import ApiErrorAlert from '@/components/ApiErrorAlert';
+import { DemoDataBanner } from '@/components/RealModeRequired';
+import { useI18n } from '@/i18n';
 import type { EventRecord } from '@/types';
 
 interface AuditEntry {
@@ -15,26 +18,37 @@ interface AuditEntry {
 }
 
 export default function TracerPage() {
+  const { t } = useI18n();
   const events = useEventStore(s => s.events);
   const engineMode = useEngineStore(s => s.mode);
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [selectedTrace, setSelectedTrace] = useState<string | null>(searchParams.get('intent_id'));
   const [auditEvents, setAuditEvents] = useState<AuditEntry[]>([]);
+  const [auditError, setAuditError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadAudit = useCallback(() => {
     if (engineMode !== 'real') {
       setAuditEvents([]);
+      setAuditError(null);
       return;
     }
     const intentId = selectedTrace || '';
     const url = intentId
       ? `/api/replay/audit?intent_id=${encodeURIComponent(intentId)}&limit=50`
       : '/api/replay/audit?limit=50';
+    setAuditError(null);
     apiFetch(url)
       .then(data => setAuditEvents(data.events || data.entries || []))
-      .catch(() => setAuditEvents([]));
+      .catch((e) => {
+        setAuditEvents([]);
+        setAuditError(getErrorMessage(e));
+      });
   }, [engineMode, selectedTrace]);
+
+  useEffect(() => {
+    loadAudit();
+  }, [loadAudit]);
 
   const traceMap = new Map<string, EventRecord[]>();
   events.forEach(evt => {
@@ -55,12 +69,21 @@ export default function TracerPage() {
     return <ClockCircleOutlined style={{ color: '#faad14' }} />;
   };
 
+  const statusLabel = (isCompleted: boolean, isFailed: boolean) => {
+    if (isCompleted) return t('pages.tracer.status.completed');
+    if (isFailed) return t('pages.tracer.status.failed');
+    return t('pages.tracer.status.inProgress');
+  };
+
   return (
-    <Row gutter={[16, 16]} style={{ height: '100%' }}>
+    <>
+      <DemoDataBanner message={t('pages.tracer.demoBanner')} />
+      <ApiErrorAlert error={auditError} onRetry={loadAudit} />
+      <Row gutter={[16, 16]} style={{ height: '100%' }}>
       <Col xs={24} sm={24} md={10} lg={8} xl={7}>
-        <Card title="意图列表" size="small" extra={
+        <Card title={t('pages.tracer.intentList')} size="small" extra={
           <Input
-            placeholder="搜索 intent_id / trace_id"
+            placeholder={t('pages.tracer.searchPlaceholder')}
             prefix={<SearchOutlined />}
             size="small"
             value={search}
@@ -69,7 +92,7 @@ export default function TracerPage() {
           />
         }>
           {filteredTraces.length === 0 ? (
-            <Empty description="暂无追踪数据" />
+            <Empty description={t('pages.tracer.noTraceData')} />
           ) : (
             <List
               size="small"
@@ -94,7 +117,7 @@ export default function TracerPage() {
                       description={
                         <span style={{ fontSize: 11 }}>
                           <Tag color={isCompleted ? 'success' : isFailed ? 'error' : 'processing'}>
-                            {isCompleted ? '完成' : isFailed ? '失败' : '进行中'}
+                            {statusLabel(!!isCompleted, !!isFailed)}
                           </Tag>
                           {new Date((lastEvt?.timestamp ?? 0) * 1000).toLocaleTimeString()}
                         </span>
@@ -114,14 +137,14 @@ export default function TracerPage() {
             type="success"
             showIcon
             style={{ marginBottom: 12 }}
-            message={`已加载 ${auditEvents.length} 条真实 audit 记录`}
+            message={t('pages.tracer.auditLoaded', { count: auditEvents.length })}
           />
         )}
-        <Card title={selectedTrace ? `追踪详情: ${selectedTrace}` : '选择一个意图查看详情'} size="small"
-          extra={selectedTrace ? <Link to={`/replay?intent_id=${encodeURIComponent(selectedTrace)}`}>Replay 回放</Link> : null}
+        <Card title={selectedTrace ? t('pages.tracer.traceDetail', { id: selectedTrace }) : t('pages.tracer.selectIntent')} size="small"
+          extra={selectedTrace ? <Link to={`/replay?intent_id=${encodeURIComponent(selectedTrace)}`}>{t('pages.tracer.replayLink')}</Link> : null}
         >
           {!selectedTrace ? (
-            <Empty description="请从左侧列表选择意图" />
+            <Empty description={t('pages.tracer.selectFromList')} />
           ) : (
             <>
               <Timeline
@@ -146,7 +169,7 @@ export default function TracerPage() {
                 }))}
               />
               {engineMode === 'real' && auditEvents.length > 0 && (
-                <Card title="Audit 时间线 (Replay)" size="small" style={{ marginTop: 16 }}>
+                <Card title={t('pages.tracer.auditTimeline')} size="small" style={{ marginTop: 16 }}>
                   <Timeline
                     items={auditEvents.map((e, i) => ({
                       key: `audit-${i}`,
@@ -167,5 +190,6 @@ export default function TracerPage() {
         </Card>
       </Col>
     </Row>
+    </>
   );
 }

@@ -3,7 +3,7 @@ import { Space, Tag, Switch, Tooltip } from 'antd';
 import { RobotOutlined, ApartmentOutlined } from '@ant-design/icons';
 import { useEngineStore } from '@/store/useEngineStore';
 import { useAgentRuntimeStore } from '@/store/useAgentRuntimeStore';
-import { getErrorMessage } from '@/utils/api';
+import { getErrorMessage } from '@/api';
 import { App } from 'antd';
 
 export default function RuntimeStatusBar() {

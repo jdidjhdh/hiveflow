@@ -4,8 +4,9 @@ import {
   Card, Input, Button, Timeline, Tag, Empty, Row, Col, Typography, Space, Alert,
 } from 'antd';
 import { SearchOutlined, ReloadOutlined, HistoryOutlined } from '@ant-design/icons';
-import { apiFetch } from '@/utils/api';
+import { apiFetch } from '@/api';
 import { useEngineStore } from '@/store/useEngineStore';
+import { useI18n } from '@/i18n';
 
 interface AuditEntry {
   agent?: string;
@@ -21,6 +22,7 @@ interface CheckpointEntry {
 }
 
 export default function ReplayPage() {
+  const { t } = useI18n();
   const engineMode = useEngineStore(s => s.mode);
   const [searchParams, setSearchParams] = useSearchParams();
   const [intentId, setIntentId] = useState(searchParams.get('intent_id') || '');
@@ -83,7 +85,7 @@ export default function ReplayPage() {
     return (
       <Card>
         <Typography.Paragraph>
-          Replay 回放需要在<strong>真实模式</strong>下使用，基于黑板 audit 历史与 checkpoint 时间线。
+          {t('pages.replay.realModeRequired')}
         </Typography.Paragraph>
       </Card>
     );
@@ -94,10 +96,10 @@ export default function ReplayPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <h3 style={{ margin: 0 }}>
           <HistoryOutlined style={{ marginRight: 8 }} />
-          执行回放
+          {t('pages.replay.title')}
         </h3>
         <Button icon={<ReloadOutlined />} onClick={loadReplay} loading={loading}>
-          刷新
+          {t('pages.replay.refresh')}
         </Button>
       </div>
 
@@ -105,29 +107,32 @@ export default function ReplayPage() {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="Tracer 展示实时 WS 事件；本页基于 /api/replay 展示黑板 audit 与 checkpoint 历史。"
+        message={t('pages.replay.infoAlert')}
       />
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={12}>
-          <Card title="按 intent_id 回放" size="small">
+          <Card title={t('pages.replay.intentReplay')} size="small">
             <Space.Compact style={{ width: '100%', marginBottom: 12 }}>
               <Input
-                placeholder="intent_id"
+                placeholder={t('pages.replay.intentIdPlaceholder')}
                 prefix={<SearchOutlined />}
                 value={intentId}
                 onChange={(e) => setIntentId(e.target.value)}
                 onPressEnter={applyIntentSearch}
               />
-              <Button type="primary" onClick={applyIntentSearch}>查询</Button>
+              <Button type="primary" onClick={applyIntentSearch}>{t('pages.replay.query')}</Button>
             </Space.Compact>
             {sessionInfo && (
               <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-                会话: {String(sessionInfo.intent_id || intentId)} · 事件 {auditEvents.length} 条
+                {t('pages.replay.sessionInfo', {
+                  intentId: String(sessionInfo.intent_id || intentId),
+                  count: auditEvents.length,
+                })}
               </Typography.Text>
             )}
             {auditEvents.length === 0 ? (
-              <Empty description="暂无 audit 记录" />
+              <Empty description={t('pages.replay.noAuditRecords')} />
             ) : (
               <Timeline
                 items={auditEvents.map((evt, i) => ({
@@ -148,18 +153,18 @@ export default function ReplayPage() {
           </Card>
         </Col>
         <Col xs={24} lg={12}>
-          <Card title="Checkpoint 时间线" size="small">
+          <Card title={t('pages.replay.checkpointTimeline')} size="small">
             <Space.Compact style={{ width: '100%', marginBottom: 12 }}>
               <Input
-                placeholder="workflow_id"
+                placeholder={t('pages.replay.workflowIdPlaceholder')}
                 value={workflowId}
                 onChange={(e) => setWorkflowId(e.target.value)}
                 onPressEnter={loadReplay}
               />
-              <Button onClick={loadReplay}>加载</Button>
+              <Button onClick={loadReplay}>{t('pages.replay.load')}</Button>
             </Space.Compact>
             {checkpoints.length === 0 ? (
-              <Empty description="输入 workflow_id 查看 checkpoint" />
+              <Empty description={t('pages.replay.noCheckpointHint')} />
             ) : (
               <Timeline
                 items={checkpoints.map((cp, i) => ({
@@ -181,7 +186,7 @@ export default function ReplayPage() {
       </Row>
 
       <div style={{ marginTop: 16 }}>
-        <Link to="/tracer">前往任务追踪（实时）</Link>
+        <Link to="/tracer">{t('pages.replay.goToTracer')}</Link>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { MockEngine, type IEngine } from '@/engine/mock/MockEngine';
-import { getWsManager, resetWsManager } from '@/engine/ws/WsConnectionManager';
+import { getWsManager, resetWsManager, resolveDefaultWsUrl } from '@/engine/ws/WsConnectionManager';
 
 interface EngineState {
   mode: 'mock' | 'real';
@@ -9,6 +9,7 @@ interface EngineState {
   engine: IEngine | null;
   setMode: (mode: 'mock' | 'real') => void;
   connect: (url?: string) => Promise<void>;
+  switchToMock: () => void;
   disconnect: () => void;
   getEngine: () => IEngine;
 }
@@ -32,24 +33,25 @@ export const useEngineStore = create<EngineState>((set, get) => ({
   setMode: (mode) => set({ mode, error: null }),
 
   connect: async (url) => {
-    if (url) {
-      set({ mode: 'real', error: null });
-      try {
-        const wsManager = getWsManager(url);
-        const success = await wsManager.connect();
-        if (success) {
-          wsManager.subscribeToEngine();
-          set({ connected: true, error: null });
-        } else {
-          set({ connected: false, error: 'WebSocket 连接失败' });
-        }
-      } catch (e) {
-        set({ connected: false, error: String(e) });
+    const wsUrl = url ?? resolveDefaultWsUrl();
+    set({ mode: 'real', error: null });
+    try {
+      const wsManager = getWsManager(wsUrl);
+      const success = await wsManager.connect();
+      if (success) {
+        wsManager.subscribeToEngine();
+        set({ connected: true, error: null });
+      } else {
+        set({ connected: false, error: 'WebSocket 连接失败' });
       }
-    } else {
-      resetWsManager();
-      set({ mode: 'mock', connected: true, engine: getOrCreateEngine() });
+    } catch (e) {
+      set({ connected: false, error: String(e) });
     }
+  },
+
+  switchToMock: () => {
+    resetWsManager();
+    set({ mode: 'mock', connected: true, error: null, engine: getOrCreateEngine() });
   },
 
   disconnect: () => {

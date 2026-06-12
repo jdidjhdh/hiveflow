@@ -51,7 +51,8 @@ async def build_hive_mind_app(engine_service):
     HiveMindApp = agent_mod.HiveMindApp
     HiveMindConfig = agent_mod.HiveMindConfig
 
-    planning_llm, execution_llm = _resolve_llm_clients()
+    planning_llm, execution_llm, llm_source = _resolve_llm_clients()
+    logger.info("Agent runtime LLM source: %s", llm_source)
 
     default_skills = {
         "general": "General-purpose ReAct task execution",
@@ -76,48 +77,20 @@ async def build_hive_mind_app(engine_service):
     app._plugin_manager = engine_service.get_plugin_manager()
     await app.start()
 
-    await _register_default_skills(app)
+    await _register_default_skills(app, execution_llm, llm_source)
     return app
 
 
 def _resolve_llm_clients():
-    from llm.base import LLMClient
-
-    class _EchoLLM(LLMClient):
-        async def complete(self, messages, **kwargs):
-            return '{"intent":"general","required_skills":["general"],"payload":{},"priority":"normal"}'
-
-        async def complete_json(self, messages, **kwargs):
-            content = (messages[-1].get("content") or "").lower()
-            if "graph" in content or "taskgraph" in content:
-                return {
-                    "general_step": {"task": "general", "depends_on": []},
-                    "final_answer": {"task": "summarize", "depends_on": ["general_step"]},
-                }
-            return {"intent": "general", "required_skills": ["general"], "payload": {}, "priority": "normal"}
-
-        async def stream(self, messages, **kwargs):
-            yield "ok"
-
-        async def embed(self, texts):
-            return [[0.0] * 8 for _ in texts]
-
-    if os.environ.get("HIVEFLOW_AGENT_ECHO_LLM", "").lower() == "true":
-        echo = _EchoLLM()
-        return echo, echo
-
-    try:
-        from llm.routing import create_routed_llm_clients
-        return create_routed_llm_clients()
-    except Exception as exc:
-        logger.warning("LLM routing unavailable (%s), using echo LLM for agent runtime", exc)
-        echo = _EchoLLM()
-        return echo, echo
+    from app.core.llm_resolver import resolve_llm_clients as _resolve
+    return _resolve()
 
 
-async def _register_default_skills(app):
+async def _register_default_skills(app, execution_llm, llm_source: str):
+    use_real_llm = llm_source != "echo"
+
     async def summarize_handler(ecm, view):
-        answer = ecm.payload.get("query") or str(ecm.payload)
+        query = ecm.payload.get("query") or getattr(ecm, "user_query", "") or str(ecm.payload)
         deps = ecm.payload.get("input_keys", {})
         parts = []
         for name, key in deps.items():
@@ -126,8 +99,26 @@ async def _register_default_skills(app):
                 parts.append(f"{name}: {val}")
             except (KeyError, PermissionError):
                 pass
-        if parts:
-            answer = "Summary based on upstream:\n" + "\n".join(parts)
+        context = "\n".join(parts)
+        if use_real_llm and execution_llm:
+            try:
+                prompt = f"Summarize for user query: {query}"
+                if context:
+                    prompt += f"\n\nContext:\n{context}"
+                answer = await execution_llm.complete(
+                    [
+                        {"role": "system", "content": "You summarize task outputs concisely."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    max_tokens=1024,
+                )
+            except Exception as exc:
+                logger.warning("Summarize LLM failed: %s", exc)
+                answer = context or str(query)
+        else:
+            answer = context or str(query)
+            if parts:
+                answer = "Summary based on upstream:\n" + answer
         payload = {"answer": answer}
         await view.put(f"hivemind:result:{ecm.intent_id}", payload)
         return payload
@@ -148,7 +139,22 @@ async def _register_default_skills(app):
     )
 
     async def general_handler(ecm, view):
-        payload = {"output": ecm.payload.get("query") or str(ecm.payload)}
+        query = ecm.payload.get("query") or getattr(ecm, "user_query", "") or str(ecm.payload)
+        if use_real_llm and execution_llm:
+            try:
+                text = await execution_llm.complete(
+                    [
+                        {"role": "system", "content": "You are a general-purpose agent worker."},
+                        {"role": "user", "content": str(query)},
+                    ],
+                    max_tokens=1024,
+                )
+                payload = {"output": text}
+            except Exception as exc:
+                logger.warning("General LLM failed: %s", exc)
+                payload = {"output": str(query), "llm_error": str(exc)}
+        else:
+            payload = {"output": str(query)}
         await view.put(f"hivemind:result:{ecm.intent_id}", payload)
         return payload
 

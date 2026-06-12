@@ -291,6 +291,21 @@ class MockOrchestrator {
     this.logCollector = logCollector;
   }
 
+  private publishNodeStatus(nodeName: string, status: string, result?: unknown) {
+    this.bus.publish('node.status', {
+      trace_id: `trace-${Date.now()}-${nodeName}`,
+      intent: nodeName,
+      intent_id: `intent-${nodeName}`,
+      emitter: 'orchestrator',
+      payload: {},
+      reply_to: '',
+      timestamp: Date.now() / 1000,
+      required_skills: [],
+      priority: 'normal',
+      metadata: { status, result },
+    });
+  }
+
   /** 评估条件分支 */
   private evaluateCondition(condition: string, context: Record<string, unknown>): boolean {
     try {
@@ -334,6 +349,7 @@ class MockOrchestrator {
       nodeStatus.set(nodeName, 'completed');
       completed.add(nodeName);
       results[nodeName] = { branch: 'default' };
+      this.publishNodeStatus(nodeName, 'completed', results[nodeName]);
       return;
     }
 
@@ -377,8 +393,9 @@ class MockOrchestrator {
       timestamp: Date.now() / 1000,
       required_skills: [],
       priority: 'normal',
-      metadata: {},
+      metadata: { status: 'completed', result: results[nodeName] },
     });
+    this.publishNodeStatus(nodeName, 'completed', results[nodeName]);
   }
 
   async execute(graph: TaskGraph): Promise<Record<string, unknown>> {
@@ -433,6 +450,7 @@ class MockOrchestrator {
       // 并行执行就绪节点
       const tasks = ready.map(async (nodeName) => {
         nodeStatus.set(nodeName, 'running');
+        this.publishNodeStatus(nodeName, 'running');
         const def = graph[nodeName];
         const variant = (def as TaskNodeDef & { variant?: string }).variant;
 
@@ -448,6 +466,7 @@ class MockOrchestrator {
           results[nodeName] = { status: 'approved', mock_hitl: true };
           nodeStatus.set(nodeName, 'completed');
           completed.add(nodeName);
+          this.publishNodeStatus(nodeName, 'completed', results[nodeName]);
           return;
         }
 
@@ -515,7 +534,9 @@ class MockOrchestrator {
         if (!success) {
           if (def.on_failure === 'abort') {
             nodeStatus.set(nodeName, 'failed');
+            ecm.metadata = { status: 'failed', result: error };
             this.bus.publish('node.failed', ecm);
+            this.publishNodeStatus(nodeName, 'failed', error);
             this.logCollector.addLog({
               workflow_id: 'mock',
               node_id: nodeName,
@@ -544,7 +565,9 @@ class MockOrchestrator {
 
         nodeStatus.set(nodeName, 'completed');
         completed.add(nodeName);
+        ecm.metadata = { status: 'completed', result: results[nodeName] };
         this.bus.publish('node.completed', ecm);
+        this.publishNodeStatus(nodeName, 'completed', results[nodeName]);
         this.logCollector.addLog({
           workflow_id: 'mock',
           node_id: nodeName,
@@ -1060,8 +1083,9 @@ export class MockEngine implements IEngine {
     // 监听事件以回调节点状态
     const handler = (ecm: ECM) => {
       if (ecm.intent && onNodeStatus) {
-        if (ecm.metadata?.status) {
-          onNodeStatus(ecm.intent, ecm.metadata.status as string);
+        const status = ecm.metadata?.status as string | undefined;
+        if (status) {
+          onNodeStatus(ecm.intent, status, ecm.metadata?.result);
         }
       }
     };

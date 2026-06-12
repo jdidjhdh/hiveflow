@@ -39,10 +39,40 @@ def reset_global_state():
         _variables.clear()
     except ImportError:
         pass
+    try:
+        from app.api.triggers_api import _triggers
+        _triggers.clear()
+    except ImportError:
+        pass
+    try:
+        from app.core.llm_settings import reset_llm_settings_store
+        reset_llm_settings_store()
+    except ImportError:
+        pass
+    try:
+        from app.api.credentials import _credentials_store
+        _credentials_store.clear()
+    except ImportError:
+        pass
     yield
     try:
         from app.api.variables_api import _variables
         _variables.clear()
+    except ImportError:
+        pass
+    try:
+        from app.api.triggers_api import _triggers
+        _triggers.clear()
+    except ImportError:
+        pass
+    try:
+        from app.core.llm_settings import reset_llm_settings_store
+        reset_llm_settings_store()
+    except ImportError:
+        pass
+    try:
+        from app.api.credentials import _credentials_store
+        _credentials_store.clear()
     except ImportError:
         pass
 
@@ -50,7 +80,6 @@ def reset_global_state():
 @pytest.fixture
 def client():
     """创建同步测试客户端（不触发 lifespan）"""
-    # 使用 TestClient 但不触发 lifespan
     return TestClient(app, raise_server_exceptions=False)
 
 

@@ -25,11 +25,13 @@ class VariableCreateRequest(BaseModel):
     value: Any
     var_type: str = "string"  # string, number, boolean, json, secret
     description: str = ""
+    scope: str = "global"
 
 
 class VariableUpdateRequest(BaseModel):
     value: Optional[Any] = None
     description: Optional[str] = None
+    scope: Optional[str] = None
 
 
 # ======================== Routes ========================
@@ -44,6 +46,7 @@ async def list_variables():
                 "value": "****" if v["var_type"] == "secret" else v["value"],
                 "var_type": v["var_type"],
                 "description": v["description"],
+                "scope": v.get("scope", "global"),
                 "created_at": v.get("created_at"),
             }
             for v in _variables.values()
@@ -63,9 +66,30 @@ async def create_variable(req: VariableCreateRequest):
         "value": req.value,
         "var_type": req.var_type,
         "description": req.description,
+        "scope": req.scope,
         "created_at": time.time(),
     }
     return {"name": req.name, "status": "created"}
+
+
+@router.get("/resolve")
+async def resolve_variables(expression: str):
+    """解析变量引用表达式（须在 /{var_name} 之前注册）"""
+    import re
+
+    def replace_var(match):
+        var_name = match.group(1)
+        var = _variables.get(var_name)
+        if var:
+            return str(var["value"])
+        return match.group(0)
+
+    resolved = re.sub(r'\$\{([^}]+)\}', replace_var, expression)
+    return {
+        "expression": expression,
+        "resolved": resolved,
+        "variables_found": re.findall(r'\$\{([^}]+)\}', expression),
+    }
 
 
 @router.get("/{var_name}")
@@ -74,11 +98,13 @@ async def get_variable(var_name: str):
     var = _variables.get(var_name)
     if not var:
         raise HTTPException(status_code=404, detail=f"Variable '{var_name}' not found")
+    value = "****" if var["var_type"] == "secret" else var["value"]
     return {
         "name": var["name"],
-        "value": var["value"],
+        "value": value,
         "var_type": var["var_type"],
         "description": var["description"],
+        "scope": var.get("scope", "global"),
     }
 
 
@@ -93,6 +119,8 @@ async def update_variable(var_name: str, req: VariableUpdateRequest):
         var["value"] = req.value
     if req.description is not None:
         var["description"] = req.description
+    if req.scope is not None:
+        var["scope"] = req.scope
 
     return {"name": var_name, "status": "updated"}
 
@@ -105,24 +133,3 @@ async def delete_variable(var_name: str):
 
     del _variables[var_name]
     return {"name": var_name, "status": "deleted"}
-
-
-@router.get("/resolve")
-async def resolve_variables(expression: str):
-    """解析变量引用表达式"""
-    import re
-
-    # Replace ${var_name} with actual values
-    def replace_var(match):
-        var_name = match.group(1)
-        var = _variables.get(var_name)
-        if var:
-            return str(var["value"])
-        return match.group(0)  # Keep original if not found
-
-    resolved = re.sub(r'\$\{([^}]+)\}', replace_var, expression)
-    return {
-        "expression": expression,
-        "resolved": resolved,
-        "variables_found": re.findall(r'\$\{([^}]+)\}', expression),
-    }

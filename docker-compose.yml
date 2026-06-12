@@ -47,8 +47,8 @@ services:
   # ==============================================
   studio:
     build:
-      context: ./packages/studio/backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: packages/studio/backend/Dockerfile
     ports:
       - "8000:8000"
     environment:
@@ -66,6 +66,7 @@ services:
         condition: service_healthy
     volumes:
       - ./packages/studio/backend:/app
+      - ./packages/core:/packages/core
       - ./packages/agent:/packages/agent
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 

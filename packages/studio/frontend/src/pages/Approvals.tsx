@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Card, List, Space, Tag, Typography, message, Input, Alert } from 'antd';
 import { CheckOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons';
-import { apiFetch } from '@/utils/api';
+import { apiFetch } from '@/api';
 import { useEngineStore } from '@/store/useEngineStore';
 import { useEventStore } from '@/store/useEventStore';
 import { useAgentRuntimeStore } from '@/store/useAgentRuntimeStore';
+import { useI18n } from '@/i18n';
 
 interface HITLGate {
   gate_id: string;
@@ -25,17 +26,8 @@ function getPlanFromContext(context?: Record<string, unknown>): unknown {
   return context?.plan;
 }
 
-function validatePlanJson(parsed: unknown): string | null {
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    return '计划必须是 JSON 对象';
-  }
-  if (!('final_answer' in (parsed as Record<string, unknown>))) {
-    return '计划必须包含 final_answer 节点';
-  }
-  return null;
-}
-
 export default function ApprovalsPage() {
+  const { t } = useI18n();
   const { mode } = useEngineStore();
   const events = useEventStore(s => s.events);
   const runtimeMode = useAgentRuntimeStore(s => s.runtimeMode);
@@ -43,6 +35,16 @@ export default function ApprovalsPage() {
   const [loading, setLoading] = useState(false);
   const [comments, setComments] = useState<Record<string, string>>({});
   const [planEdits, setPlanEdits] = useState<Record<string, string>>({});
+
+  const validatePlanJson = useCallback((parsed: unknown): string | null => {
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return t('pages.approvals.messages.planMustBeObject');
+    }
+    if (!('final_answer' in (parsed as Record<string, unknown>))) {
+      return t('pages.approvals.messages.planMustHaveFinalAnswer');
+    }
+    return null;
+  }, [t]);
 
   const loadPending = useCallback(async () => {
     if (mode !== 'real') {
@@ -96,7 +98,7 @@ export default function ApprovalsPage() {
         method: 'POST',
         body: JSON.stringify(body),
       });
-      message.success(approved ? '已批准' : '已拒绝');
+      message.success(approved ? t('pages.approvals.messages.approved') : t('pages.approvals.messages.rejected'));
       await loadPending();
     } catch (e) {
       message.error(String(e));
@@ -110,7 +112,7 @@ export default function ApprovalsPage() {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      message.error('计划 JSON 格式无效');
+      message.error(t('pages.approvals.messages.invalidPlanJson'));
       return;
     }
     const err = validatePlanJson(parsed);
@@ -130,18 +132,18 @@ export default function ApprovalsPage() {
     return (
       <Card>
         <Typography.Paragraph>
-          人工审批需要在<strong>真实模式</strong>下使用。请打开顶部开关连接后端引擎，并在工作流中加入「人工审批」节点。
+          {t('pages.approvals.realModeRequired')}
         </Typography.Paragraph>
       </Card>
     );
   }
 
   return (
-    <div>
+    <div data-testid="approvals-page">
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h3 style={{ margin: 0 }}>待审批任务</h3>
+        <h3 style={{ margin: 0 }}>{t('pages.approvals.title')}</h3>
         <Button icon={<ReloadOutlined />} onClick={loadPending} loading={loading}>
-          刷新
+          {t('pages.approvals.refresh')}
         </Button>
       </div>
 
@@ -150,14 +152,14 @@ export default function ApprovalsPage() {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Agent 计划审批需开启 Agent 模式，并设置环境变量 HIVEFLOW_PLAN_HITL=true"
+          message={t('pages.approvals.agentModeHint')}
         />
       )}
 
       <List
         loading={loading}
         dataSource={gates}
-        locale={{ emptyText: '暂无待审批项' }}
+        locale={{ emptyText: t('pages.approvals.empty') }}
         renderItem={(gate) => (
           <List.Item
             key={gate.gate_id}
@@ -168,7 +170,7 @@ export default function ApprovalsPage() {
                 icon={<CheckOutlined />}
                 onClick={() => (isPlanGate(gate) ? approvePlan(gate) : respond(gate.gate_id, true))}
               >
-                批准
+                {t('pages.approvals.approve')}
               </Button>,
               <Button
                 key="reject"
@@ -176,7 +178,7 @@ export default function ApprovalsPage() {
                 icon={<CloseOutlined />}
                 onClick={() => respond(gate.gate_id, false)}
               >
-                拒绝
+                {t('pages.approvals.reject')}
               </Button>,
             ]}
           >
@@ -185,24 +187,24 @@ export default function ApprovalsPage() {
                 <Space>
                   <span>{gate.prompt}</span>
                   <Tag>{gate.action}</Tag>
-                  {isPlanGate(gate) && <Tag color="purple">执行计划</Tag>}
+                  {isPlanGate(gate) && <Tag color="purple">{t('pages.approvals.planTag')}</Tag>}
                 </Space>
               }
               description={
                 <>
-                  <div>工作流: {gate.workflow_id} · 节点: {gate.node_id}</div>
+                  <div>{t('pages.approvals.workflowNode', { workflowId: gate.workflow_id, nodeId: gate.node_id })}</div>
                   {isPlanGate(gate) && (
                     <Input.TextArea
                       rows={12}
                       value={planEdits[gate.gate_id] || ''}
                       onChange={(e) => setPlanEdits(c => ({ ...c, [gate.gate_id]: e.target.value }))}
                       style={{ marginTop: 8, fontFamily: 'monospace', fontSize: 12 }}
-                      placeholder="执行计划 JSON（需含 final_answer 节点）"
+                      placeholder={t('pages.approvals.planPlaceholder')}
                     />
                   )}
                   <Input.TextArea
                     rows={2}
-                    placeholder="审批意见（可选）"
+                    placeholder={t('pages.approvals.commentPlaceholder')}
                     value={comments[gate.gate_id] || ''}
                     onChange={(e) => setComments((c) => ({ ...c, [gate.gate_id]: e.target.value }))}
                     style={{ marginTop: 8 }}

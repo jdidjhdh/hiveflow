@@ -4,12 +4,13 @@ import { PauseCircleOutlined, CaretRightOutlined, ClearOutlined, FilterOutlined 
 import { useEventStore } from '@/store/useEventStore';
 import { useEngineStore } from '@/store/useEngineStore';
 import { getWsManager } from '@/engine/ws/WsConnectionManager';
+import { useI18n } from '@/i18n';
 
 export default function EventsPage() {
+  const { t } = useI18n();
   const { events, paused, setPaused, clear, filters, setFilters, addEvent } = useEventStore();
   const engineMode = useEngineStore(s => s.mode);
 
-  // 真实模式下订阅 WebSocket 事件
   useEffect(() => {
     if (engineMode === 'real') {
       const wsManager = getWsManager();
@@ -37,7 +38,6 @@ export default function EventsPage() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* 工具栏 */}
       <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Space>
           <Button
@@ -45,37 +45,36 @@ export default function EventsPage() {
             onClick={() => setPaused(!paused)}
             type={paused ? 'primary' : 'default'}
           >
-            {paused ? '继续' : '暂停'}
+            {paused ? t('pages.events.resume') : t('pages.events.pause')}
           </Button>
-          <Button icon={<ClearOutlined />} onClick={clear}>清空</Button>
+          <Button icon={<ClearOutlined />} onClick={clear}>{t('pages.events.clear')}</Button>
         </Space>
         <Space>
           <FilterOutlined />
           <Select
             allowClear
-            placeholder="按主题过滤"
+            placeholder={t('pages.events.filterByTopic')}
             style={{ width: 200 }}
             value={filters.topic || undefined}
             onChange={(v) => setFilters({ topic: v })}
             options={topicOptions}
           />
           <Input
-            placeholder="按 Agent ID 过滤"
+            placeholder={t('pages.events.filterByAgent')}
             style={{ width: 200 }}
             value={filters.agent || ''}
             onChange={e => setFilters({ agent: e.target.value || undefined })}
           />
-          <Tag>{filteredEvents.length} / {events.length} 条</Tag>
-          {engineMode === 'real' && <Tag color="green">实时模式</Tag>}
+          <Tag>{t('pages.events.count', { filtered: filteredEvents.length, total: events.length })}</Tag>
+          {engineMode === 'real' && <Tag color="green">{t('pages.events.liveMode')}</Tag>}
         </Space>
       </div>
 
-      {/* 事件列表 */}
       <Card style={{ flex: 1, overflow: 'hidden' }} styles={{ body: { padding: 0, height: '100%' } }}>
         <div className="event-console" style={{ height: '100%' }}>
           {filteredEvents.length === 0 && (
             <div style={{ color: '#888', padding: 20 }}>
-              {paused ? '已暂停' : '暂无事件，执行工作流后将在此显示...'}
+              {paused ? t('pages.events.paused') : t('pages.events.noEvents')}
             </div>
           )}
           {filteredEvents.map((evt, i) => (

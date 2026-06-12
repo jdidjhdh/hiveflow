@@ -1,9 +1,12 @@
 site_name: HiveFlow
-site_description: Lightweight multi-agent orchestration engine with HITL, Studio, and MCP
+site_description: Lightweight multi-agent coordination & HITL layer with Studio and MCP
 site_url: https://hiveflow.github.io/hiveflow/
 repo_url: https://github.com/hiveflow/hiveflow
 repo_name: hiveflow/hiveflow
 edit_uri: edit/main/docs/
+
+exclude_docs: |
+  README.md
 
 theme:
   name: material
@@ -27,43 +30,7 @@ theme:
     - navigation.sections
     - content.code.copy
     - search.suggest
-
-nav:
-  - Home: index.md
-  - Getting Started: getting-started.md
-  - Concepts: concepts.md
-  - Architecture: architecture.md
-  - Cookbook:
-      - Overview: cookbook/index.md
-      - HITL Approval: cookbook/hitl-approval.md
-      - Multi-Agent Debate: cookbook/multi-agent-debate.md
-      - RAG + MCP: cookbook/rag-mcp-pipeline.md
-      - Studio Agent Mode: cookbook/studio-agent-mode.md
-      - Checkpoint Recovery: cookbook/checkpoint-recovery.md
-  - Studio:
-      - Agent Operations: studio-agent-ops.md
-  - Guides:
-      - Migrate from LangGraph: guides/migrate-from-langgraph.md
-  - Integrations:
-      - Overview: integrations/index.md
-      - LangGraph (PoC): integrations/langgraph.md
-      - OpenAI: integrations/openai.md
-      - Anthropic: integrations/anthropic.md
-      - Redis: integrations/redis.md
-      - PostgreSQL: integrations/postgres.md
-  - API:
-      - Auto-generated: api/index.md
-      - Manual reference: api-reference.md
-  - Observability: observability.md
-  - Deployment: deployment.md
-  - Versioning: versioning.md
-  - Benchmarks:
-      - Orchestration latency: benchmarks/orchestration-latency.md
-  - Case Studies:
-      - Regulated HITL review: case-studies/regulated-hitl-content-review.md
-  - Publishing (maintainers): publishing.md
-  - Roadmap: roadmap.md
-  - OSS Launch: oss-launch.md
+    - content.action.edit
 
 markdown_extensions:
   - admonition
@@ -81,6 +48,106 @@ markdown_extensions:
 
 plugins:
   - search
+  - i18n:
+      docs_structure: folder
+      fallback_to_default: true
+      reconfigure_material: true
+      languages:
+        - locale: en
+          default: true
+          name: English
+          build: true
+          site_name: HiveFlow
+          site_description: Multi-agent coordination & HITL layer with Studio and MCP
+          site_url: https://hiveflow.github.io/hiveflow/en/
+          nav:
+            - Home: index.md
+            - Getting Started: getting-started.md
+            - Concepts: concepts.md
+            - Architecture: architecture.md
+            - Modules:
+                - Overview: modules/index.md
+            - Cookbook:
+                - Overview: cookbook/index.md
+                - HITL Approval: cookbook/hitl-approval.md
+                - Multi-Agent Debate: cookbook/multi-agent-debate.md
+                - RAG + MCP: cookbook/rag-mcp-pipeline.md
+                - Studio Agent Mode: cookbook/studio-agent-mode.md
+                - Checkpoint Recovery: cookbook/checkpoint-recovery.md
+                - LangGraph Sidecar: cookbook/langgraph-sidecar.md
+            - Studio:
+                - Agent Operations: studio-agent-ops.md
+            - Guides:
+                - Migrate from LangGraph: guides/migrate-from-langgraph.md
+            - Integrations:
+                - Overview: integrations/index.md
+                - LangGraph (PoC): integrations/langgraph.md
+                - OpenAI: integrations/openai.md
+                - Anthropic: integrations/anthropic.md
+                - Redis: integrations/redis.md
+                - PostgreSQL: integrations/postgres.md
+            - API:
+                - Auto-generated: api/index.md
+                - Manual reference: api-reference.md
+            - Observability: observability.md
+            - Deployment: deployment.md
+            - Versioning: versioning.md
+            - Quality Gates: quality-gates.md
+            - Benchmarks:
+                - Orchestration latency: benchmarks/orchestration-latency.md
+            - Case Studies:
+                - Regulated HITL review: case-studies/regulated-hitl-content-review.md
+            - Publishing (maintainers): publishing.md
+            - Roadmap: roadmap.md
+            - OSS Launch: oss-launch.md
+            - Doc i18n: i18n.md
+        - locale: zh
+          name: 简体中文
+          build: true
+          site_name: HiveFlow
+          site_description: 多 Agent 协调与 HITL 层，含 Studio 与 MCP
+          site_url: https://hiveflow.github.io/hiveflow/zh/
+          nav:
+            - 首页: index.md
+            - 快速开始: getting-started.md
+            - 核心概念: concepts.md
+            - 架构: architecture.md
+            - 模块:
+                - 概览: modules/index.md
+            - 实践指南:
+                - 概览: cookbook/index.md
+                - HITL 审批: cookbook/hitl-approval.md
+                - 多 Agent 辩论: cookbook/multi-agent-debate.md
+                - RAG + MCP: cookbook/rag-mcp-pipeline.md
+                - Studio Agent 模式: cookbook/studio-agent-mode.md
+                - Checkpoint 恢复: cookbook/checkpoint-recovery.md
+                - LangGraph Sidecar: cookbook/langgraph-sidecar.md
+            - Studio:
+                - Agent 运维: studio-agent-ops.md
+            - 指南:
+                - 从 LangGraph 迁移: guides/migrate-from-langgraph.md
+            - 集成:
+                - 概览: integrations/index.md
+                - LangGraph（PoC）: integrations/langgraph.md
+                - OpenAI: integrations/openai.md
+                - Anthropic: integrations/anthropic.md
+                - Redis: integrations/redis.md
+                - PostgreSQL: integrations/postgres.md
+            - API:
+                - 自动生成: api/index.md
+                - 手册参考: api-reference.md
+            - 可观测性: observability.md
+            - 部署: deployment.md
+            - 版本策略: versioning.md
+            - 质量门禁: quality-gates.md
+            - 基准测试:
+                - 编排延迟: benchmarks/orchestration-latency.md
+            - 案例研究:
+                - 合规 HITL 内容审核: case-studies/regulated-hitl-content-review.md
+            - 发布（维护者）: publishing.md
+            - 路线图: roadmap.md
+            - 开源上线: oss-launch.md
+            - 文档国际化: i18n.md
   - mkdocstrings:
       handlers:
         python:

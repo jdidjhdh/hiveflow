@@ -23,6 +23,10 @@ var/
 wheels/
 *.egg-info/
 *.egg
+packages/core/dist/
+packages/core/build/
+packages/agent/dist/
+packages/agent/build/
 
 # Virtual environments
 .venv/
@@ -41,7 +45,8 @@ env/
 .pytest_cache/
 .coverage
 htmlcov/
-.xml
+coverage.xml
+**/coverage.xml
 .hypothesis/
 
 # Ruff
@@ -78,10 +83,14 @@ packages/studio/frontend/.next/
 # Database
 *.sqlite3
 *.db
+packages/studio/backend/data/*
+!packages/studio/backend/data/.gitkeep
 
 # Logs
 *.log
 logs/
+.debug/
+debug-*.log
 
 # MkDocs build output (CI generates)
 /site/
@@ -90,7 +99,10 @@ logs/
 packages/studio/frontend/tsconfig.tsbuildinfo
 packages/studio/frontend/playwright-report/
 packages/studio/frontend/test-results/
+packages/studio/frontend/coverage/
 packages/studio/frontend/dist-app/
+packages/studio/frontend/eslint-report.json
+packages/studio/frontend/eslint-warnings.txt
 
 # Internal planning notes (do not commit)
 OPTIMIZATION_SUMMARY.md

@@ -36,6 +36,15 @@ async def test_workflow_trend_buckets(engine):
     assert "executions" in trend[0]
 
 
+@pytest.mark.asyncio
+async def test_workflow_trend_avg_duration(engine):
+    engine.record_node_execution("summarize", 200.0, "i1")
+    engine.record_node_execution("summarize", 100.0, "i2")
+    trend = engine.get_workflow_trend(days=7)
+    today = trend[-1]
+    assert today["avg_duration"] == 150
+
+
 class TestAnalyticsHTTP:
     def test_nodes_duration_endpoint(self, client, initialized_engine):
         resp = client.get("/api/analytics/nodes/duration")

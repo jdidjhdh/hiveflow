@@ -14,7 +14,12 @@ export default defineConfig({
     },
   },
   server: {
+    host: '127.0.0.1',
     port: 3000,
+    watch: {
+      // test:coverage generates thousands of HTML files; watching them OOMs dev server
+      ignored: ['**/coverage/**'],
+    },
     proxy: {
       '/api': 'http://127.0.0.1:8000',
       '/ws': {
@@ -25,6 +30,14 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          reactflow: ['reactflow'],
+          echarts: ['echarts', 'echarts-for-react'],
+        },
+      },
+    },
   },
   base: './',
 });

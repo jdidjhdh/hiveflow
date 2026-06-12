@@ -11,6 +11,8 @@ import type { ColumnsType } from 'antd/es/table';
 import type { KnowledgeBase, DocumentDef } from '@/types';
 import { useKnowledgeBaseStore } from '@/store/useKnowledgeBaseStore';
 import { useEngineStore } from '@/store/useEngineStore';
+import PageMaturityNotice from '@/components/PageMaturityNotice';
+import { useI18n } from '@/i18n';
 
 const { Dragger } = Upload;
 
@@ -26,6 +28,7 @@ function KnowledgeBaseCard({
   onDelete: (id: string) => void;
   onSelect: (kb: KnowledgeBase) => void;
 }) {
+  const { t } = useI18n();
   const docCount = kb.documents.length;
   const completedDocs = kb.documents.filter((d) => d.status === 'completed').length;
   const processingDocs = kb.documents.filter((d) => d.status === 'processing').length;
@@ -37,15 +40,15 @@ function KnowledgeBaseCard({
       onClick={() => onSelect(kb)}
       actions={[
         <Button type="link" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); onEdit(kb); }}>
-          编辑
+          {t('pages.knowledgeBase.card.edit')}
         </Button>,
         <Popconfirm
-          title="确定删除此知识库？"
+          title={t('pages.knowledgeBase.card.confirmDelete')}
           onConfirm={(e) => { if (e) { e.stopPropagation(); onDelete(kb.id); } }}
           onCancel={(e) => e?.stopPropagation()}
         >
           <Button type="link" danger icon={<DeleteOutlined />} onClick={(e) => e.stopPropagation()}>
-            删除
+            {t('pages.knowledgeBase.card.delete')}
           </Button>
         </Popconfirm>,
       ]}
@@ -55,20 +58,20 @@ function KnowledgeBaseCard({
         title={kb.name}
         description={
           <div>
-            <p style={{ color: '#888', margin: '8px 0' }}>{kb.description || '暂无描述'}</p>
+            <p style={{ color: '#888', margin: '8px 0' }}>{kb.description || t('pages.knowledgeBase.card.noDescription')}</p>
             <Space direction="vertical" size={4}>
               <Space>
                 <FileTextOutlined />
-                <span>{docCount} 个文档（{completedDocs} 已完成）</span>
+                <span>{t('pages.knowledgeBase.card.docCount', { count: docCount, completed: completedDocs })}</span>
               </Space>
               {processingDocs > 0 && (
                 <Tag color="processing">
-                  {processingDocs} 个文档处理中
+                  {t('pages.knowledgeBase.card.processing', { count: processingDocs })}
                 </Tag>
               )}
               <Space>
                 <span style={{ fontSize: 12, color: '#888' }}>
-                  切片: {kb.chunk_size} / 重叠: {kb.chunk_overlap}
+                  {t('pages.knowledgeBase.card.chunkInfo', { size: kb.chunk_size, overlap: kb.chunk_overlap })}
                 </span>
               </Space>
             </Space>
@@ -81,6 +84,7 @@ function KnowledgeBaseCard({
 
 // ========== 知识库详情 ==========
 function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
+  const { t } = useI18n();
   const {
     addDocument, removeDocument, updateChunkConfig,
     startEmbedding, searchDocuments,
@@ -98,7 +102,7 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
 
     if (!allowedTypes.includes(ext)) {
-      message.error(`不支持的文件类型：${ext}`);
+      message.error(t('pages.knowledgeBase.messages.unsupportedFileType', { ext }));
       setUploading(false);
       return false;
     }
@@ -111,19 +115,19 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
       status: 'pending',
     });
 
-    message.success(`文件 ${file.name} 已上传`);
+    message.success(t('pages.knowledgeBase.messages.fileUploaded', { name: file.name }));
     setUploading(false);
     return false; // Prevent default upload
   };
 
   const handleStartEmbedding = () => {
     startEmbedding(kb.id);
-    message.info('开始向量化处理...');
+    message.info(t('pages.knowledgeBase.messages.embeddingStarted'));
   };
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
-      message.warning('请输入搜索内容');
+      message.warning(t('pages.knowledgeBase.detail.search.enterContent'));
       return;
     }
     const results = await searchDocuments(kb.id, searchQuery);
@@ -132,12 +136,12 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
 
   const handleSaveChunkConfig = () => {
     updateChunkConfig(kb.id, chunkSize, chunkOverlap);
-    message.success('切片配置已保存');
+    message.success(t('pages.knowledgeBase.messages.chunkConfigSaved'));
   };
 
   const docColumns: ColumnsType<DocumentDef> = [
     {
-      title: '文件名',
+      title: t('pages.knowledgeBase.detail.columns.fileName'),
       dataIndex: 'name',
       key: 'name',
       render: (text) => (
@@ -148,21 +152,21 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
       ),
     },
     {
-      title: '类型',
+      title: t('pages.knowledgeBase.detail.columns.type'),
       dataIndex: 'type',
       key: 'type',
       width: 80,
       render: (text) => <Tag>{text}</Tag>,
     },
     {
-      title: '大小',
+      title: t('pages.knowledgeBase.detail.columns.size'),
       dataIndex: 'size',
       key: 'size',
       width: 100,
       render: (size: number) => `${(size / 1024).toFixed(1)} KB`,
     },
     {
-      title: '状态',
+      title: t('pages.knowledgeBase.detail.columns.status'),
       dataIndex: 'status',
       key: 'status',
       width: 120,
@@ -173,33 +177,33 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
           completed: 'success',
           failed: 'error',
         };
-        const labels: Record<string, string> = {
-          pending: '待处理',
-          processing: '处理中',
-          completed: '已完成',
-          failed: '失败',
+        const labelKeys: Record<DocumentDef['status'], 'pages.knowledgeBase.detail.docStatus.pending' | 'pages.knowledgeBase.detail.docStatus.processing' | 'pages.knowledgeBase.detail.docStatus.completed' | 'pages.knowledgeBase.detail.docStatus.failed'> = {
+          pending: 'pages.knowledgeBase.detail.docStatus.pending',
+          processing: 'pages.knowledgeBase.detail.docStatus.processing',
+          completed: 'pages.knowledgeBase.detail.docStatus.completed',
+          failed: 'pages.knowledgeBase.detail.docStatus.failed',
         };
-        return <Tag color={colors[status]}>{labels[status]}</Tag>;
+        return <Tag color={colors[status]}>{t(labelKeys[status])}</Tag>;
       },
     },
     {
-      title: '切片数',
+      title: t('pages.knowledgeBase.detail.columns.chunks'),
       dataIndex: 'chunks_count',
       key: 'chunks_count',
       width: 80,
       render: (count?: number) => count ?? '-',
     },
     {
-      title: '操作',
+      title: t('pages.knowledgeBase.detail.columns.actions'),
       key: 'action',
       width: 100,
       render: (_, record) => (
         <Popconfirm
-          title="确定删除此文档？"
+          title={t('pages.knowledgeBase.detail.confirmDeleteDoc')}
           onConfirm={() => removeDocument(kb.id, record.id)}
         >
           <Button type="link" danger size="small" icon={<DeleteOutlined />}>
-            删除
+            {t('pages.knowledgeBase.detail.delete')}
           </Button>
         </Popconfirm>
       ),
@@ -216,7 +220,7 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
       }
       extra={
         <Button onClick={() => window.history.back()}>
-          返回列表
+          {t('pages.knowledgeBase.detail.backToList')}
         </Button>
       }
     >
@@ -226,7 +230,7 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
         items={[
           {
             key: 'documents',
-            label: '文档管理',
+            label: t('pages.knowledgeBase.detail.tabs.documents'),
             children: (
               <div>
                 <div style={{ marginBottom: 16 }}>
@@ -239,8 +243,8 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
                     <p className="ant-upload-drag-icon">
                       <UploadOutlined />
                     </p>
-                    <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-                    <p className="ant-upload-hint">支持 .txt / .md / .pdf / .docx 格式</p>
+                    <p className="ant-upload-text">{t('pages.knowledgeBase.detail.upload.hint')}</p>
+                    <p className="ant-upload-hint">{t('pages.knowledgeBase.detail.upload.formats')}</p>
                   </Dragger>
                 </div>
 
@@ -251,10 +255,10 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
                     onClick={handleStartEmbedding}
                     disabled={kb.documents.every((d) => d.status !== 'pending')}
                   >
-                    开始向量化
+                    {t('pages.knowledgeBase.detail.startEmbedding')}
                   </Button>
                   <Tag color="blue">
-                    向量化模型: {kb.embedding_model}
+                    {t('pages.knowledgeBase.detail.embeddingModel', { model: kb.embedding_model })}
                   </Tag>
                 </Space>
 
@@ -263,18 +267,18 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
                   dataSource={kb.documents}
                   rowKey="id"
                   pagination={{ pageSize: 10 }}
-                  locale={{ emptyText: <Empty description="暂无文档" /> }}
+                  locale={{ emptyText: <Empty description={t('pages.knowledgeBase.detail.noDocuments')} /> }}
                 />
               </div>
             ),
           },
           {
             key: 'chunking',
-            label: '切片配置',
+            label: t('pages.knowledgeBase.detail.tabs.chunking'),
             children: (
               <Card size="small" style={{ maxWidth: 600 }}>
                 <Form layout="vertical">
-                  <Form.Item label="切片大小 (Chunk Size)">
+                  <Form.Item label={t('pages.knowledgeBase.detail.chunk.size')}>
                     <Input
                       type="number"
                       value={chunkSize}
@@ -284,7 +288,7 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
                       addonAfter="tokens"
                     />
                   </Form.Item>
-                  <Form.Item label="重叠大小 (Overlap)">
+                  <Form.Item label={t('pages.knowledgeBase.detail.chunk.overlap')}>
                     <Input
                       type="number"
                       value={chunkOverlap}
@@ -295,14 +299,14 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
                     />
                   </Form.Item>
                   <Alert
-                    message="提示"
-                    description="较大的切片大小会保留更多上下文，但可能降低检索精度。重叠部分有助于保持语义连贯性。"
+                    message={t('pages.knowledgeBase.detail.chunk.hintTitle')}
+                    description={t('pages.knowledgeBase.detail.chunk.hintDesc')}
                     type="info"
                     showIcon
                     style={{ marginBottom: 16 }}
                   />
                   <Button type="primary" onClick={handleSaveChunkConfig}>
-                    保存配置
+                    {t('pages.knowledgeBase.detail.chunk.save')}
                   </Button>
                 </Form>
               </Card>
@@ -310,12 +314,12 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
           },
           {
             key: 'search',
-            label: '检索测试',
+            label: t('pages.knowledgeBase.detail.tabs.search'),
             children: (
               <div>
                 <Space style={{ marginBottom: 16 }} size="middle">
                   <Input
-                    placeholder="输入检索内容..."
+                    placeholder={t('pages.knowledgeBase.detail.search.placeholder')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onPressEnter={handleSearch}
@@ -323,13 +327,13 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
                     allowClear
                   />
                   <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-                    检索
+                    {t('pages.knowledgeBase.detail.search.search')}
                   </Button>
                 </Space>
 
                 {searchResults.length > 0 && (
                   <div>
-                    <Divider orientation="left">检索结果 ({searchResults.length})</Divider>
+                    <Divider orientation="left">{t('pages.knowledgeBase.detail.search.results', { count: searchResults.length })}</Divider>
                     {searchResults.map((result, index) => (
                       <Card
                         key={index}
@@ -337,7 +341,7 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
                         style={{ marginBottom: 12 }}
                         extra={
                           <Tag color={result.score > 0.8 ? 'green' : result.score > 0.5 ? 'orange' : 'default'}>
-                            相似度: {(result.score * 100).toFixed(1)}%
+                            {t('pages.knowledgeBase.detail.search.similarity', { percent: (result.score * 100).toFixed(1) })}
                           </Tag>
                         }
                       >
@@ -351,12 +355,12 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
                 )}
 
                 {searchResults.length === 0 && searchQuery && (
-                  <Empty description="未找到相关结果" />
+                  <Empty description={t('pages.knowledgeBase.detail.search.noResults')} />
                 )}
 
                 {!searchQuery && (
                   <Empty
-                    description="输入内容开始测试向量检索"
+                    description={t('pages.knowledgeBase.detail.search.startHint')}
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
                   />
                 )}
@@ -371,6 +375,7 @@ function KnowledgeBaseDetail({ kb }: { kb: KnowledgeBase }) {
 
 // ========== 主页面 ==========
 export default function KnowledgeBasePage() {
+  const { t } = useI18n();
   const {
     knowledgeBases, selectedKbId, createKnowledgeBase,
     updateKnowledgeBase, deleteKnowledgeBase, selectKnowledgeBase,
@@ -414,17 +419,17 @@ export default function KnowledgeBasePage() {
 
   const handleDelete = (id: string) => {
     deleteKnowledgeBase(id);
-    message.success('知识库已删除');
+    message.success(t('pages.knowledgeBase.messages.deleted'));
   };
 
   const handleModalOk = async () => {
     const values = await form.validateFields();
     if (editingKb) {
       updateKnowledgeBase(editingKb.id, values);
-      message.success('知识库已更新');
+      message.success(t('pages.knowledgeBase.messages.updated'));
     } else {
       await createKnowledgeBase(values);
-      message.success('知识库已创建');
+      message.success(t('pages.knowledgeBase.messages.created'));
     }
     setModalVisible(false);
   };
@@ -439,11 +444,12 @@ export default function KnowledgeBasePage() {
 
   return (
     <div>
+      <PageMaturityNotice pageKey="knowledge" />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h3 style={{ margin: 0 }}>知识库管理</h3>
+        <h3 style={{ margin: 0 }}>{t('pages.knowledgeBase.title')}</h3>
         <Space>
           <Input
-            placeholder="搜索知识库..."
+            placeholder={t('pages.knowledgeBase.searchPlaceholder')}
             prefix={<SearchOutlined />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
@@ -451,19 +457,19 @@ export default function KnowledgeBasePage() {
             allowClear
           />
           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            新建知识库
+            {t('pages.knowledgeBase.create')}
           </Button>
         </Space>
       </div>
 
       {filteredKbs.length === 0 ? (
         <Empty
-          description={searchText ? '未找到匹配的知识库' : '暂无知识库，点击上方按钮创建'}
+          description={searchText ? t('pages.knowledgeBase.emptySearch') : t('pages.knowledgeBase.empty')}
           image={Empty.PRESENTED_IMAGE_SIMPLE}
         >
           {!searchText && (
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              创建第一个知识库
+              {t('pages.knowledgeBase.createFirst')}
             </Button>
           )}
         </Empty>
@@ -483,7 +489,7 @@ export default function KnowledgeBasePage() {
       )}
 
       <Modal
-        title={editingKb ? '编辑知识库' : '新建知识库'}
+        title={editingKb ? t('pages.knowledgeBase.modal.editTitle') : t('pages.knowledgeBase.modal.createTitle')}
         open={modalVisible}
         onOk={handleModalOk}
         onCancel={() => setModalVisible(false)}
@@ -492,15 +498,15 @@ export default function KnowledgeBasePage() {
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
             name="name"
-            label="知识库名称"
-            rules={[{ required: true, message: '请输入知识库名称' }]}
+            label={t('pages.knowledgeBase.form.name')}
+            rules={[{ required: true, message: t('pages.knowledgeBase.form.nameRequired') }]}
           >
-            <Input placeholder="例如：产品文档知识库" />
+            <Input placeholder={t('pages.knowledgeBase.form.namePlaceholder')} />
           </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={3} placeholder="描述此知识库的用途" />
+          <Form.Item name="description" label={t('pages.knowledgeBase.form.description')}>
+            <Input.TextArea rows={3} placeholder={t('pages.knowledgeBase.form.descriptionPlaceholder')} />
           </Form.Item>
-          <Form.Item name="embedding_model" label="向量化模型">
+          <Form.Item name="embedding_model" label={t('pages.knowledgeBase.form.embeddingModel')}>
             <Select
               options={[
                 { value: 'text-embedding-ada-002', label: 'OpenAI Ada-002' },

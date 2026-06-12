@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { AnalyticsData, AnalyticsSummary, ExecutionTrend, NodeDurationRank, AgentLoadDist, ErrorTypeStat } from '@/types';
 import { useEngineStore } from '@/store/useEngineStore';
-import { apiFetch } from '@/utils/api';
+import { apiFetch } from '@/api';
 
 interface AnalyticsState {
   data: AnalyticsData | null;

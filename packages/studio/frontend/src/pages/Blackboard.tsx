@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect } from 'react';
 import { Card, Table, Input, Tag, Empty, Button, Modal, message, Row, Col } from 'antd';
 import { DatabaseOutlined, SearchOutlined, EyeOutlined, EditOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useEngineStore } from '@/store/useEngineStore';
-import { apiFetch } from '@/utils/api';
+import { apiFetch } from '@/api';
+import { useI18n } from '@/i18n';
 
 interface KeyRow {
   key: string;
@@ -17,6 +18,7 @@ interface AuditEntry {
 }
 
 export default function BlackboardPage() {
+  const { t } = useI18n();
   const engineMode = useEngineStore(s => s.mode);
   const engine = useEngineStore().getEngine();
   const [keys, setKeys] = useState<KeyRow[]>(() =>
@@ -95,9 +97,9 @@ export default function BlackboardPage() {
       setSelectedValue(parsed);
       await refresh();
       setEditModal(false);
-      message.success('值已更新');
+      message.success(t('pages.blackboard.messages.valueUpdated'));
     } catch {
-      message.error('无效的 JSON');
+      message.error(t('pages.blackboard.messages.invalidJson'));
     }
   };
 
@@ -105,7 +107,7 @@ export default function BlackboardPage() {
     <Row gutter={[16, 16]} style={{ height: '100%' }}>
       <Col xs={24} sm={24} md={8} lg={7} xl={6}>
         <Card
-          title="黑板键列表"
+          title={t('pages.blackboard.keyList')}
           size="small"
           loading={loading}
           extra={
@@ -113,7 +115,7 @@ export default function BlackboardPage() {
           }
         >
           <Input
-            placeholder="搜索键名"
+            placeholder={t('pages.blackboard.searchKey')}
             prefix={<SearchOutlined />}
             size="small"
             value={search}
@@ -121,7 +123,7 @@ export default function BlackboardPage() {
             style={{ width: '100%', marginBottom: 8 }}
           />
           {filteredKeys.length === 0 ? (
-            <Empty description="暂无数据" />
+            <Empty description={t('pages.blackboard.noData')} />
           ) : (
             <div style={{ maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
               {filteredKeys.map(k => (
@@ -153,19 +155,19 @@ export default function BlackboardPage() {
 
       <Col xs={24} sm={24} md={16} lg={17} xl={18} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Card
-          title={selectedKey ? `值: ${selectedKey}` : '选择一个键查看'}
+          title={selectedKey ? t('pages.blackboard.valueTitle', { key: selectedKey }) : t('pages.blackboard.selectKey')}
           size="small"
           extra={
             selectedKey && (
               <Button icon={<EditOutlined />} size="small" onClick={() => {
                 setEditValue(JSON.stringify(selectedValue, null, 2));
                 setEditModal(true);
-              }}>编辑</Button>
+              }}>{t('pages.blackboard.edit')}</Button>
             )
           }
         >
           {!selectedKey ? (
-            <Empty description="请选择左侧键名" />
+            <Empty description={t('pages.blackboard.selectKeyHint')} />
           ) : (
             <pre style={{
               background: '#1e1e1e',
@@ -182,45 +184,45 @@ export default function BlackboardPage() {
         </Card>
 
         {permissions && (
-          <Card title="权限信息" size="small">
+          <Card title={t('pages.blackboard.permissions')} size="small">
             <p>
-              <EyeOutlined style={{ color: '#1890ff' }} /> 可读 Agent:{' '}
+              <EyeOutlined style={{ color: '#1890ff' }} /> {t('pages.blackboard.readableAgents')}{' '}
               {permissions.readers.length > 0
                 ? permissions.readers.map(a => <Tag key={a} color="blue">{a}</Tag>)
-                : '无'}
+                : t('pages.blackboard.none')}
             </p>
             <p>
-              <EditOutlined style={{ color: '#52c41a' }} /> 可写 Agent:{' '}
+              <EditOutlined style={{ color: '#52c41a' }} /> {t('pages.blackboard.writableAgents')}{' '}
               {permissions.writers.length > 0
                 ? permissions.writers.map(a => <Tag key={a} color="green">{a}</Tag>)
-                : '无'}
+                : t('pages.blackboard.none')}
             </p>
           </Card>
         )}
 
-        <Card title="审计日志" size="small" extra={
-          engineMode === 'real' ? <Tag color="green">真实 audit</Tag> : <Tag>模拟</Tag>
+        <Card title={t('pages.blackboard.auditLog')} size="small" extra={
+          engineMode === 'real' ? <Tag color="green">{t('pages.blackboard.realAudit')}</Tag> : <Tag>{t('pages.blackboard.mockAudit')}</Tag>
         }>
           <Table
             dataSource={auditLog.slice(-50)}
             rowKey={(r, i) => `${r.agent}-${r.action}-${r.key}-${r.timestamp}-${i}`}
             size="small"
-            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: t => `共 ${t} 条记录` }}
+            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => t('pages.blackboard.totalRecords', { count: total }) }}
             scroll={{ x: 600 }}
             columns={[
               {
-                title: '时间', dataIndex: 'timestamp', width: 150,
-                render: (t: number) => new Date(t * 1000).toLocaleTimeString(),
+                title: t('pages.blackboard.columns.time'), dataIndex: 'timestamp', width: 150,
+                render: (ts: number) => new Date(ts * 1000).toLocaleTimeString(),
               },
-              { title: '操作', dataIndex: 'action', width: 80, render: (a: string) => <Tag>{a}</Tag> },
-              { title: 'Agent', dataIndex: 'agent', ellipsis: true },
-              { title: '键', dataIndex: 'key', ellipsis: true },
+              { title: t('pages.blackboard.columns.action'), dataIndex: 'action', width: 80, render: (a: string) => <Tag>{a}</Tag> },
+              { title: t('pages.blackboard.columns.agent'), dataIndex: 'agent', ellipsis: true },
+              { title: t('pages.blackboard.columns.key'), dataIndex: 'key', ellipsis: true },
             ]}
           />
         </Card>
 
         <Modal
-          title={`编辑: ${selectedKey}`}
+          title={t('pages.blackboard.editModal', { key: selectedKey ?? '' })}
           open={editModal}
           onOk={handleEdit}
           onCancel={() => setEditModal(false)}

@@ -18,6 +18,8 @@ import {
   ThunderboltOutlined, DiffOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import PageMaturityNotice from '@/components/PageMaturityNotice';
+import { useI18n } from '@/i18n';
 
 const { Title, Text } = Typography;
 
@@ -135,6 +137,7 @@ const mockExperiments: Experiment[] = [
 // ======================== Main Component ========================
 
 export default function ABTestingPage() {
+  const { t } = useI18n();
   const [experiments, setExperiments] = useState<Experiment[]>(mockExperiments);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null);
@@ -182,19 +185,19 @@ export default function ABTestingPage() {
 
       setExperiments((prev) => [newExperiment, ...prev]);
       setModalOpen(false);
-      message.success('实验已创建');
+      message.success(t('pages.abTesting.messages.created'));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg !== 'validateFields') {
-        message.error('创建失败');
+        message.error(t('pages.abTesting.messages.createFailed'));
       }
     }
-  }, [form]);
+  }, [form, t]);
 
   // ======================== Run Experiment (Mock) ========================
 
   const handleRun = useCallback(async (experiment: Experiment) => {
-    message.loading({ content: '正在运行实验...', key: 'running', duration: 0 });
+    message.loading({ content: t('pages.abTesting.messages.running'), key: 'running', duration: 0 });
 
     // Simulate running the experiment
     await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -202,6 +205,12 @@ export default function ABTestingPage() {
     const scoreA = 0.6 + Math.random() * 0.35;
     const scoreB = 0.6 + Math.random() * 0.35;
     const winner = scoreA > scoreB ? 'A' as const : scoreB > scoreA ? 'B' as const : 'tie' as const;
+
+    const perfLevel = (score: number) => {
+      if (score > 0.8) return t('pages.abTesting.results.performance.excellent');
+      if (score > 0.6) return t('pages.abTesting.results.performance.good');
+      return t('pages.abTesting.results.performance.fair');
+    };
 
     const updated: Experiment = {
       ...experiment,
@@ -220,8 +229,16 @@ export default function ABTestingPage() {
             name: c.name,
             score_a: Math.round(sa * 100) / 100,
             score_b: Math.round(sb * 100) / 100,
-            reason_a: `Agent A 在${c.description}方面表现${sa > 0.8 ? '优秀' : sa > 0.6 ? '良好' : '一般'}`,
-            reason_b: `Agent B 在${c.description}方面表现${sb > 0.8 ? '优秀' : sb > 0.6 ? '良好' : '一般'}`,
+            reason_a: t('pages.abTesting.results.reasonTemplate', {
+              agent: 'A',
+              description: c.description,
+              level: perfLevel(sa),
+            }),
+            reason_b: t('pages.abTesting.results.reasonTemplate', {
+              agent: 'B',
+              description: c.description,
+              level: perfLevel(sb),
+            }),
             winner: sa > sb ? 'A' as const : sb > sa ? 'B' as const : 'tie' as const,
           };
         }),
@@ -231,15 +248,15 @@ export default function ABTestingPage() {
     };
 
     setExperiments((prev) => prev.map((e) => (e.id === experiment.id ? updated : e)));
-    message.success({ content: '实验完成！', key: 'running' });
-  }, []);
+    message.success({ content: t('pages.abTesting.messages.completed'), key: 'running' });
+  }, [t]);
 
   // ======================== Delete Experiment ========================
 
   const handleDelete = useCallback((experiment: Experiment) => {
     setExperiments((prev) => prev.filter((e) => e.id !== experiment.id));
-    message.success('实验已删除');
-  }, []);
+    message.success(t('pages.abTesting.messages.deleted'));
+  }, [t]);
 
   // ======================== View Results ========================
 
@@ -252,7 +269,7 @@ export default function ABTestingPage() {
 
   const columns: ColumnsType<Experiment> = [
     {
-      title: '实验名称',
+      title: t('pages.abTesting.columns.name'),
       dataIndex: 'name',
       key: 'name',
       width: 250,
@@ -264,31 +281,31 @@ export default function ABTestingPage() {
       ),
     },
     {
-      title: '配置 A',
+      title: t('pages.abTesting.columns.configA'),
       key: 'config_a',
       width: 200,
       render: (_: unknown, record: Experiment) => (
         <Space direction="vertical" size={0}>
           <Tag color="blue">{record.config_a.name}</Tag>
-          <Text style={{ fontSize: 12 }}>模型: {record.config_a.model}</Text>
-          <Text style={{ fontSize: 12 }}>温度: {record.config_a.temperature}</Text>
+          <Text style={{ fontSize: 12 }}>{t('pages.abTesting.config.model', { model: record.config_a.model })}</Text>
+          <Text style={{ fontSize: 12 }}>{t('pages.abTesting.config.temperature', { temperature: record.config_a.temperature })}</Text>
         </Space>
       ),
     },
     {
-      title: '配置 B',
+      title: t('pages.abTesting.columns.configB'),
       key: 'config_b',
       width: 200,
       render: (_: unknown, record: Experiment) => (
         <Space direction="vertical" size={0}>
           <Tag color="green">{record.config_b.name}</Tag>
-          <Text style={{ fontSize: 12 }}>模型: {record.config_b.model}</Text>
-          <Text style={{ fontSize: 12 }}>温度: {record.config_b.temperature}</Text>
+          <Text style={{ fontSize: 12 }}>{t('pages.abTesting.config.model', { model: record.config_b.model })}</Text>
+          <Text style={{ fontSize: 12 }}>{t('pages.abTesting.config.temperature', { temperature: record.config_b.temperature })}</Text>
         </Space>
       ),
     },
     {
-      title: '评估指标',
+      title: t('pages.abTesting.columns.criteria'),
       key: 'criteria',
       width: 150,
       render: (_: unknown, record: Experiment) => (
@@ -300,11 +317,11 @@ export default function ABTestingPage() {
       ),
     },
     {
-      title: '结果',
+      title: t('pages.abTesting.columns.result'),
       key: 'result',
       width: 180,
       render: (_: unknown, record: Experiment) => {
-        if (!record.results) return <Text type="secondary">未运行</Text>;
+        if (!record.results) return <Text type="secondary">{t('pages.abTesting.result.notRun')}</Text>;
         const { winner, score_a, score_b } = record.results;
         return (
           <Space direction="vertical" size={2}>
@@ -313,7 +330,7 @@ export default function ABTestingPage() {
               {winner === 'B' && <TrophyOutlined style={{ color: '#52c41a' }} />}
               {winner === 'tie' && <DiffOutlined style={{ color: '#faad14' }} />}
               <Text strong>
-                {winner === 'A' ? 'A 胜出' : winner === 'B' ? 'B 胜出' : '平局'}
+                {winner === 'A' ? t('pages.abTesting.result.aWins') : winner === 'B' ? t('pages.abTesting.result.bWins') : t('pages.abTesting.result.tie')}
               </Text>
             </Space>
             <Progress
@@ -327,23 +344,23 @@ export default function ABTestingPage() {
       },
     },
     {
-      title: '状态',
+      title: t('pages.abTesting.columns.status'),
       dataIndex: 'status',
       key: 'status',
       width: 100,
       render: (status: string) => {
         const statusMap: Record<string, { color: string; text: string }> = {
-          draft: { color: 'default', text: '草稿' },
-          running: { color: 'processing', text: '运行中' },
-          completed: { color: 'success', text: '已完成' },
-          failed: { color: 'error', text: '失败' },
+          draft: { color: 'default', text: t('pages.abTesting.status.draft') },
+          running: { color: 'processing', text: t('pages.abTesting.status.running') },
+          completed: { color: 'success', text: t('pages.abTesting.status.completed') },
+          failed: { color: 'error', text: t('pages.abTesting.status.failed') },
         };
         const s = statusMap[status] || { color: 'default', text: status };
         return <Badge color={s.color} text={s.text} />;
       },
     },
     {
-      title: '操作',
+      title: t('pages.abTesting.columns.actions'),
       key: 'actions',
       width: 200,
       render: (_: unknown, record: Experiment) => (
@@ -355,7 +372,7 @@ export default function ABTestingPage() {
               icon={<ThunderboltOutlined />}
               onClick={() => handleRun(record)}
             >
-              运行
+              {t('pages.abTesting.actions.run')}
             </Button>
           )}
           {record.results && (
@@ -364,7 +381,7 @@ export default function ABTestingPage() {
               icon={<EyeOutlined />}
               onClick={() => handleViewResults(record)}
             >
-              查看结果
+              {t('pages.abTesting.actions.viewResults')}
             </Button>
           )}
           <Button
@@ -373,7 +390,7 @@ export default function ABTestingPage() {
             icon={<DeleteOutlined />}
             onClick={() => handleDelete(record)}
           >
-            删除
+            {t('pages.abTesting.actions.delete')}
           </Button>
         </Space>
       ),
@@ -384,13 +401,14 @@ export default function ABTestingPage() {
 
   return (
     <div style={{ padding: 24 }}>
+      <PageMaturityNotice pageKey="abTesting" />
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Space>
-          <Title level={4} style={{ margin: 0 }}>A/B 测试</Title>
-          <Text type="secondary">比较不同 Agent 配置的输出质量</Text>
+          <Title level={4} style={{ margin: 0 }}>{t('pages.abTesting.title')}</Title>
+          <Text type="secondary">{t('pages.abTesting.subtitle')}</Text>
         </Space>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
-          新建实验
+          {t('pages.abTesting.create')}
         </Button>
       </div>
 
@@ -398,18 +416,18 @@ export default function ABTestingPage() {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={6}>
           <Card>
-            <Statistic title="总实验数" value={experiments.length} prefix={<ExperimentOutlined />} />
+            <Statistic title={t('pages.abTesting.stats.total')} value={experiments.length} prefix={<ExperimentOutlined />} />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title="已完成" value={experiments.filter((e) => e.status === 'completed').length} suffix="/ 次" />
+            <Statistic title={t('pages.abTesting.stats.completed')} value={experiments.filter((e) => e.status === 'completed').length} suffix="/ 次" />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
             <Statistic
-              title="A 胜出"
+              title={t('pages.abTesting.stats.aWins')}
               value={experiments.filter((e) => e.results?.winner === 'A').length}
               valueStyle={{ color: '#1890ff' }}
             />
@@ -418,7 +436,7 @@ export default function ABTestingPage() {
         <Col span={6}>
           <Card>
             <Statistic
-              title="B 胜出"
+              title={t('pages.abTesting.stats.bWins')}
               value={experiments.filter((e) => e.results?.winner === 'B').length}
               valueStyle={{ color: '#52c41a' }}
             />
@@ -436,26 +454,26 @@ export default function ABTestingPage() {
 
       {/* Create Modal */}
       <Modal
-        title="新建 A/B 测试"
+        title={t('pages.abTesting.modal.title')}
         open={modalOpen}
         onOk={handleCreate}
         onCancel={() => setModalOpen(false)}
         width={800}
-        okText="创建"
-        cancelText="取消"
+        okText={t('pages.abTesting.modal.create')}
+        cancelText={t('pages.abTesting.modal.cancel')}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="name" label="实验名称" rules={[{ required: true }]}>
-            <Input placeholder="例如: GPT-4o vs Claude 3.5" />
+          <Form.Item name="name" label={t('pages.abTesting.form.name')} rules={[{ required: true }]}>
+            <Input placeholder={t('pages.abTesting.form.namePlaceholder')} />
           </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input placeholder="实验描述" />
+          <Form.Item name="description" label={t('pages.abTesting.form.description')}>
+            <Input placeholder={t('pages.abTesting.form.descriptionPlaceholder')} />
           </Form.Item>
 
-          <Divider>配置 A</Divider>
+          <Divider>{t('pages.abTesting.form.configA')}</Divider>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="model_a" label="模型" rules={[{ required: true }]}>
+              <Form.Item name="model_a" label={t('pages.abTesting.form.model')} rules={[{ required: true }]}>
                 <Select options={[
                   { label: 'GPT-4o', value: 'gpt-4o' },
                   { label: 'GPT-4o-mini', value: 'gpt-4o-mini' },
@@ -465,19 +483,19 @@ export default function ABTestingPage() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="temp_a" label="Temperature">
+              <Form.Item name="temp_a" label={t('pages.abTesting.form.temperature')}>
                 <InputNumber min={0} max={1} step={0.1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="tools_a" label="工具（逗号分隔）">
-            <Input placeholder="code_executor, web_search" />
+          <Form.Item name="tools_a" label={t('pages.abTesting.form.tools')}>
+            <Input placeholder={t('pages.abTesting.form.toolsPlaceholder')} />
           </Form.Item>
 
-          <Divider>配置 B</Divider>
+          <Divider>{t('pages.abTesting.form.configB')}</Divider>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="model_b" label="模型" rules={[{ required: true }]}>
+              <Form.Item name="model_b" label={t('pages.abTesting.form.model')} rules={[{ required: true }]}>
                 <Select options={[
                   { label: 'GPT-4o', value: 'gpt-4o' },
                   { label: 'GPT-4o-mini', value: 'gpt-4o-mini' },
@@ -487,20 +505,20 @@ export default function ABTestingPage() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="temp_b" label="Temperature">
+              <Form.Item name="temp_b" label={t('pages.abTesting.form.temperature')}>
                 <InputNumber min={0} max={1} step={0.1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="tools_b" label="工具（逗号分隔）">
-            <Input placeholder="code_executor, web_search" />
+          <Form.Item name="tools_b" label={t('pages.abTesting.form.tools')}>
+            <Input placeholder={t('pages.abTesting.form.toolsPlaceholder')} />
           </Form.Item>
 
-          <Divider>评估指标</Divider>
-          <Form.Item name="criteria" help="每行一个指标：名称 | 描述 | 权重 | 阈值">
+          <Divider>{t('pages.abTesting.form.criteria')}</Divider>
+          <Form.Item name="criteria" help={t('pages.abTesting.form.criteriaHelp')}>
             <Input.TextArea
               rows={4}
-              placeholder={"accuracy | 输出准确性 | 1.5 | 0.8\ncompleteness | 输出完整性 | 1.0 | 0.7\nsafety | 安全性 | 1.2 | 0.9"}
+              placeholder={t('pages.abTesting.form.criteriaPlaceholder')}
             />
           </Form.Item>
         </Form>
@@ -509,7 +527,7 @@ export default function ABTestingPage() {
       {/* Results Drawer */}
       {selectedExperiment?.results && (
         <Drawer
-          title={`实验结果 - ${selectedExperiment.name}`}
+          title={t('pages.abTesting.results.drawerTitle', { name: selectedExperiment.name })}
           open={viewDrawerOpen}
           onClose={() => setViewDrawerOpen(false)}
           width={900}
@@ -524,6 +542,7 @@ export default function ABTestingPage() {
 // ======================== Results View Component ========================
 
 function ResultsView({ experiment }: { experiment: Experiment }) {
+  const { t } = useI18n();
   const results = experiment.results!;
 
   return (
@@ -534,66 +553,72 @@ function ResultsView({ experiment }: { experiment: Experiment }) {
           <Space>
             <TrophyOutlined style={{ color: '#faad14', fontSize: 20 }} />
             <Text strong style={{ fontSize: 16 }}>
-              {results.winner === 'tie' ? '平局！' : `${results.winner} 配置胜出！`}
+              {results.winner === 'tie'
+                ? t('pages.abTesting.results.tie')
+                : t('pages.abTesting.results.winner', { winner: results.winner })}
             </Text>
           </Space>
         }
-        description={`综合评分: A=${results.score_a.toFixed(2)} vs B=${results.score_b.toFixed(2)} | 差距: ${results.score_diff > 0 ? '+' : ''}${results.score_diff.toFixed(2)}`}
+        description={t('pages.abTesting.results.scoreSummary', {
+          scoreA: results.score_a.toFixed(2),
+          scoreB: results.score_b.toFixed(2),
+          diff: `${results.score_diff > 0 ? '+' : ''}${results.score_diff.toFixed(2)}`,
+        })}
         type={results.winner === 'tie' ? 'warning' : 'success'}
         showIcon={false}
         style={{ marginBottom: 16 }}
       />
 
       {/* Score Comparison */}
-      <Card title="综合评分对比" style={{ marginBottom: 16 }}>
+      <Card title={t('pages.abTesting.results.scoreComparison')} style={{ marginBottom: 16 }}>
         <Row gutter={24}>
           <Col span={12}>
             <Descriptions bordered size="small" column={1}>
-              <Descriptions.Item label="配置">{experiment.config_a.name}</Descriptions.Item>
-              <Descriptions.Item label="模型">{experiment.config_a.model}</Descriptions.Item>
-              <Descriptions.Item label="温度">{experiment.config_a.temperature}</Descriptions.Item>
-              <Descriptions.Item label="综合评分">
+              <Descriptions.Item label={t('pages.abTesting.results.config')}>{experiment.config_a.name}</Descriptions.Item>
+              <Descriptions.Item label={t('pages.abTesting.results.model')}>{experiment.config_a.model}</Descriptions.Item>
+              <Descriptions.Item label={t('pages.abTesting.results.temperature')}>{experiment.config_a.temperature}</Descriptions.Item>
+              <Descriptions.Item label={t('pages.abTesting.results.overallScore')}>
                 <Progress
                   percent={Math.round(results.score_a * 100)}
                   status={results.winner === 'A' ? 'success' : 'normal'}
                 />
               </Descriptions.Item>
-              <Descriptions.Item label="延迟">{results.latency_a}ms</Descriptions.Item>
+              <Descriptions.Item label={t('pages.abTesting.results.latency')}>{results.latency_a}ms</Descriptions.Item>
             </Descriptions>
           </Col>
           <Col span={12}>
             <Descriptions bordered size="small" column={1}>
-              <Descriptions.Item label="配置">{experiment.config_b.name}</Descriptions.Item>
-              <Descriptions.Item label="模型">{experiment.config_b.model}</Descriptions.Item>
-              <Descriptions.Item label="温度">{experiment.config_b.temperature}</Descriptions.Item>
-              <Descriptions.Item label="综合评分">
+              <Descriptions.Item label={t('pages.abTesting.results.config')}>{experiment.config_b.name}</Descriptions.Item>
+              <Descriptions.Item label={t('pages.abTesting.results.model')}>{experiment.config_b.model}</Descriptions.Item>
+              <Descriptions.Item label={t('pages.abTesting.results.temperature')}>{experiment.config_b.temperature}</Descriptions.Item>
+              <Descriptions.Item label={t('pages.abTesting.results.overallScore')}>
                 <Progress
                   percent={Math.round(results.score_b * 100)}
                   status={results.winner === 'B' ? 'success' : 'normal'}
                 />
               </Descriptions.Item>
-              <Descriptions.Item label="延迟">{results.latency_b}ms</Descriptions.Item>
+              <Descriptions.Item label={t('pages.abTesting.results.latency')}>{results.latency_b}ms</Descriptions.Item>
             </Descriptions>
           </Col>
         </Row>
       </Card>
 
       {/* Criteria Results */}
-      <Card title="评估指标详情" style={{ marginBottom: 16 }}>
+      <Card title={t('pages.abTesting.results.criteriaDetails')} style={{ marginBottom: 16 }}>
         <Table
           dataSource={results.criteria_results}
           rowKey="name"
           pagination={false}
           columns={[
             {
-              title: '指标',
+              title: t('pages.abTesting.results.columns.criterion'),
               dataIndex: 'name',
               key: 'name',
               width: 120,
               render: (name: string) => <Tag color="geekblue">{name}</Tag>,
             },
             {
-              title: 'A 得分',
+              title: t('pages.abTesting.results.columns.scoreA'),
               dataIndex: 'score_a',
               key: 'score_a',
               width: 100,
@@ -610,7 +635,7 @@ function ResultsView({ experiment }: { experiment: Experiment }) {
               ),
             },
             {
-              title: 'B 得分',
+              title: t('pages.abTesting.results.columns.scoreB'),
               dataIndex: 'score_b',
               key: 'score_b',
               width: 100,
@@ -627,23 +652,23 @@ function ResultsView({ experiment }: { experiment: Experiment }) {
               ),
             },
             {
-              title: '胜出',
+              title: t('pages.abTesting.results.columns.winner'),
               dataIndex: 'winner',
               key: 'winner',
               width: 80,
               render: (w: string) => (
                 w === 'tie'
-                  ? <Tag>平局</Tag>
+                  ? <Tag>{t('pages.abTesting.results.tieTag')}</Tag>
                   : <Tag color={w === 'A' ? 'blue' : 'green'}>{w}</Tag>
               ),
             },
             {
-              title: 'A 评价',
+              title: t('pages.abTesting.results.columns.reasonA'),
               dataIndex: 'reason_a',
               key: 'reason_a',
             },
             {
-              title: 'B 评价',
+              title: t('pages.abTesting.results.columns.reasonB'),
               dataIndex: 'reason_b',
               key: 'reason_b',
             },
@@ -652,7 +677,7 @@ function ResultsView({ experiment }: { experiment: Experiment }) {
       </Card>
 
       {/* Output Comparison */}
-      <Card title="输出对比">
+      <Card title={t('pages.abTesting.results.outputComparison')}>
         <Row gutter={16}>
           <Col span={12}>
             <Card size="small" title={`Agent A (${experiment.config_a.model})`}>
@@ -697,6 +722,8 @@ function Drawer({ title, open, onClose, width, children }: {
   width: number;
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
+
   return (
     <div
       style={{
@@ -715,7 +742,7 @@ function Drawer({ title, open, onClose, width, children }: {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Title level={5} style={{ margin: 0 }}>{title}</Title>
-        <Button onClick={onClose}>关闭</Button>
+        <Button onClick={onClose}>{t('pages.abTesting.results.close')}</Button>
       </div>
       {children}
     </div>

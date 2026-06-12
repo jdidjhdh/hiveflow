@@ -1,24 +1,35 @@
 """HiveFlow Studio - 凭证加密管理 API"""
+import logging
+import os
 import time
 import uuid
+from pathlib import Path
 from typing import Optional
 
 from cryptography.fernet import Fernet, InvalidToken
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# 凭证加密密钥（生产环境应使用环境变量）
-_ENCRYPTION_KEY_RAW = __import__("os").environ.get("CREDENTIAL_KEY", "")
-if not _ENCRYPTION_KEY_RAW:
-    _ENCRYPTION_KEY_RAW = Fernet.generate_key().decode()
+_KEY_PATH = Path(__file__).resolve().parent.parent.parent / "data" / ".credential_key"
 
-if isinstance(_ENCRYPTION_KEY_RAW, str):
-    _encryption_key = _ENCRYPTION_KEY_RAW.encode()
-else:
-    _encryption_key = _ENCRYPTION_KEY_RAW
 
+def _resolve_encryption_key() -> bytes:
+    env_raw = os.environ.get("CREDENTIAL_KEY", "")
+    if env_raw:
+        return env_raw.encode() if isinstance(env_raw, str) else env_raw
+    _KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if _KEY_PATH.exists():
+        return _KEY_PATH.read_text(encoding="utf-8").strip().encode()
+    key = Fernet.generate_key()
+    _KEY_PATH.write_text(key.decode(), encoding="utf-8")
+    logger.info("Generated persistent credential key at %s", _KEY_PATH)
+    return key
+
+
+_encryption_key = _resolve_encryption_key()
 fernet = Fernet(_encryption_key)
 
 # 内存存储（生产环境应使用数据库）
@@ -77,8 +88,17 @@ async def create_credential(body: CredentialCreateRequest):
 
 
 @router.get("/credentials/{cred_id}")
-async def get_credential_value(cred_id: str):
-    """获取凭证值（自动解密）"""
+async def get_credential_value(cred_id: str, request: Request):
+    """获取凭证值（需 Admin Token 或 Studio 内部调用）"""
+    admin_token = os.environ.get("HIVEFLOW_STUDIO_ADMIN_TOKEN")
+    if admin_token:
+        if request.headers.get("X-Admin-Token") != admin_token:
+            raise HTTPException(status_code=403, detail="Admin token required for credential value access")
+    elif os.environ.get("HIVEFLOW_CREDENTIAL_ALLOW_GET", "").lower() != "true":
+        raise HTTPException(
+            status_code=403,
+            detail="Direct credential read disabled. Use POST /api/llm/providers/test for connection tests.",
+        )
     if cred_id not in _credentials_store:
         raise HTTPException(status_code=404, detail="Credential not found")
 
@@ -98,3 +118,13 @@ async def delete_credential(cred_id: str):
 
     del _credentials_store[cred_id]
     return {"deleted": True}
+
+
+def get_decrypted_credential(cred_id: str) -> Optional[str]:
+    """Return decrypted credential value, or None if missing."""
+    if not cred_id or cred_id not in _credentials_store:
+        return None
+    try:
+        return fernet.decrypt(_credentials_store[cred_id]["value"].encode()).decode()
+    except InvalidToken:
+        return None

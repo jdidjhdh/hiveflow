@@ -1,6 +1,5 @@
 import uuid
 import json
-import time
 import asyncio
 import logging
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
@@ -76,6 +75,63 @@ class CognitiveOrchestrator:
         self.dynamic_orch = hiveflow.dynamic_orchestrator
         self.hitl_manager = hitl_manager
         self.enable_plan_hitl = enable_plan_hitl
+
+    @staticmethod
+    def _normalize_task_graph(graph: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize LLM TaskGraph: unwrap nested nodes, ensure final_answer node key."""
+        if not isinstance(graph, dict):
+            raise ValueError("TaskGraph must be a JSON object")
+
+        for wrapper_key in ("nodes", "graph", "task_graph", "tasks"):
+            inner = graph.get(wrapper_key)
+            if isinstance(inner, dict) and inner:
+                graph = inner
+                break
+
+        normalized: Dict[str, Any] = {}
+        for key, val in graph.items():
+            if isinstance(val, dict) and "task" in val:
+                node = dict(val)
+                # LLM-hallucinated expectations often mismatch handler payloads
+                node.pop("expectation", None)
+                normalized[key] = node
+            elif key == "final_answer" and not isinstance(val, dict):
+                continue
+        if not normalized:
+            raise ValueError("TaskGraph has no valid nodes")
+
+        if "final_answer" not in normalized:
+            referenced: set[str] = set()
+            for node in normalized.values():
+                referenced.update(node.get("depends_on", []))
+            sinks = [name for name in normalized if name not in referenced]
+
+            if len(sinks) == 1:
+                sink = sinks[0]
+                normalized = dict(normalized)
+                normalized["final_answer"] = normalized.pop(sink)
+                for node in normalized.values():
+                    deps = node.get("depends_on", [])
+                    if sink in deps:
+                        node["depends_on"] = ["final_answer" if d == sink else d for d in deps]
+            else:
+                for name, node in list(normalized.items()):
+                    if node.get("task") == "final_answer":
+                        normalized = dict(normalized)
+                        if name != "final_answer":
+                            normalized["final_answer"] = normalized.pop(name)
+                            for other in normalized.values():
+                                deps = other.get("depends_on", [])
+                                if name in deps:
+                                    other["depends_on"] = [
+                                        "final_answer" if d == name else d for d in deps
+                                    ]
+                        break
+
+        if "final_answer" not in normalized:
+            raise ValueError("TaskGraph lacks 'final_answer' node")
+
+        return normalized
 
     async def execute(self, user_query: str, conversation_id: str = "") -> dict:
         ecm = await self.intent_parser.parse(user_query, conversation_id)
@@ -306,12 +362,10 @@ Conversation: {json.dumps(short_term, ensure_ascii=False)}
 Long-term: {long_term_context}
 Intent: {ecm.intent}
 Params: {json.dumps(ecm.payload, ensure_ascii=False)}"""},
-            {"role": "user", "content": "Generate graph JSON."}
+            {"role": "user", "content": f"Generate TaskGraph JSON for this user request:\n{ecm.user_query or ecm.intent}"}
         ]
         graph = await self.llm.complete_json(messages)
-        if "final_answer" not in graph:
-            raise ValueError("Generated graph lacks 'final_answer' node")
-        return graph
+        return self._normalize_task_graph(graph)
 
     async def _maybe_approve_plan(self, graph_spec: Dict, intent_id: str, conversation_id: str):
         if not self.enable_plan_hitl or not self.hitl_manager:
@@ -364,9 +418,21 @@ Long-term: {long_term_context}"""},
             {"role": "user", "content": f"Intent: {ecm.intent}"}
         ]
         graph = await self.llm.complete_json(messages)
-        if "final_answer" not in graph:
-            raise ValueError("Replanned graph lacks 'final_answer' node")
-        return graph
+        try:
+            return self._normalize_task_graph(graph)
+        except ValueError:
+            messages.append({"role": "assistant", "content": json.dumps(graph, ensure_ascii=False)})
+            messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "Invalid TaskGraph: include a top-level node key named exactly "
+                        "'final_answer' (task may be summarize or final_answer). Regenerate JSON only."
+                    ),
+                },
+            )
+            graph = await self.llm.complete_json(messages)
+            return self._normalize_task_graph(graph)
 
     async def _persist_partial_results(self, results, intent_id):
         for node_name, value in results.items():

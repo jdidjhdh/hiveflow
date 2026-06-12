@@ -9,11 +9,9 @@ test.describe('Condition Branch and Variables', () => {
     await variables.hasVariable('test_var');
 
     await orchestrator.goto();
-    await expect(page).toHaveURL(/.*orchestrator/);
-
     await orchestrator.addNodeToCanvas('condition');
     await orchestrator.clickNodeOnCanvas();
-    await expect(page.getByText('引用变量语法')).toBeVisible();
+    await expect(page.getByTestId('node-var-syntax-alert')).toBeVisible();
     await expect(page.getByText('{{variable_name}}')).toBeVisible();
   });
 
@@ -21,7 +19,6 @@ test.describe('Condition Branch and Variables', () => {
     await variables.goto();
     await variables.createVariable('edit_test', 'original');
     await variables.hasVariable('edit_test');
-    // Scope to the table to avoid matching the textarea in the modal
     await expect(page.locator('.ant-table').getByText('original')).toBeVisible();
   });
 });

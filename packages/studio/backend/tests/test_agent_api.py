@@ -38,6 +38,33 @@ async def test_switch_to_agent_mode(engine):
 
 
 @pytest.mark.asyncio
+async def test_agent_mode_toggle_twice(engine):
+    """Regression: second agent switch must not leave agent_active=false with duplicate workers."""
+    await engine.set_runtime_mode("agent")
+    await engine.set_runtime_mode("core")
+    info = await engine.set_runtime_mode("agent")
+    assert info["agent_active"] is True
+    result = await engine.run_agent_plan_only("plan a simple workflow")
+    assert result.get("plan") or result.get("intent_id")
+
+@pytest.mark.asyncio
+async def test_agent_plan_only_varies_by_query(engine):
+    """Echo LLM should produce different DAG shapes for different user queries."""
+    await engine.set_runtime_mode("agent")
+    search = await engine.run_agent_plan_only("请搜索 AI 趋势相关资料")
+    code = await engine.run_agent_plan_only("帮我写一段 Python 代码")
+    parallel = await engine.run_agent_plan_only("并行处理多个任务")
+
+    search_plan = search.get("plan") or {}
+    code_plan = code.get("plan") or {}
+    parallel_plan = parallel.get("plan") or {}
+
+    assert set(search_plan.keys()) != set(code_plan.keys())
+    assert set(parallel_plan.keys()) != set(search_plan.keys())
+    assert len(parallel_plan) >= 4  # branch_a, branch_b, merge, final
+
+
+@pytest.mark.asyncio
 async def test_agent_query_in_agent_mode(engine):
     await engine.set_runtime_mode("agent")
     result = await engine.run_agent_query("hello from studio test")

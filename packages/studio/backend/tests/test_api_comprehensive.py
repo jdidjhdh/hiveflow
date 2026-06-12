@@ -285,10 +285,16 @@ class TestVariablesAPI:
 
     def test_resolve_variables(self, client, initialized_storage):
         """GET /api/variables/resolve resolves expressions."""
-        response = client.get("/api/variables/resolve", params={
-            "expression": "Hello {greeting}!"
+        client.post("/api/variables", json={
+            "name": "greeting",
+            "value": "World",
+            "var_type": "string",
         })
-        assert response.status_code in [200, 404, 500]
+        response = client.get("/api/variables/resolve", params={
+            "expression": "Hello ${greeting}!"
+        })
+        assert response.status_code == 200
+        assert response.json()["resolved"] == "Hello World!"
 
 # ======================== Webhooks API Tests ========================
 
@@ -561,18 +567,20 @@ class TestCredentialsAPI:
         })
         assert response.status_code in [200, 201, 422, 500]
 
-    def test_get_credential(self, client):
-        """GET /api/credentials/{id} returns credential."""
+    def test_get_credential(self, client, monkeypatch):
+        """GET /api/credentials/{id} returns credential when explicitly allowed."""
+        monkeypatch.setenv("HIVEFLOW_CREDENTIAL_ALLOW_GET", "true")
         cred_resp = client.post("/api/credentials", json={
             "name": "Get Test Cred",
-            "provider": "openai",
-            "api_key": "sk-test-456"
+            "type": "api_key",
+            "value": "sk-test-456",
         })
         cred_data = cred_resp.json()
         cred_id = cred_data.get("id") or cred_data.get("credential_id") or "cred_get"
 
         response = client.get(f"/api/credentials/{cred_id}")
-        assert response.status_code in [200, 404]
+        assert response.status_code == 200
+        assert response.json()["value"] == "sk-test-456"
 
     def test_delete_credential(self, client):
         """DELETE /api/credentials/{id} removes credential."""
@@ -740,23 +748,23 @@ class TestFullWorkflowIntegration:
         installed_resp = client.get("/api/plugins/installed")
         assert installed_resp.status_code in [200, 500]
 
-    @pytest.mark.skip(reason="Async fixture issue in sync test context - passes in isolation")
-    def test_variable_management_workflow(self, client, initialized_storage):
+    @pytest.mark.asyncio
+    async def test_variable_management_workflow(self, async_client, initialized_storage):
         """Full variable lifecycle: create → update → delete."""
         var_name = "integration_var"
-        create_resp = client.post("/api/variables", json={
+        create_resp = await async_client.post("/api/variables", json={
             "name": var_name, "value": "initial_value"
         })
         assert create_resp.status_code in [200, 201]
 
-        update_resp = client.put(f"/api/variables/{var_name}", json={"value": "updated"})
+        update_resp = await async_client.put(f"/api/variables/{var_name}", json={"value": "updated"})
         assert update_resp.status_code in [200, 500]
 
-        get_resp = client.get(f"/api/variables/{var_name}")
+        get_resp = await async_client.get(f"/api/variables/{var_name}")
         assert get_resp.status_code in [200, 404, 500]
 
-        delete_resp = client.delete(f"/api/variables/{var_name}")
+        delete_resp = await async_client.delete(f"/api/variables/{var_name}")
         assert delete_resp.status_code in [200, 204, 404]
 
-        list_resp = client.get("/api/variables")
+        list_resp = await async_client.get("/api/variables")
         assert list_resp.status_code == 200

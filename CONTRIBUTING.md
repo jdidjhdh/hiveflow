@@ -206,6 +206,7 @@ When opening a PR, please include:
 - Update relevant `.md` files for API changes
 - Add examples to tutorials for new features
 - Keep the README up to date
+- **Bilingual docs:** edit matching files under `docs/en/` and `docs/zh/` (see [docs/en/i18n.md](docs/en/i18n.md))
 
 ### Writing Tutorials
 

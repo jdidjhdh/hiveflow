@@ -131,7 +131,7 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 ignore_missing_imports = true
 follow_imports = "skip"
-# CI type-check scope: public API surface (expand over time)
+# CI type-check scope: documented public API surface (see docs/en/quality-gates.md)
 files = [
     "hiveflow/blackboard.py",
     "hiveflow/bus.py",
@@ -142,6 +142,10 @@ files = [
     "hiveflow/plugin_marketplace.py",
     "hiveflow/orchestrator.py",
     "hiveflow/app.py",
+    "hiveflow/guards.py",
+    "hiveflow/streaming.py",
+    "hiveflow/validation.py",
+    "hiveflow/execution.py",
 ]
 
 [[tool.mypy.overrides]]
@@ -162,6 +166,18 @@ ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = "hiveflow.llm_client"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "hiveflow.guards"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "hiveflow.streaming"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "hiveflow.validation"
 ignore_errors = true
 
 # ============================================================

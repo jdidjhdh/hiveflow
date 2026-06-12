@@ -28,6 +28,9 @@ from hiveflow.blackboard import OrchestratorReadonlyView
 
 logger = logging.getLogger(__name__)
 
+# Skill workers registered by app.core.agent_runtime.build_hive_mind_app
+STUDIO_AGENT_WORKER_IDS = ("studio-summarize", "studio-general", "studio-final-answer")
+
 
 class EngineService:
     """
@@ -44,6 +47,8 @@ class EngineService:
         self._tasks: Dict[str, asyncio.Task] = {}  # active workflow executions
         self._intent_history: List[dict] = []  # in-memory intent timeline for Studio
         self._node_execution_stats: List[dict] = []  # per-node duration samples
+        self._agent_load_history: Dict[str, List[dict]] = {}
+        self._agent_recent_tasks: Dict[str, List[dict]] = {}
         self._ws_connected = False  # WebSocket connection status
         self._metrics_exporter = None  # Prometheus metrics exporter
         self._start_time = time.time()
@@ -74,7 +79,12 @@ class EngineService:
         self._output_validator = OutputValidator()
         self._hitl_manager.register_callback(self._on_hitl_gate_created)
         if self.runtime_mode == "agent":
-            await self._start_agent_runtime()
+            try:
+                await self._start_agent_runtime()
+            except Exception:
+                logger.exception("Agent runtime failed to start at boot; falling back to core mode")
+                self.runtime_mode = "core"
+                await self._teardown_agent_workers()
         self._running = True
         self._ws_connected = True
         if self._metrics_exporter:
@@ -92,18 +102,45 @@ class EngineService:
         await asyncio.gather(*self._tasks.values(), return_exceptions=True)
         self._tasks.clear()
         if self._hive_mind:
-            await self._hive_mind.shutdown()
-            self._hive_mind = None
+            await self._shutdown_agent_runtime()
         if self.engine:
             await self.engine.shutdown()
         if self._metrics_exporter:
             self._metrics_exporter.update_gauge("active_workers", 0)
         logger.info("HiveFlow engine shut down")
 
+    async def _teardown_agent_workers(self) -> None:
+        """Remove Studio skill workers from the shared HiveFlow cell."""
+        if not self.engine:
+            return
+        for agent_id in STUDIO_AGENT_WORKER_IDS:
+            try:
+                await self.engine.cell.stop_worker(agent_id)
+            except Exception:
+                logger.debug("stop_worker skipped for %s", agent_id, exc_info=True)
+
+    async def _shutdown_agent_runtime(self) -> None:
+        if self._hive_mind:
+            await self._hive_mind.shutdown()
+            self._hive_mind = None
+        await self._teardown_agent_workers()
+
     async def _start_agent_runtime(self) -> None:
+        await self._teardown_agent_workers()
         from app.core.agent_runtime import build_hive_mind_app
         self._hive_mind = await build_hive_mind_app(self)
         logger.info("HiveMind agent runtime started")
+
+    async def reload_agent_runtime(self) -> dict:
+        """Rebuild HiveMind with latest LLM settings."""
+        if self.runtime_mode != "agent":
+            raise RuntimeError("Agent runtime is not active")
+        if not self._running:
+            raise RuntimeError("Engine not running")
+        await self._shutdown_agent_runtime()
+        await self._start_agent_runtime()
+        from app.core.llm_settings import get_agent_settings_view
+        return get_agent_settings_view(agent_active=True)
 
     async def run_agent_query(self, query: str, conversation_id: Optional[str] = None) -> dict:
         if self.runtime_mode != "agent" or not self._hive_mind:
@@ -147,14 +184,20 @@ class EngineService:
         mode = mode.lower()
         if mode not in ("core", "agent"):
             raise ValueError("mode must be 'core' or 'agent'")
-        if mode == self.runtime_mode:
+        if mode == self.runtime_mode and (
+            (mode == "agent" and self._hive_mind is not None)
+            or (mode == "core" and self._hive_mind is None)
+        ):
             return self.get_runtime_info()
-        if self._hive_mind:
-            await self._hive_mind.shutdown()
-            self._hive_mind = None
+        await self._shutdown_agent_runtime()
         self.runtime_mode = mode
         if mode == "agent" and self._running:
-            await self._start_agent_runtime()
+            try:
+                await self._start_agent_runtime()
+            except Exception as exc:
+                self.runtime_mode = "core"
+                await self._teardown_agent_workers()
+                raise RuntimeError(f"Failed to start agent runtime: {exc}") from exc
         return self.get_runtime_info()
 
     def get_replay_debugger(self):
@@ -195,24 +238,21 @@ class EngineService:
         )
 
     async def list_agents(self) -> List[dict]:
+        self._record_agent_load_snapshot()
         caps = self.engine.scheduler._capabilities.values()
         agents = []
         for cap in caps:
-            agents.append({
-                "agent_id": cap.agent_id,
-                "skills": list(cap.skills),
-                "load": cap.load,
-                "pending_tasks": cap.pending_tasks,
-                "state": cap.state,
-                "read_keys": list(cap.read_keys),
-                "write_keys": list(cap.write_keys),
-            })
+            agents.append(self._serialize_agent_capability(cap))
         return agents
 
     async def get_agent(self, agent_id: str) -> Optional[dict]:
         cap = self.engine.scheduler._capabilities.get(agent_id)
         if cap is None:
             return None
+        self._record_agent_load_snapshot()
+        return self._serialize_agent_capability(cap)
+
+    def _serialize_agent_capability(self, cap: Capability) -> dict:
         return {
             "agent_id": cap.agent_id,
             "skills": list(cap.skills),
@@ -221,7 +261,46 @@ class EngineService:
             "state": cap.state,
             "read_keys": list(cap.read_keys),
             "write_keys": list(cap.write_keys),
+            "load_history": list(self._agent_load_history.get(cap.agent_id, [])),
+            "recent_tasks": list(self._agent_recent_tasks.get(cap.agent_id, [])),
         }
+
+    def _record_agent_load_snapshot(self) -> None:
+        if not self.engine:
+            return
+        now = time.time()
+        hour_ago = now - 3600
+        for cap in self.engine.scheduler._capabilities.values():
+            history = self._agent_load_history.setdefault(cap.agent_id, [])
+            history.append({"time": now, "load": cap.load})
+            self._agent_load_history[cap.agent_id] = [
+                point for point in history if point.get("time", 0) >= hour_ago
+            ][-120:]
+
+    def _record_agent_task(
+        self,
+        agent_id: str,
+        intent_id: str,
+        status: str,
+        payload: Optional[dict] = None,
+    ) -> None:
+        if not agent_id:
+            return
+        payload = payload or {}
+        duration_ms = float(payload.get("duration_ms") or payload.get("duration") or 0)
+        if "duration_ms" in (payload or {}) or duration_ms > 100:
+            duration_sec = duration_ms / 1000.0
+        else:
+            duration_sec = duration_ms
+        task_status = "success" if status == "completed" else "failed" if status == "failed" else "timeout"
+        tasks = self._agent_recent_tasks.setdefault(agent_id, [])
+        tasks.append({
+            "intent_id": intent_id,
+            "status": task_status,
+            "timestamp": time.time(),
+            "duration": round(duration_sec, 3),
+        })
+        self._agent_recent_tasks[agent_id] = tasks[-20:]
 
     async def stop_agent(self, agent_id: str):
         await self.engine.cell.stop_worker(agent_id)
@@ -311,28 +390,53 @@ class EngineService:
                 _hitl=hitl_config,
                 _node=node,
             ):
-                if enable_guard:
-                    self._apply_input_guard(deps)
+                await self._broadcast_workflow_node(wf_id, _nid, "running")
+                try:
+                    if enable_guard:
+                        self._apply_input_guard(deps)
 
-                if _variant == "hitl":
-                    t0 = time.monotonic()
-                    result = await self._run_hitl_node(wf_id, _nid, _hitl, deps)
-                else:
-                    t0 = time.monotonic()
-                    result = await _orig(deps, view)
+                    if _variant == "hitl":
+                        t0 = time.monotonic()
+                        result = await self._run_hitl_node(wf_id, _nid, _hitl, deps)
+                    else:
+                        t0 = time.monotonic()
+                        result = await _orig(deps, view)
 
-                self.record_node_execution(_nid, (time.monotonic() - t0) * 1000, wf_id)
+                    self.record_node_execution(_nid, (time.monotonic() - t0) * 1000, wf_id)
 
-                if enable_guard:
-                    result = self._apply_output_guard(result)
+                    if enable_guard:
+                        result = self._apply_output_guard(result)
 
-                if enable_checkpoint:
-                    await self._save_node_checkpoint(wf_id, _nid, deps, result)
+                    if enable_checkpoint:
+                        await self._save_node_checkpoint(wf_id, _nid, deps, result)
 
-                return result
+                    await self._broadcast_workflow_node(wf_id, _nid, "completed", result)
+                    return result
+                except Exception as exc:
+                    await self._broadcast_workflow_node(wf_id, _nid, "failed", str(exc))
+                    raise
 
             prepared[node_id] = {**node, "task": wrapped_task}
         return prepared
+
+    async def _broadcast_workflow_node(
+        self,
+        wf_id: str,
+        node_id: str,
+        status: str,
+        result=None,
+    ) -> None:
+        try:
+            from app.core.ws_manager import manager
+            await manager.broadcast({
+                "type": "workflow.status",
+                "wid": wf_id,
+                "node": node_id,
+                "status": status,
+                "result": result,
+            })
+        except Exception:
+            logger.debug("workflow status broadcast skipped", exc_info=True)
 
     async def _run_hitl_node(
         self,
@@ -574,6 +678,7 @@ class EngineService:
 
         async def _on_task_completed(msg: ECM):
             self.record_intent(msg.intent_id, msg.intent, msg.emitter, "completed")
+            self._record_agent_task(msg.emitter, msg.intent_id, "completed", msg.payload)
             if self._broadcast_fn:
                 await self._broadcast_fn("task.completed", {
                     "intent_id": msg.intent_id,
@@ -584,6 +689,7 @@ class EngineService:
 
         async def _on_task_failed(msg: ECM):
             self.record_intent(msg.intent_id, msg.intent, msg.emitter, "failed")
+            self._record_agent_task(msg.emitter, msg.intent_id, "failed", msg.payload)
             if self._broadcast_fn:
                 await self._broadcast_fn("task.failed", {
                     "intent_id": msg.intent_id,
@@ -594,6 +700,7 @@ class EngineService:
 
         async def _on_intent_timeout(msg: ECM):
             self.record_intent(msg.intent_id, msg.intent, msg.emitter, "timeout")
+            self._record_agent_task(msg.emitter, msg.intent_id, "timeout", msg.payload)
             if self._broadcast_fn:
                 await self._broadcast_fn("intent.timeout", {
                     "intent_id": msg.intent_id,
@@ -611,6 +718,26 @@ class EngineService:
     async def set_strategy(self, strategy: SelectionStrategy):
         await self.engine.set_strategy(strategy)
 
+    def get_scheduler_settings(self) -> dict:
+        sched = self.engine.scheduler
+        strat = sched.strategy
+        strategy_name = "auction" if isinstance(strat, AuctionStrategy) else "least_loaded"
+        auction_timeout = getattr(strat, "auction_timeout", sched.config.auction_timeout)
+        return {
+            "strategy": strategy_name,
+            "auction_timeout": float(auction_timeout),
+        }
+
+    async def set_scheduler_settings(self, strategy: str, auction_timeout: float = 5.0) -> None:
+        if strategy == "auction":
+            await self.set_strategy(
+                AuctionStrategy(self.engine.bus, auction_timeout=auction_timeout)
+            )
+        else:
+            await self.set_strategy(LeastLoadedStrategy())
+        self.engine.scheduler.config.auction_timeout = auction_timeout
+        self.engine.scheduler.config.selection_strategy = strategy
+
     # ========== Analytics (missing methods needed by analytics.py) ==========
 
     def get_workflow_stats(self) -> dict:
@@ -619,10 +746,16 @@ class EngineService:
         failed = self.engine.metrics._counters.get("workflows_failed", 0)
         total = completed + failed
         success_rate = (completed / total * 100) if total > 0 else 0
+        durations = [
+            float(e.get("duration_ms", 0) or 0)
+            for e in self._node_execution_stats
+            if float(e.get("duration_ms", 0) or 0) > 0
+        ]
+        avg_duration = round(sum(durations) / len(durations)) if durations else 0
         return {
             "total_executions": total,
             "success_rate": round(success_rate, 2),
-            "avg_duration": 0,  # placeholder
+            "avg_duration": avg_duration,
         }
 
     def get_agent_stats(self) -> dict:
@@ -668,6 +801,29 @@ class EngineService:
                 buckets[day_key]["successes"] += 1
             elif status == "failed":
                 buckets[day_key]["failures"] += 1
+            duration_ms = float(entry.get("duration_ms", 0) or 0)
+            if duration_ms > 0:
+                buckets[day_key]["_duration_sum"] = buckets[day_key].get("_duration_sum", 0.0) + duration_ms
+                buckets[day_key]["_duration_count"] = buckets[day_key].get("_duration_count", 0) + 1
+
+        for entry in self._node_execution_stats:
+            ts = entry.get("timestamp", 0)
+            if ts < now - days * day_seconds:
+                continue
+            day_key = datetime.date.fromtimestamp(ts).isoformat()
+            if day_key not in buckets:
+                continue
+            duration_ms = float(entry.get("duration_ms", 0) or 0)
+            if duration_ms <= 0:
+                continue
+            buckets[day_key]["_duration_sum"] = buckets[day_key].get("_duration_sum", 0.0) + duration_ms
+            buckets[day_key]["_duration_count"] = buckets[day_key].get("_duration_count", 0) + 1
+
+        for bucket in buckets.values():
+            duration_count = bucket.pop("_duration_count", 0)
+            duration_sum = bucket.pop("_duration_sum", 0.0)
+            if duration_count > 0:
+                bucket["avg_duration"] = round(duration_sum / duration_count)
 
         return list(buckets.values())
 
@@ -771,6 +927,7 @@ class EngineService:
 
     def get_agent_performance(self) -> list:
         """获取Agent性能数据"""
+        self._record_agent_load_snapshot()
         caps = self.engine.scheduler._capabilities.values()
         agents = []
         for cap in caps:
@@ -780,6 +937,8 @@ class EngineService:
                 "pending_tasks": cap.pending_tasks,
                 "state": cap.state,
                 "skills": list(cap.skills),
+                "load_history": list(self._agent_load_history.get(cap.agent_id, [])),
+                "recent_tasks": list(self._agent_recent_tasks.get(cap.agent_id, [])),
             })
         return agents
 

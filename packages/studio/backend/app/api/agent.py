@@ -43,6 +43,8 @@ async def set_runtime(body: RuntimeModeRequest):
         return await engine.set_runtime_mode(body.mode)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 
 @router.post("/query")

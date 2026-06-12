@@ -262,3 +262,92 @@ async def test_cognitive_orchestrator_on_failure_skip():
     deps = {"missing_upstream": MISSING}
     result = await node_task(deps, view)
     assert result is MISSING
+
+
+def test_normalize_task_graph_unwraps_tasks_wrapper():
+    raw = {
+        "tasks": {
+            "calc": {"task": "calculate", "depends_on": []},
+            "answer": {"task": "summarize", "depends_on": ["calc"]},
+        }
+    }
+    normalized = CognitiveOrchestrator._normalize_task_graph(raw)
+    assert "final_answer" in normalized
+
+
+def test_normalize_task_graph_strips_hallucinated_expectation():
+    raw = {
+        "calc": {"task": "calculate", "depends_on": [], "expectation": {"required_keys": ["result"]}},
+        "final_answer": {"task": "summarize", "depends_on": ["calc"]},
+    }
+    normalized = CognitiveOrchestrator._normalize_task_graph(raw)
+    assert "expectation" not in normalized["calc"]
+
+
+def test_normalize_task_graph_unwraps_nodes_wrapper():
+    raw = {
+        "nodes": {
+            "calc": {"task": "calculate", "depends_on": []},
+            "final_answer": {"task": "summarize", "depends_on": ["calc"]},
+        }
+    }
+    normalized = CognitiveOrchestrator._normalize_task_graph(raw)
+    assert "final_answer" in normalized
+    assert normalized["final_answer"]["task"] == "summarize"
+
+
+def test_normalize_task_graph_renames_unique_sink_to_final_answer():
+    raw = {
+        "calc": {"task": "calculate", "depends_on": []},
+        "summary": {"task": "summarize", "depends_on": ["calc"]},
+    }
+    normalized = CognitiveOrchestrator._normalize_task_graph(raw)
+    assert "final_answer" in normalized
+    assert "summary" not in normalized
+    assert normalized["final_answer"]["task"] == "summarize"
+
+
+@pytest.mark.asyncio
+async def test_replan_normalizes_nested_graph_without_final_answer_key(mock_hiveflow, memory_manager):
+    """H2: replan LLM returns nested nodes without top-level final_answer — must normalize."""
+    llm = MockLLM(
+        json_responses=[
+            {
+                "intent": "calc",
+                "required_skills": ["calculate", "summarize"],
+                "payload": {"expression": "7*8"},
+                "priority": "normal",
+            },
+            {
+                "calc_node": {"task": "calculate", "depends_on": []},
+                "final_answer": {"task": "summarize", "depends_on": ["calc_node"]},
+            },
+            {
+                "nodes": {
+                    "calc_retry": {"task": "calculate", "depends_on": []},
+                    "answer": {"task": "summarize", "depends_on": ["calc_retry"]},
+                }
+            },
+        ],
+        text_responses=["calc failed"],
+    )
+    parser = IntentParser(llm, {"calculate": "calc", "summarize": "sum", "final_answer": "final"})
+    orch = CognitiveOrchestrator(
+        llm=llm,
+        hiveflow=mock_hiveflow,
+        skill_bindings={},
+        skill_signatures={"calculate": "calc", "summarize": "sum", "final_answer": "final"},
+        memory_manager=memory_manager,
+        intent_parser=parser,
+        max_replan_attempts=2,
+    )
+
+    graph = await orch._replan(
+        ecm=await parser.parse("calc"),
+        diagnosis="retry",
+        partial_results={},
+        short_term=[],
+        long_term_context="",
+        intent_id="i1",
+    )
+    assert "final_answer" in graph
