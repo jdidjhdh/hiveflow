@@ -45,7 +45,7 @@ security = [
     "jsonschema>=4.0",
 ]
 redis = [
-    "redis>=5.0",
+    "redis>=8.0.0",
 ]
 llm = [
     "openai>=1.0",
