@@ -112,3 +112,6 @@ TEST_COVERAGE_ROADMAP.md
 # Benchmark CI artifacts
 benchmarks/last-run*.json
 benchmarks/test-last-run.json
+
+# Local docs venv
+.tmpdocsvenv/

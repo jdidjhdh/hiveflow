@@ -1,0 +1,5 @@
+# Docs site (CI / local: pip install -r requirements-docs.txt && pip install -e packages/core)
+mkdocs-material>=9.5,<10
+mkdocstrings[python]>=0.24
+mkdocs-static-i18n>=1.2
+jieba>=0.42

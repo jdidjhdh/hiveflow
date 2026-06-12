@@ -11,8 +11,8 @@ Complete these steps after the first `git push` to `main`. Items marked **(web)*
 | # | Task | How |
 |---|------|-----|
 | 1 | **Verify CI on `main`** **(web)** | [Actions → Test](https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml) — wait for green on commit `chore: prepare v0.1.0 public release` |
-| 2 | **Enable GitHub Pages** **(web)** | Settings → Pages → Build and deployment → Source: **GitHub Actions** |
-| 3 | **Verify docs deploy** **(web)** | [Actions → Docs](https://github.com/jdidjhdh/hiveflow/actions/workflows/docs.yml) → site at **https://jdidjhdh.github.io/hiveflow/en/** |
+| 2 | **Enable GitHub Pages** **(web)** | Settings → Pages → Source: **GitHub Actions** (not “Deploy from branch”) |
+| 3 | **Verify docs deploy** **(web)** | [Actions → Docs](https://github.com/jdidjhdh/hiveflow/actions/workflows/docs.yml) → site at **https://jdidjhdh.github.io/hiveflow/** (EN: `/en/`, ZH: `/zh/`) |
 | 4 | **Enable Discussions** **(web)** | Settings → General → Features → **Discussions** ✓ |
 | 5 | **Security advisories** **(web)** | Settings → Security → Private vulnerability reporting (optional) |
 | 6 | **Repo About** **(web)** | Description + Website URL (docs link above) + Topics: `multi-agent`, `hitl`, `langgraph`, `mcp`, `python` |
@@ -69,7 +69,13 @@ This triggers [`.github/workflows/release.yml`](https://github.com/jdidjhdh/hive
 
 ---
 
-## Quick links
+## Pages deploy failed?
+
+1. Settings → Pages → Source must be **GitHub Actions**
+2. Re-run: [Actions → Docs → Run workflow](https://github.com/jdidjhdh/hiveflow/actions/workflows/docs.yml)
+3. If `github-pages` environment shows **“Waiting for review”**, approve the deployment under Environments
+
+---
 
 | Resource | URL |
 |----------|-----|
