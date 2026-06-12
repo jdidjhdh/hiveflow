@@ -45,6 +45,10 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
+          if [ -z "$TWINE_PASSWORD" ]; then
+            echo "Skipping PyPI: PYPI_API_TOKEN secret not configured."
+            exit 0
+          fi
           cd packages/core
           twine upload dist/*
 
@@ -63,14 +67,21 @@ jobs:
         run: |
           cd packages/agent
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-timeout
-          python -m pytest tests/ --ignore=tests/test_real_llm.py --ignore=tests/test_llm_connection.py
+          pip install pytest pytest-asyncio pytest-timeout pytest-cov
+          python -m pytest tests/ \
+            --ignore=tests/test_real_llm.py \
+            --ignore=tests/test_llm_connection.py \
+            --cov --cov-fail-under=60
 
       - name: Publish hiveflow-agent to PyPI
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
+          if [ -z "$TWINE_PASSWORD" ]; then
+            echo "Skipping PyPI: PYPI_API_TOKEN secret not configured."
+            exit 0
+          fi
           cd packages/agent
           twine upload dist/*
 
@@ -79,7 +90,7 @@ jobs:
         with:
           body_path: CHANGELOG.md
           draft: false
-          prerelease: false
+          prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
