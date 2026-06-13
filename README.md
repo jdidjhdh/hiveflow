@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/jdidjhdh/hiveflow/releases/tag/v0.1.0"><img src="https://img.shields.io/github/v/release/jdidjhdh/hiveflow?label=release" alt="Release"/></a>
+  <a href="https://github.com/jdidjhdh/hiveflow/releases/tag/v0.1.0"><img src="https://img.shields.io/github/v/release/jdidjhdh/hiveflow?include_prereleases&amp;label=release" alt="Release v0.1.0"/></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+"/></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"/></a>
   <a href="https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml"><img src="https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml/badge.svg" alt="Tests"/></a>
