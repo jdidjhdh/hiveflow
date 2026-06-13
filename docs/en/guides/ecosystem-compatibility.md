@@ -43,7 +43,17 @@ See [LangGraph integration](../integrations/langgraph.md) and [roadmap](../roadm
 
 ---
 
-## Architecture: coordination vs execution
+## Architecture diagrams & explanations
+
+This section pairs **every diagram element** with text so you can read the picture top-to-bottom without opening source code.
+
+---
+
+### Figure 1 — Coordination layer vs execution layer
+
+<a id="figure-1-coordination-vs-execution"></a>
+
+**What this figure shows:** HiveFlow sits **beside** LangChain/LangGraph — not inside it. The upper box is governance & ops; the lower box is where graphs and agents actually run.
 
 ```mermaid
 flowchart TB
@@ -73,9 +83,165 @@ flowchart TB
     B --> LG
 ```
 
-**HiveFlow owns:** planning surface (NL → TaskGraph), human gates, encrypted blackboard, audit trail, ops UI.
+#### Coordination layer — component guide
 
-**Your runtime owns:** node functions, LangChain chains, tool implementations, checkpointers (until v0.3 bridge).
+| # | Box | What it does | HiveFlow differentiator | LangGraph / LangChain equivalent |
+|---|-----|--------------|-------------------------|----------------------------------|
+| 1 | **Studio UI** | Web ops console: Orchestrator canvas, Approvals, Blackboard viewer, Tracer, Replay, Analytics | Self-hosted, no per-seat SaaS; non-engineers approve plans | LangGraph Studio (paid) or custom Flask admin |
+| 2 | **HITLManager** | Creates approval gates, tracks pending/approved/rejected, supports timeouts | Native API + Studio **Approvals** page; maps to `interrupt_before` on export | `interrupt()` + you build the UI |
+| 3 | **SecureBlackboard** | Shared key-value store between agents with ACL keys | Memory / Redis / **AES encrypted** backends + audit log | Graph `state` dict only |
+| 4 | **Input/Output Guards** | Blocks prompt injection patterns; validates output size/schema | Built-in defense-in-depth before tools execute | DIY middleware on chains |
+| 5 | **MCP Plugin Manager** | Discovers, installs, invokes MCP tools (filesystem, HTTP, code exec, …) | **MCP-first** marketplace in Studio | LangChain `@tool` / `StructuredTool` classes |
+
+#### Execution layer — component guide
+
+| # | Box | What it does | Who implements it |
+|---|-----|--------------|-------------------|
+| 6 | **LangGraph StateGraph** | Compiles nodes & edges, runs checkpointer, pauses at interrupts | Your LangGraph app (Sidecar) or HiveFlow native orchestrator (no LangGraph) |
+| 7 | **LangChain agents / tools** | ReAct loops, chains, retrievers, custom `@tool` functions | Your existing LangChain code — wrap into MCP/ReActTool if needed |
+| 8 | **OpenAI / Anthropic / Ollama** | LLM inference | HiveFlow native clients **or** LangChain LLM wrappers — same API keys |
+
+#### Arrows — data & control flows
+
+| Arrow | Meaning | Payload / trigger | Typical API or code |
+|-------|---------|-------------------|---------------------|
+| **Studio → HITLManager** | Reviewer opens **Approvals**, approves/rejects a gate | `gate_id`, `approved`, `comment` | `POST /api/hitl/{id}/respond` |
+| **Studio → SecureBlackboard** | Ops user inspects live shared keys during a run | `intent_id`, blackboard keys | `GET /api/blackboard/*` |
+| **TaskGraph JSON → LangGraph** | Export plan topology + HITL hints | JSON plan → LangGraph spec with `interrupt_before` | `taskgraph_to_langgraph()` · `POST /api/agent/export-langgraph` |
+| **LangGraph → HITLManager** | Graph pauses at human node; Sidecar creates a gate | `node_id`, draft context, `trace_id` | Your interrupt handler calls `hitl.create_gate()` |
+| **HITLManager → LangGraph** | Human approved; graph resumes | `approved=True` | Poll gate status or webhook, then `graph.invoke(...)` |
+| **LangChain → LLM** | Model call inside your agent loop | messages, tools | LangChain or HiveFlow `LLMClient` |
+| **LangGraph → MCP** | Node invokes a unified tool | tool name + args | `MCPPluginManager.invoke()` |
+| **Guards → LangChain** | Sanitize I/O before/after chain execution | text in/out | `Guards.validate_input()` / `validate_output()` |
+| **Blackboard → LangGraph** | Node reads/writes audited shared state | key-value by `intent_id` | `blackboard.sys_get/put()` from node code |
+
+**Division of responsibility:**
+
+- **HiveFlow owns:** NL → TaskGraph planning surface, human gates, encrypted audited blackboard, guards, self-hosted ops UI, MCP catalog.
+- **Your runtime owns:** node functions, LangChain chains, tool bodies, LangGraph checkpointers (until v0.3 in-process bridge).
+
+→ Deeper system design: [Architecture](../architecture.md)
+
+---
+
+### Figure 2 — HiveFlow native three-layer stack
+
+<a id="figure-2-three-layer-stack"></a>
+
+**What this figure shows:** When you run **full HiveFlow** (Path 1), components stack vertically. This is HiveFlow's **internal** architecture — independent of LangGraph.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Layer 3 — HiveFlow Studio (React + FastAPI)                │
+│  Orchestrator · Chatflow · Approvals · Tracer · Analytics   │
+└─────────────────────────────┬───────────────────────────────┘
+                              │ REST + WebSocket (SSE)
+┌─────────────────────────────▼───────────────────────────────┐
+│  Layer 2 — HiveFlow Agent Runtime (hiveflow-agent)            │
+│  NL planning · ReActWorker · LLM routing · memory · tools   │
+└─────────────────────────────┬───────────────────────────────┘
+                              │ ECM messages · scheduler calls
+┌─────────────────────────────▼───────────────────────────────┐
+│  Layer 1 — HiveFlow Core Engine (hiveflow-core)             │
+│  Event Bus · Scheduler · Cell · Blackboard · HITL · MCP       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Layer guide
+
+| Layer | Package | Key modules | Role in compatibility story |
+|-------|---------|-------------|----------------------------|
+| **Layer 3 — Studio** | `packages/studio` | Orchestrator, `/api/agent/*`, `/api/hitl/*` | Where reviewers approve plans; where you export LangGraph JSON from the UI |
+| **Layer 2 — Agent** | `packages/agent` | `HiveMindApp`, `ReActWorker`, `llm/*` | NL → TaskGraph; wraps Core without requiring LangChain |
+| **Layer 1 — Core** | `packages/core` | `HiveFlow`, `HITLManager`, `adapters/langgraph` | Scheduling, blackboard, HITL primitives, LangGraph export adapter |
+
+**How this relates to Figure 1:** Layers 1–3 together form the **HiveFlow coordination box**. In Sidecar mode, Layer 2 planning still produces TaskGraph JSON, but **execution** happens in your external LangGraph process instead of Core's native orchestrator.
+
+---
+
+### Figure 3 — Sidecar lifecycle (sequence)
+
+<a id="figure-3-sidecar-sequence"></a>
+
+**What this figure shows:** One full Sidecar iteration — from natural-language plan to human approval to resumed execution.
+
+```mermaid
+sequenceDiagram
+    participant U as User / Reviewer
+    participant ST as Studio UI
+    participant HF as HiveFlow API
+    participant BB as SecureBlackboard
+    participant LG as LangGraph app
+
+    U->>ST: Enter goal (Agent mode)
+    ST->>HF: POST /api/agent/plan-only
+    HF-->>ST: TaskGraph JSON + intent_id
+    U->>ST: Review plan (optional HITL)
+    ST->>HF: POST /api/agent/export-langgraph
+    HF-->>LG: LangGraph spec (interrupt_before)
+    LG->>LG: Run nodes (research, draft, …)
+    LG->>HF: create_gate(compliance node)
+    HF->>BB: Store draft + audit entry
+    HF-->>ST: Pending gate (Approvals)
+    U->>ST: Approve / reject
+    ST->>HF: POST /api/hitl/{id}/respond
+    HF-->>LG: approved=True
+    LG->>LG: Resume graph → final_answer
+    LG->>BB: Write final results
+    U->>ST: Replay / Tracer (same intent_id)
+```
+
+#### Sequence step guide
+
+| Step | Actor | Action | HiveFlow highlight |
+|------|-------|--------|------------------|
+| 1 | User | Types a goal in Orchestrator Agent drawer | NL → structured TaskGraph without writing LangGraph code first |
+| 2 | Studio | `plan-only` | Produces reviewable JSON; optional `HIVEFLOW_PLAN_HITL` gate before any execution |
+| 3 | User | Reviews topology on canvas | Visual ops — not available in raw LangGraph CLI |
+| 4 | Export | `export-langgraph` | Single format bridges Studio ↔ LangGraph team |
+| 5 | LangGraph | Runs automated nodes | Your existing investment stays |
+| 6 | LangGraph → HiveFlow | Interrupt handler calls `create_gate` | Replaces custom approval microservice |
+| 7 | Blackboard | Stores draft + audit | Encrypted, keyed by `intent_id` for compliance |
+| 8 | Reviewer | Studio **Approvals** | Non-engineer friendly; same UX as native HiveFlow HITL |
+| 9 | Resume | After `respond(approved=True)` | LangGraph continues; HiveFlow records decision |
+| 10 | Replay | Same `intent_id` in Tracer/Replay | Self-hosted audit trail vs LangSmith-only |
+
+---
+
+### Figure 4 — Decision tree (which integration path?)
+
+<a id="figure-4-decision-tree"></a>
+
+**What this figure shows:** How to choose Path 1 (native), Path 2 (Sidecar), or LangGraph-only.
+
+```mermaid
+flowchart TD
+    Q1{Already on LangGraph?}
+    Q1 -->|Yes| Q2{Need Studio HITL / audit?}
+    Q1 -->|No| Q3{Need visual ops UI?}
+    Q2 -->|Yes| Sidecar[Path 2: LangGraph Sidecar]
+    Q2 -->|No| LGOnly[LangGraph only — export optional]
+    Q3 -->|Yes| Native[Path 1: Native + Studio]
+    Q3 -->|No| Lib[Path 1: Core/Agent library embed]
+    Sidecar --> HF[HITL + Blackboard + Studio]
+    Native --> HF
+```
+
+#### Decision node guide
+
+| Node | Question | If **Yes** | If **No** |
+|------|----------|------------|-----------|
+| **Q1** | Already standardized on LangGraph? | Go to Q2 — consider Sidecar | Go to Q3 — native HiveFlow is simpler |
+| **Q2** | Need Studio HITL, audit, or reviewer UI? | **Path 2 Sidecar** — keep LangGraph execution, add HiveFlow governance | **LangGraph only** — optional export from HiveFlow for planning |
+| **Q3** | Need visual ops UI (Orchestrator, Tracer)? | **Path 1 Native + Studio** — `docker compose up` | **Path 1 library embed** — Core/Agent in your service, no UI |
+| **Sidecar / Native → HF** | Terminal: you get HiveFlow's coordination features | HITL + audited blackboard + self-hosted Studio | — |
+
+| Outcome | Best when | You keep | You gain from HiveFlow |
+|---------|-----------|----------|------------------------|
+| **Path 2 Sidecar** | LangGraph codebase exists; compliance/HITL needed | LangGraph nodes & checkpointers | Approvals UI, blackboard audit, guards, MCP market |
+| **Path 1 Native + Studio** | Greenfield or full stack acceptable | Single dependency | Everything in one self-hosted product |
+| **Path 1 library embed** | Backend microservice, no UI | Minimal footprint | Scheduler, HITL API, blackboard in-process |
+| **LangGraph only** | No governance requirements | Status quo | Optional TaskGraph export from HiveFlow planning only |
 
 ---
 
@@ -406,18 +572,7 @@ spec = lg.to_langgraph_spec(skill_plan)
 
 ## Decision tree: which path?
 
-```mermaid
-flowchart TD
-    Q1{Already on LangGraph?}
-    Q1 -->|Yes| Q2{Need Studio HITL / audit?}
-    Q1 -->|No| Q3{Need visual ops UI?}
-    Q2 -->|Yes| Sidecar[Path 2: LangGraph Sidecar]
-    Q2 -->|No| LGOnly[LangGraph only — export optional]
-    Q3 -->|Yes| Native[Path 1: Native + Studio]
-    Q3 -->|No| Lib[Path 1: Core/Agent library embed]
-    Sidecar --> HF[HITL + Blackboard + Studio]
-    Native --> HF
-```
+See **Figure 4** in [Architecture diagrams & explanations](#figure-4-decision-tree) above for the diagram and per-node guide.
 
 ---
 
