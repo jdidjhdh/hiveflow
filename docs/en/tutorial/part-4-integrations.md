@@ -47,7 +47,7 @@ User → Studio → HiveFlow (HITL + audit + blackboard)
                LangGraph runtime (graph execution)
 ```
 
-Deep dive: [LangGraph Sidecar cookbook](../cookbook/langgraph-sidecar.md) and [LangGraph integration](../integrations/langgraph.md).
+Deep dive: [LangGraph Sidecar cookbook](../cookbook/langgraph-sidecar.md) and [Ecosystem compatibility guide](../guides/ecosystem-compatibility.md).
 
 ### Studio export buttons
 

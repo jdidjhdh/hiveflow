@@ -10,6 +10,8 @@ HiveFlow connects to external systems through optional dependency groups and Stu
 | PostgreSQL (Studio) | Studio backend deps | [PostgreSQL](postgres.md) |
 | LangGraph (plan export/import) | Core adapter (no extra) | [LangGraph PoC](langgraph.md) |
 
+**Full guide:** [Ecosystem compatibility (LangChain · LangGraph · MCP)](../guides/ecosystem-compatibility.md)
+
 ## Optional dependency groups
 
 ```bash

@@ -10,6 +10,8 @@ HiveFlow 通过可选依赖组与 Studio 配置连接外部系统。
 | PostgreSQL（Studio） | Studio backend deps | [PostgreSQL](postgres.md) |
 | LangGraph（计划导出/导入） | Core adapter（无 extra） | [LangGraph PoC](langgraph.md) |
 
+**完整指南：** [生态兼容指南（LangChain · LangGraph · MCP）](../guides/ecosystem-compatibility.md)
+
 ## 可选依赖组
 
 ```bash

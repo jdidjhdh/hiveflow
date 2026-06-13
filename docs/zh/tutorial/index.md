@@ -9,7 +9,7 @@
 | **新用户** | 第 1 部分 → 第 2 部分 → 第 5 部分（Studio） |
 | **库/embed 开发者** | 第 1 部分 → 第 2 部分 → 第 3 部分 |
 | **运维 / 平台** | 第 5 部分 → 第 6 部分 |
-| **LangGraph 用户** | 第 4 部分 + [LangGraph Sidecar](../cookbook/langgraph-sidecar.md) |
+| **LangGraph 用户** | 第 4 部分 + [LangGraph Sidecar](../cookbook/langgraph-sidecar.md) · [生态兼容指南](../guides/ecosystem-compatibility.md) |
 
 ## 前置条件
 

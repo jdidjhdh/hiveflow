@@ -88,6 +88,7 @@ plugins:
                 - Agent Operations: studio-agent-ops.md
             - Guides:
                 - Migrate from LangGraph: guides/migrate-from-langgraph.md
+                - Ecosystem compatibility: guides/ecosystem-compatibility.md
             - Integrations:
                 - Overview: integrations/index.md
                 - LangGraph (PoC): integrations/langgraph.md
@@ -144,6 +145,7 @@ plugins:
                 - Agent 运维: studio-agent-ops.md
             - 指南:
                 - 从 LangGraph 迁移: guides/migrate-from-langgraph.md
+                - 生态兼容指南: guides/ecosystem-compatibility.md
             - 集成:
                 - 概览: integrations/index.md
                 - LangGraph（PoC）: integrations/langgraph.md

@@ -47,7 +47,7 @@ LangGraph 作为 **执行运行时**，HiveFlow 作为 **协调层**（HITL、�
                LangGraph 运行时（图执行）
 ```
 
-深度阅读：[LangGraph Sidecar Cookbook](../cookbook/langgraph-sidecar.md)、[LangGraph 集成](../integrations/langgraph.md)。
+深度阅读：[LangGraph Sidecar Cookbook](../cookbook/langgraph-sidecar.md)、[生态兼容指南](../guides/ecosystem-compatibility.md)。
 
 ### Studio 导出按钮
 

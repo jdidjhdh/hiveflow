@@ -9,7 +9,7 @@ Welcome to the **full HiveFlow tutorial**. This series walks you from zero to pr
 | **New users** | Part 1 → Part 2 → Part 5 (Studio) |
 | **Library embedders** | Part 1 → Part 2 → Part 3 |
 | **Ops / platform** | Part 5 → Part 6 |
-| **LangGraph users** | Part 4 + [LangGraph Sidecar](../cookbook/langgraph-sidecar.md) |
+| **LangGraph users** | Part 4 + [LangGraph Sidecar](../cookbook/langgraph-sidecar.md) · [Ecosystem compatibility](../guides/ecosystem-compatibility.md) |
 
 ## Prerequisites
 
