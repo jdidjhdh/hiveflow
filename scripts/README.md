@@ -6,6 +6,7 @@
 | [`pre_release_check.py`](pre_release_check.py) | Pre-push hygiene + readiness (run before first GitHub publish) |
 | [`setup_github_repo.py`](setup_github_repo.py) | One-click GitHub setup (Discussions, topics, security, release sync) |
 | [`setup_github_repo.ps1`](setup_github_repo.ps1) | Windows wrapper (uses git credential manager) |
+| [`close_dependabot_prs.py`](close_dependabot_prs.py) | Close open Dependabot PRs (Alpha noise cleanup) |
 | [`debug/`](debug/) | Maintainer-only local diagnostics |
 
 ```bash

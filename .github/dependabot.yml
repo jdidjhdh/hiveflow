@@ -1,25 +1,26 @@
 version: 2
+# Paused during v0.1.x Alpha (open-pull-requests-limit: 0). Re-enable by setting limit to 1–2.
 updates:
   - package-ecosystem: pip
     directory: /packages/core
     schedule:
       interval: monthly
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 0
 
   - package-ecosystem: pip
     directory: /packages/studio/backend
     schedule:
       interval: monthly
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 0
 
   - package-ecosystem: npm
     directory: /packages/studio/frontend
     schedule:
       interval: monthly
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 0
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 0
