@@ -3,7 +3,7 @@ site_description: Lightweight multi-agent coordination & HITL layer with Studio 
 site_url: https://jdidjhdh.github.io/hiveflow/
 repo_url: https://github.com/jdidjhdh/hiveflow
 repo_name: jdidjhdh/hiveflow
-edit_uri: edit/main/docs/
+# Per-locale edit_uri is set under plugins.i18n.languages (docs/en, docs/zh).
 
 exclude_docs: |
   README.md
@@ -31,6 +31,7 @@ theme:
     - content.code.copy
     - search.suggest
     - content.action.edit
+    - content.action.view
 
 markdown_extensions:
   - admonition
@@ -57,6 +58,7 @@ plugins:
           default: true
           name: English
           build: true
+          edit_uri: edit/main/docs/en/
           site_name: HiveFlow
           site_description: Multi-agent coordination & HITL layer with Studio and MCP
           site_url: https://jdidjhdh.github.io/hiveflow/en/
@@ -105,6 +107,7 @@ plugins:
         - locale: zh
           name: 简体中文
           build: true
+          edit_uri: edit/main/docs/zh/
           site_name: HiveFlow
           site_description: 多 Agent 协调与 HITL 层，含 Studio 与 MCP
           site_url: https://jdidjhdh.github.io/hiveflow/zh/

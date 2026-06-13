@@ -2,6 +2,20 @@
 
 Thank you for your interest in contributing to HiveFlow! This document provides guidelines and instructions for contributing.
 
+## Edit without being a collaborator
+
+You do **not** need write access to the repository. Any signed-in GitHub user can:
+
+| What | How |
+|------|-----|
+| **Documentation** | Open any docs page → click **Edit this page** (top right) → GitHub creates a fork and opens an editor → submit a PR |
+| **Code / examples** | [Fork](https://github.com/jdidjhdh/hiveflow/fork) the repo → branch → push → open a Pull Request |
+| **Questions & ideas** | [Discussions](https://github.com/jdidjhdh/hiveflow/discussions) — post and reply freely |
+| **Bug reports** | [Issues](https://github.com/jdidjhdh/hiveflow/issues) — open or comment |
+| **Wiki** | [Wiki](https://github.com/jdidjhdh/hiveflow/wiki) — edit if public wiki editing is enabled in repo settings |
+
+Maintainers review PRs before changes land on `main`.
+
 ## Table of Contents
 
 - [Code of Conduct](#code-of-conduct)

@@ -106,6 +106,8 @@ def main() -> int:
             "has_discussions": True,
             "has_issues": True,
             "has_wiki": True,
+            "has_pull_requests": True,
+            "pull_request_creation_policy": "all",
             "allow_update_branch": True,
             "delete_branch_on_merge": True,
             "allow_merge_commit": True,
@@ -115,6 +117,7 @@ def main() -> int:
     )
     print(f"  discussions: {repo.get('has_discussions')}")
     print(f"  homepage: {repo.get('homepage')}")
+    print(f"  pull_request_creation_policy: {repo.get('pull_request_creation_policy')}")
 
     topics = [
         "multi-agent",
@@ -135,6 +138,11 @@ def main() -> int:
     print("\nDone. Verify:")
     print(f"  https://github.com/{OWNER}/{REPO}/discussions")
     print(f"  https://github.com/{OWNER}/{REPO}/releases/tag/v0.1.0")
+    print(
+        "\nOptional (web UI): Settings → General → Features → "
+        "uncheck 'Restrict wiki editing to collaborators only' so any signed-in user can edit the Wiki:"
+    )
+    print(f"  https://github.com/{OWNER}/{REPO}/settings#features")
     return 0
 
 
