@@ -13,15 +13,15 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/hiveflow-core/"><img src="https://img.shields.io/pypi/v/hiveflow-core.svg" alt="PyPI"/></a>
-  <a href="https://pypi.org/project/hiveflow-core/"><img src="https://img.shields.io/pypi/pyversions/hiveflow-core.svg" alt="Python"/></a>
+  <a href="https://github.com/jdidjhdh/hiveflow/releases/tag/v0.1.0"><img src="https://img.shields.io/github/v/release/jdidjhdh/hiveflow?label=release" alt="Release"/></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+"/></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"/></a>
   <a href="https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml"><img src="https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml/badge.svg" alt="Tests"/></a>
-  <a href="https://jdidjhdh.github.io/hiveflow/en/"><img src="https://img.shields.io/badge/docs-English-blue" alt="Docs EN"/></a>
+  <a href="https://jdidjhdh.github.io/hiveflow/"><img src="https://img.shields.io/badge/docs-English-blue" alt="Docs EN"/></a>
   <a href="https://jdidjhdh.github.io/hiveflow/zh/"><img src="https://img.shields.io/badge/docs-中文-blue" alt="Docs ZH"/></a>
 </p>
 
-> **0.1.x Alpha** — [v0.1.0 release](https://github.com/jdidjhdh/hiveflow/releases/tag/v0.1.0) · [versioning policy](docs/en/versioning.md) · [docs](https://jdidjhdh.github.io/hiveflow/) · [contribute](CONTRIBUTING.md#edit-without-being-a-collaborator) (fork / edit docs / discussions)
+> **0.1.x Alpha** — Install via **Docker**, **git source**, or **[GitHub Release](https://github.com/jdidjhdh/hiveflow/releases/tag/v0.1.0)** wheels (PyPI optional later) · [versioning policy](docs/en/versioning.md) · [docs](https://jdidjhdh.github.io/hiveflow/) · [contribute](CONTRIBUTING.md#edit-without-being-a-collaborator) (fork / edit docs / discussions)
 
 HiveFlow is the **multi-agent coordination and HITL layer** for teams that need human approval, audited shared state, and a self-hosted ops UI — while staying compatible with runtimes like LangGraph via the [sidecar pattern](docs/en/cookbook/langgraph-sidecar.md).
 
@@ -59,14 +59,26 @@ Open **http://localhost:3000** → **Orchestrator** → enable **Agent / real mo
 
 APIs: `POST /api/agent/plan-only` · `execute-plan` · `query` — see [Studio Agent cookbook](docs/en/cookbook/studio-agent-mode.md) ([中文](docs/zh/cookbook/studio-agent-mode.md)).
 
-### 2. PyPI (library / scripts)
+### 2. Library / scripts (no PyPI required)
+
+**From source (recommended for 0.1.x):**
 
 ```bash
-pip install hiveflow-core hiveflow-agent
+git clone https://github.com/jdidjhdh/hiveflow.git
+cd hiveflow
+pip install -e packages/core -e packages/agent
 python examples/01_hello_hiveflow.py
 ```
 
-Optional extras: `pip install "hiveflow-core[all]"` (security, llm, rag, redis).
+Optional extras: `pip install -e "packages/core[all]"` (security, llm, rag, redis).
+
+**From GitHub Release wheels** — download `hiveflow_core` / `hiveflow_agent` wheels from [v0.1.0](https://github.com/jdidjhdh/hiveflow/releases/tag/v0.1.0), then:
+
+```bash
+pip install ./hiveflow_core-*.whl ./hiveflow_agent-*.whl
+```
+
+PyPI (`pip install hiveflow-core`) will be added when published; not required for Alpha.
 
 ### Advanced — embed Core engine only
 
@@ -149,22 +161,22 @@ HiveFlow is a monorepo with three packages. Pick the layer that matches your int
 
 | Module | Package | Role | Typical user |
 |--------|---------|------|--------------|
-| **Core** | [`hiveflow`](packages/core/) · PyPI | Orchestration kernel — scheduler, blackboard, DAG/HITL/RAG/MCP | Library authors, backend engineers |
-| **Agent** | [`hiveflow-agent`](packages/agent/) · PyPI | NL planning + cognitive Skill graphs on top of Core | Agent builders, LLM app developers |
+| **Core** | [`hiveflow`](packages/core/) · source / Release | Orchestration kernel — scheduler, blackboard, DAG/HITL/RAG/MCP | Library authors, backend engineers |
+| **Agent** | [`hiveflow-agent`](packages/agent/) · source / Release | NL planning + cognitive Skill graphs on top of Core | Agent builders, LLM app developers |
 | **Studio** | [`packages/studio`](packages/studio/) · self-hosted | Visual ops UI + FastAPI backend (REST/WS) | Operators, reviewers, full-stack teams |
 
 ### Core — `packages/core` (`hiveflow`)
 
 The **embeddable engine**. You register workers with skills, schedule `ECM` tasks, and coordinate through a shared blackboard. Includes static/dynamic DAG orchestrators, HITL gates, checkpoints, dual guards, RAG, MCP plugin hooks, and Prometheus-friendly metrics — with no UI dependency.
 
-- **Install:** `pip install hiveflow-core` · **Docs:** [Core README](packages/core/README.md) · [API](docs/en/api/index.md)
+- **Install:** `pip install -e packages/core` or [Release wheels](https://github.com/jdidjhdh/hiveflow/releases/tag/v0.1.0) · **Docs:** [Core README](packages/core/README.md) · [API](docs/en/api/index.md)
 - **Examples:** `examples/01_hello_hiveflow.py` … `15_multimodal_pipeline.py`
 
 ### Agent — `packages/agent` (`hiveflow-agent`)
 
 The **cognitive runtime** on Core. `HiveMindApp` turns natural language into a TaskGraph, binds Skills to ReAct workers, and executes via `CognitiveOrchestrator`. Supports plan-only, full `run_query`, and `execute_plan` on an existing graph — with optional plan HITL before execution.
 
-- **Install:** `pip install hiveflow-agent` · **Docs:** [Agent README](packages/agent/README.md) · [Studio Agent cookbook](docs/en/cookbook/studio-agent-mode.md)
+- **Install:** `pip install -e packages/agent` or Release wheels · **Docs:** [Agent README](packages/agent/README.md) · [Studio Agent cookbook](docs/en/cookbook/studio-agent-mode.md)
 - **Key APIs:** `run_query` · `plan_only` · `execute_plan` (also exposed as `/api/agent/*` in Studio)
 
 ### Studio — `packages/studio` (FastAPI + React)
@@ -184,7 +196,7 @@ The **visual operations platform**. Orchestrator and Chatflow for workflow desig
 
 | Resource | English | 中文 |
 |----------|---------|------|
-| Documentation site | [en/](https://jdidjhdh.github.io/hiveflow/en/) | [zh/](https://jdidjhdh.github.io/hiveflow/zh/) |
+| Documentation site | [English](https://jdidjhdh.github.io/hiveflow/) | [zh/](https://jdidjhdh.github.io/hiveflow/zh/) |
 | Getting Started | [docs/en/getting-started.md](docs/en/getting-started.md) | [docs/zh/getting-started.md](docs/zh/getting-started.md) |
 | Three modules | [Core](packages/core/README.md) · [Agent](packages/agent/README.md) · [Studio](packages/studio/README.md) | [Core](packages/core/README.zh.md) · [Agent](packages/agent/README.zh.md) · [Studio](packages/studio/README.zh.md) |
 | Cookbook | [docs/en/cookbook/](docs/en/cookbook/) | [docs/zh/cookbook/](docs/zh/cookbook/) |
@@ -196,8 +208,8 @@ The **visual operations platform**. Orchestrator and Chatflow for workflow desig
 
 ```
 HiveFlow/
-├── packages/core/          # PyPI: hiveflow — orchestration kernel
-├── packages/agent/         # PyPI: hiveflow-agent — NL cognitive runtime
+├── packages/core/          # hiveflow-core — orchestration kernel (source / Release)
+├── packages/agent/         # hiveflow-agent — NL cognitive runtime (source / Release)
 ├── packages/studio/        # Self-hosted UI + FastAPI backend
 ├── examples/               # 16 smoke-tested examples
 └── docs/                   # MkDocs（en/ + zh/）

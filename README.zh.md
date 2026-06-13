@@ -13,15 +13,15 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/hiveflow-core/"><img src="https://img.shields.io/pypi/v/hiveflow-core.svg" alt="PyPI"/></a>
-  <a href="https://pypi.org/project/hiveflow-core/"><img src="https://img.shields.io/pypi/pyversions/hiveflow-core.svg" alt="Python"/></a>
+  <a href="https://github.com/jdidjhdh/hiveflow/releases/tag/v0.1.0"><img src="https://img.shields.io/github/v/release/jdidjhdh/hiveflow?label=release" alt="Release"/></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+"/></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"/></a>
   <a href="https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml"><img src="https://github.com/jdidjhdh/hiveflow/actions/workflows/test.yml/badge.svg" alt="Tests"/></a>
-  <a href="https://jdidjhdh.github.io/hiveflow/en/"><img src="https://img.shields.io/badge/docs-English-blue" alt="Docs EN"/></a>
+  <a href="https://jdidjhdh.github.io/hiveflow/"><img src="https://img.shields.io/badge/docs-English-blue" alt="Docs EN"/></a>
   <a href="https://jdidjhdh.github.io/hiveflow/zh/"><img src="https://img.shields.io/badge/docs-中文-blue" alt="Docs ZH"/></a>
 </p>
 
-> **0.1.x Alpha** — [v0.1.0 发布](https://github.com/jdidjhdh/hiveflow/releases/tag/v0.1.0) · [版本策略](docs/zh/versioning.md) · [文档](https://jdidjhdh.github.io/hiveflow/zh/) · [参与贡献](CONTRIBUTING.md#edit-without-being-a-collaborator)（Fork / 编辑文档 / 讨论）
+> **0.1.x Alpha** — 安装方式：**Docker**、**git 源码** 或 **[GitHub Release](https://github.com/jdidjhdh/hiveflow/releases/tag/v0.1.0)** wheel（PyPI 后续可选）· [版本策略](docs/zh/versioning.md) · [文档](https://jdidjhdh.github.io/hiveflow/zh/) · [参与贡献](CONTRIBUTING.md#edit-without-being-a-collaborator)（Fork / 编辑文档 / 讨论）
 
 HiveFlow 是面向多 Agent 场景的**协调与 HITL 层**：人工审批、可审计共享状态、自托管运维 UI —— 并可通过 [LangGraph Sidecar](docs/zh/cookbook/langgraph-sidecar.md) 与 LangGraph 等运行时兼容共存。
 
@@ -59,14 +59,26 @@ docker compose up --build
 
 API：`POST /api/agent/plan-only` · `execute-plan` · `query` — 见 [Studio Agent 指南](docs/zh/cookbook/studio-agent-mode.md)（[English](docs/en/cookbook/studio-agent-mode.md)）。
 
-### 2. PyPI（库 / 脚本）
+### 2. 库 / 脚本（无需 PyPI）
+
+**源码安装（0.1.x 推荐）：**
 
 ```bash
-pip install hiveflow-core hiveflow-agent
+git clone https://github.com/jdidjhdh/hiveflow.git
+cd hiveflow
+pip install -e packages/core -e packages/agent
 python examples/01_hello_hiveflow.py
 ```
 
-可选扩展：`pip install "hiveflow-core[all]"`（security、llm、rag、redis）。
+可选扩展：`pip install -e "packages/core[all]"`（security、llm、rag、redis）。
+
+**GitHub Release wheel** — 从 [v0.1.0](https://github.com/jdidjhdh/hiveflow/releases/tag/v0.1.0) 下载 `hiveflow_core` / `hiveflow_agent` 的 wheel，然后：
+
+```bash
+pip install ./hiveflow_core-*.whl ./hiveflow_agent-*.whl
+```
+
+PyPI（`pip install hiveflow-core`）计划后续发布；Alpha 阶段不依赖 PyPI。
 
 ### 进阶 — 仅嵌入 Core 引擎
 
@@ -149,21 +161,21 @@ HiveFlow 是包含三个包的 monorepo。按集成深度选择层级。
 
 | 模块 | 包 | 角色 | 典型用户 |
 |------|-----|------|----------|
-| **Core** | [`hiveflow`](packages/core/) · PyPI | 编排内核 — 调度、黑板、DAG/HITL/RAG/MCP | 库作者、后端工程师 |
-| **Agent** | [`hiveflow-agent`](packages/agent/) · PyPI | 自然语言规划 + Core 之上认知 Skill 图 | Agent 开发者、LLM 应用开发者 |
+| **Core** | [`hiveflow`](packages/core/) · 源码 / Release | 编排内核 — 调度、黑板、DAG/HITL/RAG/MCP | 库作者、后端工程师 |
+| **Agent** | [`hiveflow-agent`](packages/agent/) · 源码 / Release | 自然语言规划 + Core 之上认知 Skill 图 | Agent 开发者、LLM 应用开发者 |
 | **Studio** | [`packages/studio`](packages/studio/) · 自托管 | 可视化运维 UI + FastAPI（REST/WS） | 运维、审批人、全栈团队 |
 
 ### Core — `packages/core`（`hiveflow`）
 
 **可嵌入引擎**。注册带 Skill 的 Worker，调度 `ECM`，通过共享黑板协同。含静态/动态 DAG、HITL、Checkpoint、双 Guard、RAG、MCP 与指标 — 不依赖 UI。
 
-- **安装：** `pip install hiveflow-core` · **文档：** [Core README（中文）](packages/core/README.zh.md) · [API](docs/zh/api/index.md)
+- **安装：** `pip install -e packages/core` 或 [Release wheel](https://github.com/jdidjhdh/hiveflow/releases/tag/v0.1.0) · **文档：** [Core README（中文）](packages/core/README.zh.md) · [API](docs/zh/api/index.md)
 
 ### Agent — `packages/agent`（`hiveflow-agent`）
 
 Core 之上的**认知运行时**。`HiveMindApp` 将自然语言转为 TaskGraph，绑定 ReAct Skill 并执行。支持 plan-only、`run_query`、`execute_plan`，可选计划 HITL。
 
-- **安装：** `pip install hiveflow-agent` · **文档：** [Agent README（中文）](packages/agent/README.zh.md)
+- **安装：** `pip install -e packages/agent` 或 Release wheel · **文档：** [Agent README（中文）](packages/agent/README.zh.md)
 
 ### Studio — `packages/studio`（FastAPI + React）
 
@@ -182,7 +194,7 @@ Core 之上的**认知运行时**。`HiveMindApp` 将自然语言转为 TaskGrap
 
 | 资源 | English | 中文 |
 |------|---------|------|
-| 文档站 | [en/](https://jdidjhdh.github.io/hiveflow/en/) | [zh/](https://jdidjhdh.github.io/hiveflow/zh/) |
+| 文档站 | [English](https://jdidjhdh.github.io/hiveflow/) | [zh/](https://jdidjhdh.github.io/hiveflow/zh/) |
 | 快速入门 | [docs/en/getting-started.md](docs/en/getting-started.md) | [docs/zh/getting-started.md](docs/zh/getting-started.md) |
 | 三大模块 | [Core](packages/core/README.md) · [Agent](packages/agent/README.md) · [Studio](packages/studio/README.md) | [Core](packages/core/README.zh.md) · [Agent](packages/agent/README.zh.md) · [Studio](packages/studio/README.zh.md) |
 | 实践指南 | [docs/en/cookbook/](docs/en/cookbook/) | [docs/zh/cookbook/](docs/zh/cookbook/) |
@@ -193,8 +205,8 @@ Core 之上的**认知运行时**。`HiveMindApp` 将自然语言转为 TaskGrap
 
 ```
 HiveFlow/
-├── packages/core/          # PyPI: hiveflow
-├── packages/agent/         # PyPI: hiveflow-agent
+├── packages/core/          # hiveflow-core — 编排内核（源码 / Release）
+├── packages/agent/         # hiveflow-agent — NL 认知运行时（源码 / Release）
 ├── packages/studio/        # 自托管 UI + 后端
 ├── examples/               # 16 个 smoke 示例
 └── docs/                   # MkDocs（en/ + zh/）
