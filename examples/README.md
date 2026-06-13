@@ -2,6 +2,8 @@
 
 This directory contains practical examples demonstrating various HiveFlow capabilities.
 
+**Full bilingual tutorial:** [English](../docs/en/tutorial/index.md) · [简体中文](../docs/zh/tutorial/index.md)
+
 ## Basic Examples
 
 | File | Description |

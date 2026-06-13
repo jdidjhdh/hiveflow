@@ -64,6 +64,14 @@ plugins:
           nav:
             - Home: index.md
             - Getting Started: getting-started.md
+            - Tutorial:
+                - Overview: tutorial/index.md
+                - "Part 1 — Foundation": tutorial/part-1-foundation.md
+                - "Part 2 — Workflows": tutorial/part-2-workflows.md
+                - "Part 3 — Advanced": tutorial/part-3-advanced.md
+                - "Part 4 — Integrations": tutorial/part-4-integrations.md
+                - "Part 5 — Studio": tutorial/part-5-studio.md
+                - "Part 6 — Production": tutorial/part-6-production.md
             - Concepts: concepts.md
             - Architecture: architecture.md
             - Modules:
@@ -112,6 +120,14 @@ plugins:
           nav:
             - 首页: index.md
             - 快速开始: getting-started.md
+            - 完整教程:
+                - 概览: tutorial/index.md
+                - 第 1 部分 — 基础: tutorial/part-1-foundation.md
+                - 第 2 部分 — 工作流: tutorial/part-2-workflows.md
+                - 第 3 部分 — 进阶: tutorial/part-3-advanced.md
+                - 第 4 部分 — 集成: tutorial/part-4-integrations.md
+                - 第 5 部分 — Studio: tutorial/part-5-studio.md
+                - 第 6 部分 — 生产: tutorial/part-6-production.md
             - 核心概念: concepts.md
             - 架构: architecture.md
             - 模块:

@@ -1,6 +1,6 @@
 # Cookbook
 
-Scenario-oriented guides beyond the getting started tutorial.
+Scenario-oriented guides beyond the getting started tutorial. For a **full walkthrough of all 16 examples**, see the [Complete Tutorial](../tutorial/index.md).
 
 | Scenario | Guide |
 |----------|-------|

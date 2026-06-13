@@ -266,4 +266,4 @@ npm install && npm run dev
 - **执行回放** — 按 `intent_id` 查看 audit 与 checkpoint
 - **任务追踪** — 实时 WS 事件，`intent_id` 与 `trace_id` 已统一
 
-详见 [Studio Agent 运维](studio-agent-ops.md)。
+详见 [Studio Agent 运维](studio-agent-ops.md) 与 [完整教程 — 第 5 部分](tutorial/part-5-studio.md)。

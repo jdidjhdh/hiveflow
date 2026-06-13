@@ -229,41 +229,41 @@ docker run -d -p 6379:6379 redis:7-alpine
 
 <a id="studio-agent-mode"></a>
 
-## Studio Agent 模式
+## Studio Agent mode
 
-HiveFlow Studio 可在 **Core DAG** 与 **HiveMind Agent** 两种运行时之间切换。Agent 模式使用 `HiveMindApp.run_query` 自动规划 Skill 图；开启计划 HITL 后，执行前需在「人工审批」页审阅计划 JSON。
+HiveFlow Studio switches between **Core DAG** and **HiveMind Agent** runtimes. Agent mode uses `HiveMindApp.run_query` to plan Skill graphs; with plan HITL enabled, review plan JSON on the **Approvals** page before execution.
 
-### 环境变量
+### Environment variables
 
-| 变量 | 说明 |
-|------|------|
-| `HIVEFLOW_RUNTIME=agent` | 启动时默认 Agent 模式 |
-| `HIVEFLOW_PLAN_HITL=true` | 执行前需人工审批计划图 |
-| `HIVEFLOW_AGENT_ECHO_LLM=true` | 无 LLM 时使用 Echo 客户端（测试/联调） |
-| `HIVEFLOW_LLM_PLANNING_PROVIDER` | 规划阶段 LLM 路由 |
-| `HIVEFLOW_LLM_EXECUTION_PROVIDER` | 执行阶段 LLM 路由 |
+| Variable | Description |
+|----------|-------------|
+| `HIVEFLOW_RUNTIME=agent` | Default Agent runtime on startup |
+| `HIVEFLOW_PLAN_HITL=true` | Require human approval before executing the plan graph |
+| `HIVEFLOW_AGENT_ECHO_LLM=true` | Echo LLM client when no API key (testing / CI) |
+| `HIVEFLOW_LLM_PLANNING_PROVIDER` | LLM route for planning |
+| `HIVEFLOW_LLM_EXECUTION_PROVIDER` | LLM route for execution |
 
-### 本地启动
+### Local startup
 
 ```bash
-# 后端（packages/studio/backend）
+# Backend (packages/studio/backend)
 pip install -r requirements.txt
-$env:HIVEFLOW_RUNTIME="agent"
-$env:HIVEFLOW_PLAN_HITL="true"
-$env:HIVEFLOW_AGENT_ECHO_LLM="true"
+export HIVEFLOW_RUNTIME=agent
+export HIVEFLOW_PLAN_HITL=true
+export HIVEFLOW_AGENT_ECHO_LLM=true
 uvicorn app.main:app --reload --port 8000
 
-# 前端（packages/studio/frontend）
+# Frontend (packages/studio/frontend)
 npm install && npm run dev
 ```
 
-在 Studio 顶栏打开**真实模式**，编排器内切换 **Agent 模式**，使用「Agent 查询」或「NL 生成草图（plan-only）」。
+Enable **real mode** in the Studio toolbar, switch **Orchestrator** to **Agent mode**, then use **Agent query** or **NL plan-only**.
 
-### 相关页面
+### Related pages
 
-- **人工审批** — 审阅/编辑 `plan_approval` 计划 JSON
-- **执行分析** — 真实模式下读取 `/api/analytics/*`
-- **执行回放** — 按 `intent_id` 查看 audit 与 checkpoint
-- **任务追踪** — 实时 WS 事件，`intent_id` 与 `trace_id` 已统一
+- **Approvals** — review/edit `plan_approval` plan JSON
+- **Analytics** — `/api/analytics/*` in real mode
+- **Replay** — audit and checkpoints by `intent_id`
+- **Tracer** — live WebSocket events; unified `intent_id` and `trace_id`
 
-详见 [Studio Agent 运维](studio-agent-ops.md)。
+See [Studio Agent Operations](studio-agent-ops.md) and the [Complete Tutorial — Part 5](tutorial/part-5-studio.md).
