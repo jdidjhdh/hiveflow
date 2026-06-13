@@ -74,7 +74,7 @@ HIVEFLOW_LLM_EXECUTION_PROVIDER=anthropic
 
 ## 4.4 MCP ecosystem
 
-HiveFlow speaks MCP natively (`hiveflow.mcp`). Plugins register tools discoverable by any MCP-compatible agent. See [Part 2 — MCP](part-2-workflows.md#26-mcp-tools-example-07).
+HiveFlow speaks MCP natively (`hiveflow.mcp`). Plugins register tools discoverable by any MCP-compatible agent. See [Part 2 — MCP](part-2-workflows.md#example-07-mcp-tools).
 
 ## 4.5 Exercises
 

@@ -74,7 +74,7 @@ HIVEFLOW_LLM_EXECUTION_PROVIDER=anthropic
 
 ## 4.4 MCP 生态
 
-HiveFlow 原生支持 MCP（`hiveflow.mcp`）。插件注册的工具可被任何 MCP 兼容 Agent 发现。见 [第 2 部分 — MCP](part-2-workflows.md#26-mcp-示例-07)。
+HiveFlow 原生支持 MCP（`hiveflow.mcp`）。插件注册的工具可被任何 MCP 兼容 Agent 发现。见 [第 2 部分 — MCP](part-2-workflows.md#example-07-mcp-tools)。
 
 ## 4.5 练习
 

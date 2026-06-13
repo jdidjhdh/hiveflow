@@ -51,7 +51,7 @@ configure_tracing(service_name="hiveflow-prod")
 ## 6.3 安全清单
 
 - [ ] 通过密钥管理服务轮换 `HIVEFLOW_ENCRYPTION_KEY`（[第 3 部分](part-3-advanced.md)）
-- [ ] 启用输入/输出护栏（[示例 14](../../examples/14_guard_configuration.py)）
+- [ ] 启用输入/输出护栏（[示例 14](https://github.com/jdidjhdh/hiveflow/blob/main/examples/14_guard_configuration.py)）
 - [ ] 对不可逆操作使用 HITL（[第 2 部分](part-2-workflows.md)）
 - [ ] 限制 Studio 网络访问（反向代理 + 认证）
 - [ ] 按 [SECURITY.md](https://github.com/jdidjhdh/hiveflow/blob/main/SECURITY.md) 报告漏洞
@@ -76,7 +76,7 @@ configure_tracing(service_name="hiveflow-prod")
                     └─────────────┘
 ```
 
-- 设置 `blackboard_type=redis` 共享状态（[示例 11](../../examples/11_distributed_agents.py)）
+- 设置 `blackboard_type=redis` 共享状态（[示例 11](https://github.com/jdidjhdh/hiveflow/blob/main/examples/11_distributed_agents.py)）
 - Postgres 存储 Studio 元数据（工作流、凭证）
 - 水平扩展：多个 Agent/Core Worker 共用同一 Redis URL
 

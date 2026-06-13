@@ -51,7 +51,7 @@ configure_tracing(service_name="hiveflow-prod")
 ## 6.3 Security checklist
 
 - [ ] Rotate `HIVEFLOW_ENCRYPTION_KEY` via secrets manager ([Part 3](part-3-advanced.md))
-- [ ] Enable input/output guards ([Example 14](../../examples/14_guard_configuration.py))
+- [ ] Enable input/output guards ([Example 14](https://github.com/jdidjhdh/hiveflow/blob/main/examples/14_guard_configuration.py))
 - [ ] Use HITL for irreversible actions ([Part 2](part-2-workflows.md))
 - [ ] Restrict Studio network access (reverse proxy + auth)
 - [ ] Report vulnerabilities per [SECURITY.md](https://github.com/jdidjhdh/hiveflow/blob/main/SECURITY.md)
@@ -76,7 +76,7 @@ configure_tracing(service_name="hiveflow-prod")
                     └─────────────┘
 ```
 
-- Set `blackboard_type=redis` for shared state ([Example 11](../../examples/11_distributed_agents.py))
+- Set `blackboard_type=redis` for shared state ([Example 11](https://github.com/jdidjhdh/hiveflow/blob/main/examples/11_distributed_agents.py))
 - Postgres stores Studio metadata (workflows, credentials)
 - Horizontal scale: multiple Agent/Core workers behind the same Redis URL
 

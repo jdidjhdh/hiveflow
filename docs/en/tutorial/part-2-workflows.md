@@ -116,6 +116,8 @@ Typical flow:
 
 Deep dive: [RAG + MCP cookbook](../cookbook/rag-mcp-pipeline.md).
 
+<a id="example-07-mcp-tools"></a>
+
 ## 2.6 MCP tools (Example 07)
 
 Unified tool discovery and invocation via Model Context Protocol.

@@ -116,6 +116,8 @@ python examples/06_rag_pipeline.py
 
 深度阅读：[RAG + MCP Cookbook](../cookbook/rag-mcp-pipeline.md)。
 
+<a id="example-07-mcp-tools"></a>
+
 ## 2.6 MCP 工具（示例 07）
 
 通过 Model Context Protocol 统一工具发现与调用。
