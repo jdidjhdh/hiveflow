@@ -21,6 +21,7 @@ EXAMPLES = [
     "14_guard_configuration.py",
     "15_multimodal_pipeline.py",
     "16_langgraph_export.py",
+    "17_x_twitter_source_review.py",
 ]
 
 

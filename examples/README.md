@@ -33,6 +33,8 @@ This directory contains practical examples demonstrating various HiveFlow capabi
 | `13_plugin_development.py` | Creating custom plugins |
 | `14_guard_configuration.py` | Input/Output guard setup |
 | `15_multimodal_pipeline.py` | Image/audio/video processing |
+| `16_langgraph_export.py` | Exporting TaskGraph plans to LangGraph |
+| `17_x_twitter_source_review.py` | X/Twitter source evidence review with HITL |
 
 ## Running Examples
 
@@ -40,5 +42,5 @@ This directory contains practical examples demonstrating various HiveFlow capabi
 cd packages/core && pip install -e ".[all]"
 cd ../../examples
 python 01_hello_hiveflow.py    # run a single example
-python run_smoke_tests.py      # run all 15 examples
+python run_smoke_tests.py      # run all 17 examples
 ```
