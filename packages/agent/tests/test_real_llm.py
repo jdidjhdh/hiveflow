@@ -36,15 +36,36 @@ from intent_parser import IntentParser
 # ============================================================
 
 def has_llm_available():
-    """检查是否有可用的 LLM 提供商。"""
+    """检查是否有可用的 LLM 提供商（真实探测，避免"装了包就算可用"的假阳性）。
+
+    可复现性修复：无真实服务/凭据时自动 skip，而不是运行后失败。
+    """
+    import httpx
     provider = os.environ.get("LLM_PROVIDER", "").lower()
-    if provider == "ollama":
-        return True  # Ollama 不需要 API key
+
+    if provider == "ollama" or not provider:
+        # 真实探测 Ollama 服务：可达且至少有一个模型
+        base = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+        try:
+            resp = httpx.get(f"{base}/api/tags", timeout=3.0)
+            if resp.status_code == 200 and resp.json().get("models"):
+                return True
+        except Exception:
+            return False
+
     if provider in ("openai", "deepseek", "anthropic"):
+        key_map = {
+            "openai": "OPENAI_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+        }
+        return bool(os.environ.get(key_map[provider]))
+
+    # 自动检测：真实探测 API key 或 Ollama 服务
+    if os.environ.get("OPENAI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY") \
+            or os.environ.get("ANTHROPIC_API_KEY"):
         return True
-    # 自动检测
-    from llm.provider_factory import list_available_providers
-    return len(list_available_providers()) > 0
+    return False  # Ollama 探测结果已在上方返回，无凭据且无服务 → 不可用
 
 
 requires_real_llm = pytest.mark.skipif(
@@ -57,10 +78,39 @@ pytestmark = pytest.mark.real_llm
 
 @pytest.fixture(scope="module")
 def real_llm():
-    """创建真实 LLM 客户端 (通过工厂函数自动检测)。"""
-    llm = create_llm_client()
+    """创建真实 LLM 客户端。
+
+    可复现性修复：
+    1. 未显式设置 LLM_PROVIDER 时，若本地 Ollama 服务可达则优先使用
+       （本地可复现通道，避免自动检测误用失效的远程 API key）；
+    2. Ollama 下自动探测本机已有模型，替换默认的 llama3，
+       使"有 Ollama 但缺默认模型"的环境也能真实跑通。
+    """
+    provider = os.environ.get("LLM_PROVIDER", "").lower()
+    if not provider and has_llm_available():
+        provider = "ollama"  # 本地服务可达 → 走可复现通道
+    llm = create_llm_client(provider=provider or None)
     info = get_provider_info()
-    print(f"\n[LLM] Using provider: {info['provider']}, model: {info['model']}")
+
+    if info["provider"] == "ollama":
+        import httpx
+        base = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+        try:
+            resp = httpx.get(f"{base}/api/tags", timeout=3.0)
+            models = [m["name"] for m in resp.json().get("models", [])]
+            # 排除 embedding 专用模型（chat 接口不可用）
+            chat_models = [
+                m for m in models
+                if not any(k in m.lower() for k in ("embed", "jina", "bge", "e5", "minilm"))
+            ]
+            target = chat_models or models
+            if llm.model not in target:
+                llm.model = target[0]
+                print(f"\n[LLM] Ollama 缺默认模型，自动切换为: {llm.model}")
+        except Exception as e:
+            pytest.skip(f"Ollama 服务不可用: {e}")
+
+    print(f"\n[LLM] Using provider: {info['provider']}, model: {llm.model}")
     return llm
 
 
