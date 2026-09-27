@@ -1,3 +1,4 @@
+import json
 import os
 
 from .base import LLMClient
@@ -29,6 +30,34 @@ class DeepSeekLLMClient(LLMClient):
             model=self.model, messages=messages, **kwargs
         )
         return resp.choices[0].message.content
+
+    async def complete_with_tools(self, messages, tools, tool_choice="auto", **kwargs):
+        """原生 function calling：由 API 结构化返回工具调用，参数保证为合法 JSON。
+
+        Returns:
+            (tool_calls, content):
+              - tool_calls: list[dict] | None，每个含 {name, arguments(dict)}
+              - content: str | None
+        """
+        kwargs.pop("trace_id", None)
+        kwargs.pop("max_retries", None)
+        kwargs.pop("jitter", None)
+        kwargs.pop("max_messages", None)
+        resp = await self.client.chat.completions.create(
+            model=self.model, messages=messages, tools=tools,
+            tool_choice=tool_choice, **kwargs,
+        )
+        msg = resp.choices[0].message
+        calls = None
+        if getattr(msg, "tool_calls", None):
+            calls = []
+            for tc in msg.tool_calls:
+                try:
+                    arguments = json.loads(tc.function.arguments or "{}")
+                except json.JSONDecodeError:
+                    arguments = {}
+                calls.append({"name": tc.function.name, "arguments": arguments})
+        return calls, msg.content
 
     async def _stream_impl(self, messages, **kwargs):
         kwargs.pop("trace_id", None)

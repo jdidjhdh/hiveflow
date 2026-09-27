@@ -169,6 +169,18 @@ class LLMClient(ABC):
         
         return _timeout_enforced_stream()
 
+    async def complete_with_tools(self, messages, tools, tool_choice="auto", **kwargs):
+        """原生 function calling（OpenAI tools 风格）。
+
+        子类（如 DeepSeek）实现后返回 (tool_calls, content)：
+          - tool_calls: list[{"name": str, "arguments": dict}] | None
+          - content: str | None
+        不支持的客户端抛 NotImplementedError，调用方可降级到文本 JSON 解析。
+        """
+        raise NotImplementedError(
+            "This LLM client does not support native function calling"
+        )
+
     async def embed(self, texts: list[str], trace_id: str | None = None) -> list[list[float]]:
         """Embed texts with trace_id tracking."""
         if trace_id:
