@@ -21,6 +21,22 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+# ======================== Exceptions ========================
+
+
+class ToolNameConflictError(Exception):
+    """Raised when attempting to register a tool with a name that already exists."""
+
+    def __init__(self, tool_name: str, existing_plugin_id: str, new_plugin_id: str):
+        self.tool_name = tool_name
+        self.existing_plugin_id = existing_plugin_id
+        self.new_plugin_id = new_plugin_id
+        super().__init__(
+            f"Tool name conflict: '{tool_name}' is already registered by plugin '{existing_plugin_id}'. "
+            f"Cannot register from plugin '{new_plugin_id}'."
+        )
+
+
 # ======================== MCP Transport ========================
 
 
@@ -105,6 +121,8 @@ class MCPClient:
 
     Supports stdio transport (subprocess) and mock mode for testing.
 
+    🔒 P0 FIX: Proper subprocess cleanup to prevent zombie processes.
+
     Usage:
         # stdio mode
         client = MCPClient(
@@ -141,6 +159,24 @@ class MCPClient:
         self._mock_handlers: dict[str, Callable] = {}
         self._request_id = 0
 
+    def __del__(self):
+        """
+        🔄 P0 FIX: Fallback cleanup to prevent zombie processes.
+        
+        If close() wasn't called explicitly, this ensures the subprocess
+        is terminated when the object is garbage collected.
+        """
+        if self._process and self._process.returncode is None:
+            try:
+                self._process.terminate()
+                # Give process a moment to terminate
+                import time
+                time.sleep(0.1)
+                if self._process.returncode is None:
+                    self._process.kill()
+            except Exception:
+                pass
+
     async def initialize(self):
         """Initialize the MCP connection."""
         if self.transport == MCPTransportType.STDIO:
@@ -175,14 +211,31 @@ class MCPClient:
             raise
 
     async def close(self):
-        """Close the MCP connection."""
+        """
+        Close the MCP connection.
+        
+        🔄 P0 FIX: Proper subprocess cleanup with terminate + wait to prevent zombies.
+        """
         if self._process:
             try:
+                # 🔄 P0 FIX: Graceful shutdown sequence
                 self._process.terminate()
-                await self._process.wait()
-            except Exception:
-                self._process.kill()
-            self._process = None
+                # Wait for process to terminate (with timeout)
+                try:
+                    await asyncio.wait_for(self._process.wait(), timeout=5.0)
+                    logger.debug(f"MCP process terminated gracefully (pid={self._process.pid})")
+                except asyncio.TimeoutError:
+                    # Force kill if terminate didn't work
+                    logger.warning(f"MCP process didn't terminate gracefully, killing (pid={self._process.pid})")
+                    self._process.kill()
+                    await self._process.wait()
+            except ProcessLookupError:
+                # Process already terminated
+                pass
+            except Exception as e:
+                logger.warning(f"Error during MCP process cleanup: {e}")
+            finally:
+                self._process = None
         self._initialized = False
         self._tools = []
 
@@ -492,9 +545,62 @@ class MCPPluginManager:
             await client.initialize()
 
         self._clients[plugin_id] = client
-        plugin.tools = await client.list_tools()
+
+        # Get tools from the new plugin
+        new_tools = await client.list_tools()
         plugin.resources = await client.list_resources()
+
+        # Check for tool name conflicts before assigning tools
+        conflicts = self._check_tool_conflicts(plugin_id, new_tools)
+        if conflicts:
+            # Log conflicts and raise error
+            conflict_names = [c[0] for c in conflicts]
+            logger.error(
+                f"Tool name conflicts detected for plugin '{plugin_id}': {conflict_names}"
+            )
+            # Close the client since we won't be using it
+            await client.close()
+            del self._clients[plugin_id]
+            # Raise the first conflict as error
+            first_conflict = conflicts[0]
+            raise ToolNameConflictError(
+                tool_name=first_conflict[0],
+                existing_plugin_id=first_conflict[1],
+                new_plugin_id=plugin_id,
+            )
+
+        # No conflicts, assign tools
+        plugin.tools = new_tools
         logger.info(f"MCP plugin initialized: {plugin_id} ({len(plugin.tools)} tools)")
+
+    def _check_tool_conflicts(
+        self, new_plugin_id: str, new_tools: list[MCPTool]
+    ) -> list[tuple[str, str]]:
+        """
+        Check for tool name conflicts with existing plugins.
+
+        Args:
+            new_plugin_id: ID of the plugin being initialized
+            new_tools: List of tools from the new plugin
+
+        Returns:
+            List of tuples (tool_name, existing_plugin_id) for conflicts
+        """
+        conflicts = []
+
+        # Build a map of existing tool names to plugin IDs
+        existing_tool_map: dict[str, str] = {}
+        for plugin_id, plugin in self._plugins.items():
+            if plugin_id != new_plugin_id:  # Skip the plugin being initialized
+                for tool in plugin.tools:
+                    existing_tool_map[tool.name] = plugin_id
+
+        # Check each new tool for conflicts
+        for tool in new_tools:
+            if tool.name in existing_tool_map:
+                conflicts.append((tool.name, existing_tool_map[tool.name]))
+
+        return conflicts
 
     async def close_plugin(self, plugin_id: str):
         """Close an MCP plugin connection."""
@@ -550,6 +656,58 @@ class MCPPluginManager:
             del self._plugins[plugin_id]
             return True
         return False
+
+    async def reload_plugin(self, plugin_id: str) -> MCPPlugin | None:
+        """
+        🔧 Hot reload a plugin - unload and reinitialize without removing registration.
+        
+        This is useful for updating tool implementations without restarting the entire system.
+        
+        Workflow:
+        1. Close existing client connection (unload)
+        2. Reinitialize plugin (connect to server, discover tools)
+        3. Preserve plugin registration, update tools
+        
+        Args:
+            plugin_id: ID of the plugin to reload
+            
+        Returns:
+            Updated MCPPlugin if successful, None if plugin not found
+            
+        Raises:
+            ToolNameConflictError: If reloaded tools conflict with other plugins
+            ValueError: If plugin not found
+        """
+        plugin = self._plugins.get(plugin_id)
+        if not plugin:
+            logger.warning(f"Reload failed: plugin '{plugin_id}' not found")
+            return None
+        
+        logger.info(f"Hot reloading plugin: {plugin_id}")
+        
+        # Step 1: Close existing connection (unload)
+        await self.close_plugin(plugin_id)
+        logger.debug(f"Plugin {plugin_id} unloaded")
+        
+        # Step 2: Clear existing tools (will be rediscovered)
+        plugin.tools = []
+        plugin.resources = []
+        
+        # Step 3: Reinitialize (connect and discover tools)
+        try:
+            await self.initialize_plugin(plugin_id)
+            logger.info(
+                f"Plugin {plugin_id} reloaded successfully with {len(plugin.tools)} tools"
+            )
+            return plugin
+        except ToolNameConflictError as e:
+            logger.error(f"Reload failed for {plugin_id}: tool conflict - {e}")
+            # Don't remove plugin, but leave it with empty tools
+            raise
+        except Exception as e:
+            logger.error(f"Reload failed for {plugin_id}: {e}")
+            # Leave plugin in unloaded state
+            raise
 
     def get_stats(self) -> dict[str, Any]:
         """Get plugin statistics."""

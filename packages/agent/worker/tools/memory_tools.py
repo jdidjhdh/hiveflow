@@ -1,15 +1,15 @@
 import json
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any
 
 
 class Tool(ABC):
     name: str = ""
     description: str = ""
-    parameters: Dict[str, Any] = {}
+    parameters: dict[str, Any] = {}
 
     @abstractmethod
-    async def run(self, input: Dict[str, Any], view) -> Any: ...
+    async def run(self, input: dict[str, Any], view) -> Any: ...
 
 
 class RecallMemoryTool(Tool):

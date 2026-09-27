@@ -1,7 +1,8 @@
 import os
+
 import openai
+
 from .base import LLMClient
-from typing import List
 
 
 class OpenAILLMClient(LLMClient):
@@ -20,7 +21,8 @@ class OpenAILLMClient(LLMClient):
         )
         return resp.choices[0].message.content
 
-    async def stream(self, messages, **kwargs):
+    async def _stream_impl(self, messages, **kwargs):
+        """Internal stream implementation for base class."""
         stream = await self.client.chat.completions.create(
             model=self.model, messages=messages, stream=True, **kwargs
         )
@@ -28,7 +30,7 @@ class OpenAILLMClient(LLMClient):
             if chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
 
-    async def embed(self, texts: List[str]) -> List[List[float]]:
+    async def embed(self, texts: list[str]) -> list[list[float]]:
         resp = await self.client.embeddings.create(
             input=texts, model="text-embedding-3-small"
         )

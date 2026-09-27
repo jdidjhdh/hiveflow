@@ -58,6 +58,16 @@ class HITLGate:
     on_timeout: str = "fail"  # "fail", "approve", "skip"
 
 
+# Terminal statuses (cannot be changed)
+_TERMINAL_STATUSES = {
+    HITLStatus.APPROVED,
+    HITLStatus.REJECTED,
+    HITLStatus.MODIFIED,
+    HITLStatus.TIMED_OUT,
+    HITLStatus.CANCELLED,
+}
+
+
 class HITLManager:
     """
     Manages human-in-the-loop gates in workflows.
@@ -83,12 +93,45 @@ class HITLManager:
 
         # Human responds (called from UI/API)
         await mgr.respond(gate.gate_id, approved=True, comment="Looks good!")
+    
+    🔧 Distributed Deployment Note:
+    For multi-Pod deployments, asyncio.Lock only protects within a single process.
+    To prevent "ghost approval" across multiple Pods, consider using a distributed lock:
+    
+    Recommended: Redlock algorithm (redis-py has built-in support)
+    
+    Example implementation:
+        ```python
+        from redis import Redis
+        from redis.lock import Lock
+        
+        class DistributedHITLManager(HITLManager):
+            def __init__(self, redis_client: Redis):
+                super().__init__()
+                self._redis = redis_client
+            
+            async def respond(self, gate_id, approved=True, ...):
+                # Acquire distributed lock with short TTL
+                lock = self._redis.lock(f"hitl:{gate_id}", timeout=5.0)
+                if lock.acquire(blocking=False):
+                    try:
+                        result = await super().respond(gate_id, approved, ...)
+                        return result
+                    finally:
+                        lock.release()
+                else:
+                    logger.warning(f"Gate {gate_id} is being processed by another Pod")
+                    return None
+        ```
+    
+    This ensures only one Pod can modify a gate's status at any time.
     """
 
     def __init__(self):
         self._gates: dict[str, HITLGate] = {}
         self._waiters: dict[str, asyncio.Event] = {}
         self._callbacks: list[Callable[[HITLGate], Awaitable[None]]] = []
+        self._lock = asyncio.Lock()  # Lock for gate status updates
 
     async def create_gate(
         self,
@@ -113,8 +156,11 @@ class HITLManager:
             timeout_seconds=timeout_seconds,
             on_timeout=on_timeout,
         )
-        self._gates[gate.gate_id] = gate
-        self._waiters[gate.gate_id] = asyncio.Event()
+        
+        async with self._lock:
+            self._gates[gate.gate_id] = gate
+            self._waiters[gate.gate_id] = asyncio.Event()
+        
         logger.info(f"HITL gate created: {gate.gate_id} for node {node_id}")
 
         # Notify callbacks
@@ -134,39 +180,51 @@ class HITLManager:
         comment: str = "",
         input_data: Any | None = None,
     ) -> HITLGate | None:
-        """Record a human response to a gate."""
-        gate = self._gates.get(gate_id)
-        if not gate:
-            logger.error(f"HITL gate not found: {gate_id}")
-            return None
+        """
+        Record a human response to a gate.
+        
+        🔄 Ghost Approval Prevention:
+        - Check gate status BEFORE updating
+        - If already in terminal state, return existing gate without modification
+        - Use lock to prevent concurrent status updates
+        """
+        async with self._lock:
+            gate = self._gates.get(gate_id)
+            if not gate:
+                logger.error(f"HITL gate not found: {gate_id}")
+                return None
 
-        if gate.status != HITLStatus.PENDING:
-            logger.warning(f"HITL gate already resolved: {gate_id} ({gate.status})")
-            return gate
+            # 🔄 Ghost Approval Prevention: Check if already resolved
+            if gate.status in _TERMINAL_STATUSES:
+                logger.warning(
+                    f"HITL gate already resolved: {gate_id} ({gate.status.value}), "
+                    f"ignoring duplicate approval"
+                )
+                return gate  # Return existing gate without modification
 
-        gate.responded_at = time.time()
-        gate.human_comment = comment
+            gate.responded_at = time.time()
+            gate.human_comment = comment
 
-        if gate.action == HITLAction.APPROVAL:
-            gate.status = HITLStatus.APPROVED if approved else HITLStatus.REJECTED
-            gate.human_response = approved
-        elif gate.action == HITLAction.REVIEW:
-            if not approved:
-                gate.status = HITLStatus.REJECTED
-                gate.human_response = None
-            else:
-                gate.status = HITLStatus.MODIFIED if modified_data is not None else HITLStatus.APPROVED
-                gate.human_response = modified_data
-        elif gate.action == HITLAction.INPUT:
-            gate.status = HITLStatus.APPROVED
-            gate.human_response = input_data
-        elif gate.action == HITLAction.CONFIRMATION:
-            gate.status = HITLStatus.APPROVED if approved else HITLStatus.REJECTED
-            gate.human_response = approved
+            if gate.action == HITLAction.APPROVAL:
+                gate.status = HITLStatus.APPROVED if approved else HITLStatus.REJECTED
+                gate.human_response = approved
+            elif gate.action == HITLAction.REVIEW:
+                if not approved:
+                    gate.status = HITLStatus.REJECTED
+                    gate.human_response = None
+                else:
+                    gate.status = HITLStatus.MODIFIED if modified_data is not None else HITLStatus.APPROVED
+                    gate.human_response = modified_data
+            elif gate.action == HITLAction.INPUT:
+                gate.status = HITLStatus.APPROVED
+                gate.human_response = input_data
+            elif gate.action == HITLAction.CONFIRMATION:
+                gate.status = HITLStatus.APPROVED if approved else HITLStatus.REJECTED
+                gate.human_response = approved
 
-        # Signal waiters
-        if gate_id in self._waiters:
-            self._waiters[gate_id].set()
+            # Signal waiters (inside lock to ensure atomic update)
+            if gate_id in self._waiters:
+                self._waiters[gate_id].set()
 
         logger.info(f"HITL gate resolved: {gate_id} -> {gate.status}")
         return gate
@@ -177,12 +235,13 @@ class HITLManager:
         timeout: float | None = None,
     ) -> HITLGate:
         """Wait for a human response to a gate. Returns the gate with updated status."""
-        gate = self._gates.get(gate_id)
-        if not gate:
-            raise ValueError(f"HITL gate not found: {gate_id}")
+        async with self._lock:
+            gate = self._gates.get(gate_id)
+            if not gate:
+                raise ValueError(f"HITL gate not found: {gate_id}")
 
-        if gate.status != HITLStatus.PENDING:
-            return gate
+            if gate.status in _TERMINAL_STATUSES:
+                return gate
 
         wait_timeout = timeout if timeout is not None else gate.timeout_seconds
         waiter = self._waiters.get(gate_id)
@@ -192,40 +251,67 @@ class HITLManager:
                 await asyncio.wait_for(waiter.wait(), timeout=wait_timeout)
             except asyncio.TimeoutError:
                 # Handle timeout
-                if gate.on_timeout == "approve":
-                    gate.status = HITLStatus.APPROVED
-                    gate.human_comment = "Auto-approved (timeout)"
-                elif gate.on_timeout == "skip":
-                    gate.status = HITLStatus.APPROVED
-                    gate.human_comment = "Auto-skipped (timeout)"
-                else:
-                    gate.status = HITLStatus.TIMED_OUT
-                    gate.human_comment = "Timed out"
-                gate.responded_at = time.time()
-                waiter.set()
+                async with self._lock:
+                    # Re-fetch gate to check if already resolved by another process
+                    gate = self._gates.get(gate_id)
+                    if gate is None:
+                        raise ValueError(f"HITL gate not found: {gate_id}")
+                    
+                    # 🔄 Ghost Approval Prevention: Check status again
+                    if gate.status in _TERMINAL_STATUSES:
+                        return gate  # Already resolved, don't override
+                    
+                    if gate.on_timeout == "approve":
+                        gate.status = HITLStatus.APPROVED
+                        gate.human_comment = "Auto-approved (timeout)"
+                    elif gate.on_timeout == "skip":
+                        gate.status = HITLStatus.APPROVED
+                        gate.human_comment = "Auto-skipped (timeout)"
+                    else:
+                        gate.status = HITLStatus.TIMED_OUT
+                        gate.human_comment = "Timed out"
+                    gate.responded_at = time.time()
+                    waiter.set()
 
         return gate
 
     async def list_pending_gates(self, workflow_id: str | None = None) -> list[HITLGate]:
         """List all pending HITL gates."""
-        gates = [g for g in self._gates.values() if g.status == HITLStatus.PENDING]
+        async with self._lock:
+            gates = [g for g in self._gates.values() if g.status == HITLStatus.PENDING]
         if workflow_id:
             gates = [g for g in gates if g.workflow_id == workflow_id]
         return sorted(gates, key=lambda g: g.created_at)
 
+    def list_gates(
+        self,
+        *,
+        workflow_id: str | None = None,
+        intent_id: str | None = None,
+    ) -> list[HITLGate]:
+        """List gates optionally filtered by workflow or intent_id in context."""
+        gates = list(self._gates.values())
+        if workflow_id:
+            gates = [g for g in gates if g.workflow_id == workflow_id]
+        if intent_id:
+            gates = [g for g in gates if g.workflow_id == intent_id or (g.context or {}).get("intent_id") == intent_id]
+        return sorted(gates, key=lambda g: g.created_at)
+
     async def get_gate(self, gate_id: str) -> HITLGate | None:
         """Get a specific gate."""
-        return self._gates.get(gate_id)
+        async with self._lock:
+            return self._gates.get(gate_id)
 
     async def cancel_gate(self, gate_id: str) -> bool:
         """Cancel a pending gate."""
-        gate = self._gates.get(gate_id)
-        if gate and gate.status == HITLStatus.PENDING:
-            gate.status = HITLStatus.CANCELLED
-            gate.responded_at = time.time()
-            if gate_id in self._waiters:
-                self._waiters[gate_id].set()
-            return True
+        async with self._lock:
+            gate = self._gates.get(gate_id)
+            if gate and gate.status == HITLStatus.PENDING:
+                gate.status = HITLStatus.CANCELLED
+                gate.responded_at = time.time()
+                if gate_id in self._waiters:
+                    self._waiters[gate_id].set()
+                return True
         return False
 
     def register_callback(self, callback: Callable[[HITLGate], Awaitable[None]]):

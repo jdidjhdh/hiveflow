@@ -27,6 +27,11 @@ The embeddable orchestration kernel of HiveFlow. Core provides the primitives to
 
 For natural-language planning and Skill graphs, add [`hiveflow-agent`](../agent/README.md). For a visual ops UI, use [Studio](../studio/README.md).
 
+## Requirements
+
+- **Python 3.11+** (3.11, 3.12, 3.13 supported)
+- Python 3.10 is not supported due to use of modern type hints and async features
+
 ## Installation
 
 ```bash

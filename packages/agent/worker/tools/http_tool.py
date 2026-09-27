@@ -1,18 +1,19 @@
-import aiohttp
 import ipaddress
 import socket
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 from urllib.parse import urlparse
+
+import aiohttp
 
 
 class Tool(ABC):
     name: str = ""
     description: str = ""
-    parameters: Dict[str, Any] = {}
+    parameters: dict[str, Any] = {}
 
     @abstractmethod
-    async def run(self, input: Dict[str, Any], view) -> Any: ...
+    async def run(self, input: dict[str, Any], view) -> Any: ...
 
 
 def _is_private_ip(host: str) -> bool:
@@ -43,8 +44,8 @@ class HTTPRequestTool(Tool):
 
     def __init__(
         self,
-        allowed_domains: Optional[List[str]] = None,
-        blocked_domains: Optional[List[str]] = None,
+        allowed_domains: list[str] | None = None,
+        blocked_domains: list[str] | None = None,
         block_private_ips: bool = True,
         timeout: int = 30,
     ):

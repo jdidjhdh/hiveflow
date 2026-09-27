@@ -118,3 +118,29 @@ benchmarks/test-last-run.json
 
 # Local docs venv
 .tmpdocsvenv/
+
+# 本地调试残留（不入库）
+1.txt
+2.txt
+check.txt
+cmd.txt
+check_atom.py
+check_env.txt
+node-check.txt
+npm-install.txt
+npm-list.txt
+action.json
+debug_craft_err.txt
+debug_craft_out.txt
+mbstderr.txt
+eula.txt
+_launch_out.txt
+_start_paper.ps1
+integration_summary.txt
+AUDIT_CHECK_RESULT.txt
+node.zip
+read_me.txt
+server.properties
+test_out.txt
+package.json
+package-lock.json

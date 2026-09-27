@@ -16,6 +16,7 @@
   OLLAMA_BASE_URL: Ollama 服务地址 (默认 http://localhost:11434)
 """
 import os
+
 from .base import LLMClient
 
 

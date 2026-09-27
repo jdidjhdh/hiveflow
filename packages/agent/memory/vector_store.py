@@ -1,7 +1,6 @@
 import asyncio
 import uuid
 from abc import ABC, abstractmethod
-from typing import List, Optional
 
 
 class MemoryItem:
@@ -14,13 +13,13 @@ class MemoryItem:
 
 class VectorStore(ABC):
     @abstractmethod
-    async def add_texts(self, texts: List[str], metadatas: List[dict] = None, ids: List[str] = None): ...
+    async def add_texts(self, texts: list[str], metadatas: list[dict] = None, ids: list[str] = None): ...
 
     @abstractmethod
-    async def similarity_search(self, query: str, k: int = 5) -> List[MemoryItem]: ...
+    async def similarity_search(self, query: str, k: int = 5) -> list[MemoryItem]: ...
 
     @abstractmethod
-    async def delete(self, ids: List[str]): ...
+    async def delete(self, ids: list[str]): ...
 
 
 class ChromaVectorStore(VectorStore):
@@ -49,7 +48,7 @@ class ChromaVectorStore(VectorStore):
             embeddings=embeddings
         )
 
-    async def similarity_search(self, query: str, k: int = 5) -> List[MemoryItem]:
+    async def similarity_search(self, query: str, k: int = 5) -> list[MemoryItem]:
         q_embed = None
         if self.embed:
             q_embed = (await self.embed([query]))[0]

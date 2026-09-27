@@ -1,18 +1,17 @@
-import os
-import json
 import asyncio
+import json
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
 from pathlib import Path
+from typing import Any
 
 
 class Tool(ABC):
     name: str = ""
     description: str = ""
-    parameters: Dict[str, Any] = {}
+    parameters: dict[str, Any] = {}
 
     @abstractmethod
-    async def run(self, input: Dict[str, Any], view) -> Any: ...
+    async def run(self, input: dict[str, Any], view) -> Any: ...
 
 
 class FileIOTool(Tool):
@@ -31,7 +30,7 @@ class FileIOTool(Tool):
 
     def __init__(
         self,
-        allowed_base_dirs: Optional[list] = None,
+        allowed_base_dirs: list | None = None,
         max_read_size: int = 1_000_000,
         max_write_size: int = 5_000_000,
     ):
@@ -40,11 +39,41 @@ class FileIOTool(Tool):
         self.max_write_size = max_write_size
 
     def _safe_path(self, path: str) -> Path:
+        """
+        🔒 SECURITY FIX: Validate path using Path.resolve() + relative_to() 
+        to prevent directory traversal attacks (../, symlink, etc.)
+        
+        Previous implementation used startswith() which could be bypassed by:
+        - Path traversal: /allowed/path/../secret
+        - Symlink attacks
+        - Case sensitivity tricks
+        
+        New implementation:
+        1. Resolve path to absolute canonical form
+        2. Check if resolved path is strictly under allowed directory
+        3. relative_to() raises ValueError if path escapes allowed directory
+        """
         p = Path(path).resolve()
+        
         if self.allowed_base_dirs:
-            allowed = any(p == Path(d).resolve() or str(p).startswith(str(Path(d).resolve())) for d in self.allowed_base_dirs)
-            if not allowed:
-                raise PermissionError(f"Path outside allowed directories: {path}")
+            for base_dir in self.allowed_base_dirs:
+                base_resolved = Path(base_dir).resolve()
+                try:
+                    # relative_to() raises ValueError if p is not a subpath of base_resolved
+                    # This prevents ANY path traversal including ../, symlinks, etc.
+                    p.relative_to(base_resolved)
+                    # Path is valid - strictly under this allowed directory
+                    return p
+                except ValueError:
+                    # Path is not under this base_dir, try next
+                    continue
+            
+            # Path is not under ANY allowed directory
+            raise PermissionError(
+                f"Path '{path}' (resolved: '{p}') is outside allowed directories: {self.allowed_base_dirs}"
+            )
+        
+        # No restriction configured - allow any path
         return p
 
     async def run(self, input, view):

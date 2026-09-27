@@ -1,5 +1,5 @@
 import os
-from typing import List
+
 from .base import LLMClient
 
 
@@ -34,7 +34,7 @@ class DeepSeekLLMClient(LLMClient):
             if chunk.choices and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
 
-    async def embed(self, texts: List[str]) -> List[List[float]]:
+    async def embed(self, texts: list[str]) -> list[list[float]]:
         # DeepSeek doesn't have embedding; return simple hash-based vectors
         import hashlib
         vectors = []

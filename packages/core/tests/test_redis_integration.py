@@ -490,11 +490,15 @@ def test_config_from_env_defaults():
             del os.environ[f"HIVEFLOW_{key}"]
 
     config = HiveFlowConfig.from_env()
-    assert config.blackboard_type == "memory"
-    assert config.redis_max_connections == 10
+    # 🔄 P0 FIX: Default changed from "memory" to "ttl_memory"
+    assert config.blackboard_type == "ttl_memory"
+    # 🔄 P0 FIX: redis_max_connections default changed from 10 to 20
+    assert config.redis_max_connections == 20
     assert config.redis_socket_timeout == 5.0
     assert config.blackboard_prefix == "hiveflow"
     assert config.log_level == "INFO"
+    # 🔄 P0 FIX: default_ttl now defaults to 3600.0
+    assert config.default_ttl == 3600.0
 
 
 def test_config_from_env_with_values():

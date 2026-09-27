@@ -1,6 +1,6 @@
 """Register MCP plugin tools as HiveMind skills."""
 import logging
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -10,17 +10,17 @@ async def register_mcp_plugin_as_skills(
     plugin_manager,
     plugin_id: str,
     *,
-    read_keys: Optional[Set[str]] = None,
-    write_keys: Optional[Set[str]] = None,
+    read_keys: set[str] | None = None,
+    write_keys: set[str] | None = None,
     argument_key: str = "arguments",
-) -> List[str]:
+) -> list[str]:
     """Initialize an MCP plugin and expose each tool as a named skill."""
     read_keys = read_keys or {"mcp:*", "hivemind:result:*"}
     write_keys = write_keys or {"mcp:*", "hivemind:result:*"}
 
     await plugin_manager.initialize_plugin(plugin_id)
     tools = await plugin_manager.get_plugin_tools(plugin_id)
-    registered: List[str] = []
+    registered: list[str] = []
 
     for tool in tools:
         skill_name = f"mcp_{plugin_id}_{tool.name}"
@@ -42,7 +42,7 @@ async def register_mcp_plugin_as_skills(
                 except json.JSONDecodeError:
                     args = {"input": args}
             result = await plugin_manager.call_tool(_plugin_id, _tool_name, args)
-            payload: Dict[str, Any] = {
+            payload: dict[str, Any] = {
                 "success": result.success,
                 "content": result.content,
                 "error": result.error,

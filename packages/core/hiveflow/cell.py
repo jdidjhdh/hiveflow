@@ -11,11 +11,15 @@ try:
     from . import ECM, Capability
     from .blackboard import AuditedBlackboardView, SecureBlackboard
     from .bus import EventBus
+    from .observability.failure_reason import build_failure_payload, classify_exception
+    from .observability.metrics import metrics
     from .scheduler import PRIORITY_ORDER, Scheduler
     from .validation import ValidationPipeline
 except ImportError:
     from blackboard import AuditedBlackboardView, SecureBlackboard
     from bus import EventBus
+    from observability.failure_reason import build_failure_payload, classify_exception  # type: ignore
+    from observability.metrics import metrics  # type: ignore
     from scheduler import PRIORITY_ORDER, Scheduler
     from validation import ValidationPipeline
 
@@ -56,6 +60,11 @@ def ensure_error_writes(blackboard: SecureBlackboard, agent_id: str):
     return decorator
 
 
+class QueueFullError(RuntimeError):
+    """🔄 P0 FIX: Dedicated exception for queue backpressure."""
+    pass
+
+
 class Worker:
     def __init__(
         self,
@@ -68,7 +77,7 @@ class Worker:
         bus: EventBus,
         cap: Capability,
         validation: "ValidationPipeline",
-        max_queue_size: int = 0,
+        max_queue_size: int = 100,  # 🔄 P0 FIX: Default changed from 0 (unbounded) to 100
     ):
         self.agent_id = agent_id
         self.skills = skills
@@ -113,41 +122,88 @@ class Worker:
             pass
 
     async def _execute_task(self, ecm: ECM):
+        """Execute a task and record metrics.
+        
+        🔄 Metrics Integration:
+        - task_duration_seconds: Histogram for task execution time
+        - tasks_completed: Counter for successful tasks
+        - tasks_failed: Counter for failed tasks
+        """
         view = self.blackboard.view_for(self.agent_id)
         success = False
+        start_time = time.monotonic()
+        
         try:
-            result = await self.task_handler(ecm, view)
-            if ecm.expectation:
-                valid = await self.validation.validate(ecm.expectation, result)
-                if not valid:
-                    raise ValueError(f"Validation failed for expectation on key '{ecm.expectation.state_key}'")
-                await view.put(ecm.expectation.state_key, result)
-            await self.bus.publish(
-                "task.completed",
-                ECM(
-                    trace_id=ecm.trace_id,
-                    intent="task.completed",
-                    intent_id=ecm.intent_id,
-                    emitter=self.agent_id,
-                    payload={"result": result},
-                ),
-            )
-            success = True
-        except Exception as e:
-            logger.exception(f"Worker {self.agent_id} task failed")
-            try:
-                await self.bus.publish(
-                    "task.failed",
-                    ECM(
-                        trace_id=ecm.trace_id,
-                        intent="task.failed",
-                        intent_id=ecm.intent_id,
-                        emitter=self.agent_id,
-                        payload={"error": str(e)},
-                    ),
-                )
-            except Exception:
-                logger.exception("Failed to publish task.failed")
+            from .observability.tracing import get_tracer
+        except ImportError:
+            from observability.tracing import get_tracer  # type: ignore
+
+        tracer = get_tracer()
+        span_attrs = {
+            "intent.id": ecm.intent_id,
+            "agent.id": self.agent_id,
+            "intent.type": ecm.intent,
+        }
+        try:
+            with tracer.start_as_current_span("task.execute", attributes=span_attrs):
+                try:
+                    result = await self.task_handler(ecm, view)
+                    if ecm.expectation:
+                        valid = await self.validation.validate(ecm.expectation, result)
+                        if not valid:
+                            raise ValueError(f"Validation failed for expectation on key '{ecm.expectation.state_key}'")
+                        await view.put(ecm.expectation.state_key, result)
+                    await self.bus.publish(
+                        "task.completed",
+                        ECM(
+                            trace_id=ecm.trace_id,
+                            intent="task.completed",
+                            intent_id=ecm.intent_id,
+                            emitter=self.agent_id,
+                            payload={"result": result},
+                        ),
+                    )
+                    success = True
+                    
+                    # 🔄 Metrics: Record successful task completion
+                    metrics.update_counter("tasks_completed", labels={"agent_id": self.agent_id})
+                    metrics.observe_histogram(
+                        "task_duration_seconds",
+                        time.monotonic() - start_time,
+                        labels={"agent_id": self.agent_id, "intent": ecm.intent}
+                    )
+                    
+                except Exception as e:
+                    logger.exception(f"Worker {self.agent_id} task failed")
+                    reason = classify_exception(e)
+                    payload = build_failure_payload(
+                        reason,
+                        error=str(e),
+                        agent=self.agent_id,
+                        tool=ecm.payload.get("tool") if isinstance(ecm.payload, dict) else None,
+                    )
+                    try:
+                        await self.bus.publish(
+                            "task.failed",
+                            ECM(
+                                trace_id=ecm.trace_id,
+                                intent="task.failed",
+                                intent_id=ecm.intent_id,
+                                emitter=self.agent_id,
+                                payload=payload,
+                            ),
+                        )
+                    except Exception:
+                        logger.exception("Failed to publish task.failed")
+                    
+                    # 🔄 Metrics: Record failed task
+                    metrics.update_counter("tasks_failed", labels={"agent_id": self.agent_id, "reason": reason.value})
+                    metrics.update_counter("errors_total", labels={"error_type": reason.value})
+                    metrics.observe_histogram(
+                        "task_duration_seconds",
+                        time.monotonic() - start_time,
+                        labels={"agent_id": self.agent_id, "intent": ecm.intent, "success": "false"}
+                    )
         finally:
             try:
                 await self.bus.complete_intent(ecm.intent_id, success=success)
@@ -159,7 +215,7 @@ class Worker:
             if self._draining or not self._running:
                 raise RuntimeError("Worker is draining or stopped")
             if self._queue.full():
-                raise RuntimeError("Worker queue full, task rejected")
+                raise QueueFullError(f"Worker {self.agent_id} queue full (max_size={self.capability.max_queue_size}), task rejected")  # 🔄 P0 FIX: Use QueueFullError
             self.capability.load += 1.0
             self.capability.pending_tasks += 1
             try:
@@ -210,7 +266,7 @@ class Cell:
         blackboard: SecureBlackboard,
         scheduler: Scheduler,
         validation: "ValidationPipeline",
-        default_max_queue_size: int = 0,
+        default_max_queue_size: int = 100,  # 🔄 P0 FIX: Default changed from 0 (unbounded) to 100
     ):
         self.bus = bus
         self.blackboard = blackboard

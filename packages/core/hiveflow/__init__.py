@@ -56,7 +56,9 @@ class Capability:
 class AbortExecutionException(Exception):
     """编排器节点明确要求中断整个流程"""
 
-    pass
+    def __init__(self, message: str, failure_reason: str | None = None):
+        super().__init__(message)
+        self.failure_reason = failure_reason
 
 
 TaskGraph = dict[str, dict]
@@ -70,6 +72,7 @@ try:
         FileKeyProvider,
         KeyProvider,
         MemoryBlackboard,
+        ObjectTooLargeError,
         OrchestratorReadonlyView,
         RedisBlackboard,
         SecureBlackboard,
@@ -129,7 +132,7 @@ try:
         VideoProcessor,
         VideoSummaryResult,
     )
-    from .orchestrator import DAGOrchestrator, DynamicOrchestrator
+    from .orchestrator import CycleDependencyError, DAGOrchestrator, DynamicOrchestrator
     from .execution import (
         ExecutionBackend,
         ExecutionBackendNotReadyError,
@@ -179,6 +182,7 @@ except ImportError:
         FileKeyProvider,
         KeyProvider,
         MemoryBlackboard,
+        ObjectTooLargeError,
         OrchestratorReadonlyView,
         RedisBlackboard,
         SecureBlackboard,
@@ -238,7 +242,7 @@ except ImportError:
         VideoProcessor,
         VideoSummaryResult,
     )
-    from .orchestrator import DAGOrchestrator, DynamicOrchestrator
+    from .orchestrator import CycleDependencyError, DAGOrchestrator, DynamicOrchestrator
     from .execution import (
         ExecutionBackend,
         ExecutionBackendNotReadyError,
@@ -284,8 +288,11 @@ try:
     from .observability import (
         HiveFlowLogger,
         PrometheusMetricsExporter,
+        RateLimitedLogger,
+        SlidingWindowCounter,
         create_prometheus_registry,
         create_span,
+        setup_rate_limited_logging,
         setup_structured_logging,
         setup_tracing,
         trace_workflow_execution,
@@ -313,6 +320,7 @@ __all__ = [
     "CheckpointManager",
     "ChunkStrategy",
     "CognitiveOrchestrator",
+    "CycleDependencyError",
     "DAGOrchestrator",
     "Document",
     "DocumentChunk",
@@ -381,6 +389,7 @@ __all__ = [
     "MockVideoProcessor",
     "MultiModalPipeline",
     "NativeExecutionBackend",
+    "ObjectTooLargeError",
     "OpenAIAudioProcessor",
     "OpenAIClient",
     "OpenAIImageProcessor",
@@ -395,6 +404,8 @@ __all__ = [
     "PluginSpec",
     # Observability (optional subpackage)
     "PrometheusMetricsExporter",
+    "RateLimitedLogger",
+    "SlidingWindowCounter",
     "RAGPipeline",
     "RAGResult",
     "ReActTool",
@@ -429,6 +440,7 @@ __all__ = [
     "ensure_error_writes",
     "get_execution_backend",
     "get_trace_logger",
+    "setup_rate_limited_logging",
     "setup_structured_logging",
     "setup_tracing",
     "trace_workflow_execution",

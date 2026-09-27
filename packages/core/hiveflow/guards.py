@@ -8,6 +8,7 @@ These guards prevent prompt injection, XSS, data leakage, and ensure
 output conforms to expected schemas.
 """
 
+import asyncio
 import json
 import logging
 import re
@@ -58,13 +59,13 @@ class InputGuard:
 
     Layers:
     1. Length/size limits
-    2. Regex pattern matching (prompt injection, XSS, SQLi)
+    2. Regex pattern matching (prompt injection, XSS, SQLi) - runs in thread pool
     3. Semantic check via LLM (optional)
     4. Custom validators
 
     Usage:
         guard = InputGuard(max_length=10000)
-        result = guard.check(user_input)
+        result = await guard.check_async(user_input)  # Non-blocking
         if result.passed:
             safe_text = result.sanitized_text
     """
@@ -92,10 +93,10 @@ class InputGuard:
                 logger.warning(f"Invalid regex pattern '{pattern}': {e}")
                 self._compiled_patterns.append(re.compile(re.escape(pattern), re.IGNORECASE))
 
-    def check(self, text: str) -> InputGuardResult:
+    def _check_sync(self, text: str) -> InputGuardResult:
         """
-        Synchronously validate input text through all guard layers.
-        Returns InputGuardResult with pass/fail status and sanitized text.
+        Synchronous core validation logic (runs in thread pool).
+        This contains the CPU-intensive regex matching.
         """
         if not isinstance(text, str):
             return InputGuardResult(
@@ -119,7 +120,7 @@ class InputGuard:
                 severity="info",
             )
 
-        # Layer 2: Pattern matching
+        # Layer 2: Pattern matching (CPU-intensive regex)
         for pattern in self._compiled_patterns:
             match = pattern.search(text)
             if match:
@@ -146,11 +147,20 @@ class InputGuard:
             sanitized_text=sanitized,
         )
 
+    def check(self, text: str) -> InputGuardResult:
+        """
+        Synchronous validation (blocking).
+        DEPRECATED: Use check_async() for non-blocking validation.
+        """
+        return self._check_sync(text)
+
     async def check_async(self, text: str) -> InputGuardResult:
         """
-        Async version that includes optional LLM semantic check.
+        🔄 Async version that runs regex matching in thread pool.
+        Non-blocking to prevent event loop starvation under high concurrency.
         """
-        result = self.check(text)
+        # Run CPU-intensive regex matching in thread pool
+        result = await asyncio.to_thread(self._check_sync, text)
         if not result.passed:
             return result
 
@@ -225,13 +235,13 @@ class OutputValidator:
     Layers:
     1. Type checking
     2. Size/length limits
-    3. Content sanitization
+    3. Content sanitization - runs in thread pool for HTML/script stripping
     4. JSON schema validation (optional)
     5. LLM fact-checking (optional)
 
     Usage:
         validator = OutputValidator(max_length=50000)
-        result = validator.validate(output, expected_type=dict)
+        result = await validator.validate_async(output)  # Non-blocking
     """
 
     def __init__(
@@ -252,8 +262,11 @@ class OutputValidator:
         self.sanitize_html = sanitize_html
         self.custom_validators = custom_validators or []
 
-    def validate(self, output: Any, expected_type: type | None = None) -> OutputValidationResult:
-        """Synchronously validate output."""
+    def _validate_sync(self, output: Any, expected_type: type | None = None) -> OutputValidationResult:
+        """
+        Synchronous core validation logic (runs in thread pool).
+        This contains CPU-intensive string sanitization and regex matching.
+        """
         allowed = expected_type or self.allowed_types
 
         # Layer 1: Type check
@@ -272,7 +285,7 @@ class OutputValidator:
                 severity="warning",
             )
 
-        # Layer 3: Content sanitization
+        # Layer 3: Content sanitization (CPU-intensive regex)
         sanitized = output
         if isinstance(output, str):
             sanitized = self._sanitize_string(output)
@@ -308,9 +321,20 @@ class OutputValidator:
             sanitized_output=sanitized,
         )
 
+    def validate(self, output: Any, expected_type: type | None = None) -> OutputValidationResult:
+        """
+        Synchronous validation (blocking).
+        DEPRECATED: Use validate_async() for non-blocking validation.
+        """
+        return self._validate_sync(output, expected_type)
+
     async def validate_async(self, output: Any, context: str = "") -> OutputValidationResult:
-        """Async version with optional LLM fact-checking."""
-        result = self.validate(output)
+        """
+        🔄 Async version that runs sanitization in thread pool.
+        Non-blocking to prevent event loop starvation under high concurrency.
+        """
+        # Run CPU-intensive sanitization in thread pool
+        result = await asyncio.to_thread(self._validate_sync, output)
         if not result.passed:
             return result
 
@@ -358,7 +382,7 @@ class OutputValidator:
 
     @staticmethod
     def _sanitize_string(text: str) -> str:
-        """Sanitize string output."""
+        """Sanitize string output (CPU-intensive regex)."""
         # Remove null bytes
         text = text.replace("\x00", "")
         # Strip dangerous HTML if configured
@@ -400,3 +424,96 @@ class OutputValidator:
             return True
         # If no type specified or matches, pass
         return True
+
+
+# ======================== MiddlewareGuard ========================
+
+@dataclass
+class IntermediateCheckResult:
+    passed: bool
+    reason: str = ""
+    severity: str = "info"
+
+
+class MiddlewareGuard:
+    """
+    🔄 P0 FIX: Guard for checking intermediate state during workflow execution.
+    
+    Unlike InputGuard (checks user inputs) and OutputValidator (checks final outputs),
+    MiddlewareGuard checks intermediate results stored in Blackboard during task execution.
+    
+    This prevents corrupted intermediate data from propagating through the workflow.
+    
+    Usage:
+        guard = MiddlewareGuard(schema={"type": "object", "required": ["status"]})
+        result = await guard.check_intermediate(blackboard_value)
+        if not result.passed:
+            raise AbortExecutionException(result.reason)
+    """
+    
+    def __init__(
+        self,
+        schema: dict[str, Any] | None = None,
+        max_size: int = 100000,
+        custom_checkers: list[Callable[[Any], IntermediateCheckResult]] | None = None,
+    ):
+        self.schema = schema
+        self.max_size = max_size
+        self.custom_checkers = custom_checkers or []
+    
+    async def check_intermediate(self, value: Any) -> IntermediateCheckResult:
+        """
+        🔄 P0 FIX: Check intermediate state value before storing to Blackboard.
+        
+        Runs in thread pool to avoid blocking event loop.
+        
+        Args:
+            value: The intermediate value to check
+        
+        Returns:
+            IntermediateCheckResult with passed/reason/severity
+        """
+        result = await asyncio.to_thread(self._check_sync, value)
+        return result
+    
+    def _check_sync(self, value: Any) -> IntermediateCheckResult:
+        """
+        Synchronous core validation (runs in thread pool).
+        """
+        # Layer 1: Size check
+        try:
+            if isinstance(value, (str, bytes)):
+                size = len(value)
+            elif isinstance(value, (list, dict)):
+                size = len(json.dumps(value, default=str))
+            else:
+                size = len(str(value))
+            
+            if size > self.max_size:
+                return IntermediateCheckResult(
+                    passed=False,
+                    reason=f"Intermediate value too large ({size} > {self.max_size} bytes)",
+                    severity="warning"
+                )
+        except Exception as e:
+            logger.warning(f"Size check failed: {e}")
+        
+        # Layer 2: Schema validation
+        if self.schema:
+            if not OutputValidator._validate_json_schema(value, self.schema):
+                return IntermediateCheckResult(
+                    passed=False,
+                    reason="Intermediate value does not match expected schema",
+                    severity="warning"
+                )
+        
+        # Layer 3: Custom checkers
+        for checker in self.custom_checkers:
+            try:
+                result = checker(value)
+                if not result.passed:
+                    return result
+            except Exception as e:
+                logger.error(f"Custom intermediate checker error: {e}")
+        
+        return IntermediateCheckResult(passed=True)

@@ -1,7 +1,8 @@
 import os
+
 import httpx
+
 from .base import LLMClient
-from typing import List
 
 
 class OllamaLLMClient(LLMClient):
@@ -41,7 +42,7 @@ class OllamaLLMClient(LLMClient):
                         if content:
                             yield content
 
-    async def embed(self, texts: List[str]) -> List[List[float]]:
+    async def embed(self, texts: list[str]) -> list[list[float]]:
         payload = {"model": self.model, "input": texts}
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(f"{self.base_url}/api/embed", json=payload)

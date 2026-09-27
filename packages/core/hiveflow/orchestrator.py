@@ -1,18 +1,39 @@
 import asyncio
 import logging
 import time
-from graphlib import TopologicalSorter
-from typing import TYPE_CHECKING, Any, Optional
+from collections import OrderedDict
+from graphlib import TopologicalSorter, CycleError
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from . import MISSING, AbortExecutionException, TaskGraph
 from .blackboard import OrchestratorReadonlyView, SecureBlackboard
 from .hitl import HITLAction, HITLStatus
+from .observability.failure_reason import FailureReason
 
 if TYPE_CHECKING:
     from .checkpoint import CheckpointManager
     from .hitl import HITLManager
 
 logger = logging.getLogger(__name__)
+
+
+class CycleDependencyError(Exception):
+    """
+    循环依赖错误
+
+    当动态编排添加子图时检测到循环依赖时抛出。
+    包含循环路径的详细信息。
+    """
+
+    def __init__(self, message: str, cycle_path: list[str] | None = None):
+        super().__init__(message)
+        self.cycle_path = cycle_path or []
+
+    def __str__(self) -> str:
+        if self.cycle_path:
+            path_str = " -> ".join(self.cycle_path)
+            return f"{super().__str__()} Cycle path: {path_str}"
+        return super().__str__()
 
 
 def _resolve_hitl_context(context: Any, deps: dict, all_results: dict) -> dict[str, Any]:
@@ -51,7 +72,13 @@ async def _run_hitl_gate(
     gate = await hitl_manager.wait_for_response(gate.gate_id)
 
     if gate.status in (HITLStatus.REJECTED, HITLStatus.TIMED_OUT):
-        raise AbortExecutionException(f"HITL gate rejected or timed out for node '{node_name}' ({gate.status.value})")
+        reason = (
+            FailureReason.HITL_REJECTED.value if gate.status == HITLStatus.REJECTED else FailureReason.TIMEOUT.value
+        )
+        raise AbortExecutionException(
+            f"HITL gate rejected or timed out for node '{node_name}' ({gate.status.value})",
+            failure_reason=reason,
+        )
     return gate.human_response
 
 
@@ -277,6 +304,11 @@ class DynamicOrchestrator:
         self.hitl_manager = hitl_manager
         self.checkpoint_manager = checkpoint_manager
         self.workflow_id = workflow_id or "default"
+        # 🔄 P0 FIX: Track internal state for reset capability
+        self._executed_nodes: set[str] = set()  # Nodes that have been executed
+        self._pending_dependencies: dict[str, set[str]] = {}  # Pending deps for each node
+        # 🔄 Transaction Compensation: Registry for compensation handlers
+        self._compensation_handlers: OrderedDict[str, Callable] = OrderedDict()  # node_id -> compensation handler
 
     async def execute(self, initial_graph: TaskGraph, global_timeout: float | None = None) -> dict[str, Any]:
         graph = dict(initial_graph)
@@ -458,6 +490,17 @@ class DynamicOrchestrator:
 
                 result = await task_fn(deps, view)
 
+                # 🔄 Transaction Compensation: Register compensation handler on success
+                compensate_fn = node.get("compensate")
+                if compensate_fn is not None:
+                    if asyncio.iscoroutinefunction(compensate_fn):
+                        self.register_compensation(node_name, compensate_fn)
+                    else:
+                        # Wrap sync function in async wrapper
+                        async def async_compensate_wrapper(node_id=node_name, fn=compensate_fn):
+                            return fn()
+                        self.register_compensation(node_name, async_compensate_wrapper)
+
                 if self.checkpoint_manager:
                     await _save_node_checkpoint(
                         self.checkpoint_manager,
@@ -476,6 +519,8 @@ class DynamicOrchestrator:
                 raise
             except Exception as e:
                 if attempt == max_attempts - 1:
+                    # 🔄 Transaction Compensation: Execute compensations when node fails
+                    await self.execute_compensations(node_name)
                     on_failure = node.get("on_failure", "abort")
                     if callable(on_failure):
                         action = on_failure(e, node_name, deps)
@@ -489,3 +534,285 @@ class DynamicOrchestrator:
                 delay = base if backoff_type == "constant" else min(base * (2**attempt), max_backoff)
                 await asyncio.sleep(delay)
         return MISSING
+
+    def register_compensation(self, node_id: str, handler: Callable) -> None:
+        """
+        Register a compensation handler for a node.
+
+        Args:
+            node_id: Identifier of the node
+            handler: Async callable to execute for compensation
+        """
+        self._compensation_handlers[node_id] = handler
+        logger.debug(f"Registered compensation handler for node '{node_id}'")
+
+    async def execute_compensations(self, failed_node_id: str) -> None:
+        """
+        Execute all registered compensation handlers in reverse order.
+
+        Called when a node fails to rollback previously successful nodes.
+
+        Args:
+            failed_node_id: ID of the node that failed
+        """
+        if not self._compensation_handlers:
+            logger.info(f"No compensation handlers to execute for failed node '{failed_node_id}'")
+            return
+
+        logger.warning(
+            f"Executing {len(self._compensation_handlers)} compensation(s) for failed node '{failed_node_id}'"
+        )
+
+        # Execute in reverse order (most recent first)
+        for node_id in reversed(list(self._compensation_handlers.keys())):
+            handler = self._compensation_handlers[node_id]
+            try:
+                logger.info(f"Executing compensation for node '{node_id}'")
+                if asyncio.iscoroutinefunction(handler):
+                    await handler()
+                else:
+                    handler()
+            except Exception as e:
+                logger.error(f"Compensation failed for node '{node_id}': {e}")
+
+        # Clear handlers after execution
+        self._compensation_handlers.clear()
+
+    def reset(self) -> None:
+        """
+        🔄 P0 FIX: Reset the orchestrator internal state.
+
+        Clears all tracked execution state (_executed_nodes, _pending_dependencies, _compensation_handlers),
+        allowing the orchestrator to be reused for a new workflow without state leakage.
+
+        This prevents unlimited growth of internal lists when orchestrator is reused
+        across multiple workflow executions.
+
+        Call this method between workflow runs or when starting a fresh execution.
+        """
+        self._executed_nodes.clear()
+        self._pending_dependencies.clear()
+        self._compensation_handlers.clear()
+        logger.info(f"DynamicOrchestrator reset: cleared internal state for workflow_id={self.workflow_id}")
+
+    def add_subgraph(
+        self,
+        parent_node: str,
+        subgraph: TaskGraph,
+        current_graph: TaskGraph,
+        running_nodes: set[str] | None = None,
+    ) -> TaskGraph:
+        """
+        🔧 循环依赖检测：添加子图前检测循环依赖
+
+        Args:
+            parent_node: 动态生成子图的父节点名称
+            subgraph: 要添加的子图（TaskGraph）
+            current_graph: 当前已有的图结构
+            running_nodes: 当前正在运行的节点集合（用于检测是否引用正在运行的节点）
+
+        Returns:
+            合并后的完整图结构
+
+        Raises:
+            CycleDependencyError: 如果检测到循环依赖
+
+        使用方式:
+            orchestrator = DynamicOrchestrator(...)
+            try:
+                new_graph = orchestrator.add_subgraph(
+                    parent_node="dynamic_node",
+                    subgraph={"sub1": {...}, "sub2": {...}},
+                    current_graph=current_graph,
+                    running_nodes={"node_a", "node_b"}
+                )
+            except CycleDependencyError as e:
+                logger.error(f"Cycle detected: {e}")
+        """
+        running_nodes = running_nodes or set()
+
+        # 构建合并后的图结构
+        merged_graph = dict(current_graph)
+
+        # 处理子图节点名称和依赖关系
+        for sub_name, sub_node in subgraph.items():
+            new_name = f"{parent_node}::{sub_name}"
+            new_node = dict(sub_node)
+
+            # 处理依赖关系：引用同一子图内的节点转换为完整名称
+            raw_deps = new_node.get("depends_on", [])
+            new_deps = []
+            seen = set()
+
+            for d in raw_deps:
+                if d not in seen:
+                    seen.add(d)
+                    # 如果依赖的是子图内的节点，转换为完整名称
+                    if d in subgraph:
+                        new_deps.append(f"{parent_node}::{d}")
+                    else:
+                        new_deps.append(d)
+
+            # 确保依赖父节点（防止子图节点在没有父节点完成前执行）
+            if parent_node not in seen:
+                new_deps.append(parent_node)
+
+            new_node["depends_on"] = new_deps
+            merged_graph[new_name] = new_node
+
+        # 🔧 检测循环依赖
+        self._detect_cycle(merged_graph, parent_node, running_nodes)
+
+        return merged_graph
+
+    def _detect_cycle(
+        self,
+        graph: TaskGraph,
+        parent_node: str,
+        running_nodes: set[str],
+    ) -> None:
+        """
+        检测图中的循环依赖
+
+        Args:
+            graph: 要检测的图结构
+            parent_node: 父节点名称
+            running_nodes: 当前正在运行的节点集合
+
+        Raises:
+            CycleDependencyError: 如果检测到循环依赖
+        """
+        # 构建依赖关系字典
+        dependency_map: dict[str, list[str]] = {}
+        for node_name, node_data in graph.items():
+            deps = node_data.get("depends_on", [])
+            dependency_map[node_name] = deps
+
+        # 方法1：使用 TopologicalSorter 检测循环
+        try:
+            sorter = TopologicalSorter(dependency_map)
+            sorter.prepare()
+        except CycleError as e:
+            # 拓扑排序检测到循环，提取循环路径
+            cycle_path = self._find_cycle_path(dependency_map)
+            raise CycleDependencyError(
+                f"Cycle dependency detected in subgraph from node '{parent_node}'",
+                cycle_path=cycle_path,
+            )
+
+        # 方法2：检测是否引用正在运行的节点（可能导致死循环）
+        # 新添加的子图节点如果依赖正在运行的节点，而正在运行的节点又依赖新节点，会形成循环
+        subgraph_nodes = set()
+        for node_name in graph:
+            if node_name.startswith(f"{parent_node}::"):
+                subgraph_nodes.add(node_name)
+
+        # 检查新子图节点是否被正在运行的节点依赖
+        for running_node in running_nodes:
+            if running_node not in graph:
+                continue
+            running_deps = graph[running_node].get("depends_on", [])
+            for dep in running_deps:
+                if dep in subgraph_nodes:
+                    # 正在运行的节点依赖新添加的子图节点
+                    # 这可能导致死循环（因为运行节点等待子图节点，子图节点等待父节点）
+                    cycle_path = [running_node, dep, parent_node, running_node]
+                    raise CycleDependencyError(
+                        f"Running node '{running_node}' depends on new subgraph node '{dep}'. "
+                        f"This creates a potential deadlock.",
+                        cycle_path=cycle_path,
+                    )
+
+        # 方法3：检测父节点是否被子图节点间接依赖
+        # 父节点已经完成或正在运行，如果子图节点依赖链回到父节点，会形成循环
+        for sub_node in subgraph_nodes:
+            path = self._trace_dependency_path(sub_node, parent_node, dependency_map)
+            if path and parent_node in path and len(path) > 1:
+                # 找到从子图节点回到父节点的路径
+                cycle_path = path + [sub_node]
+                raise CycleDependencyError(
+                    f"Subgraph node '{sub_node}' creates a cycle back to parent '{parent_node}'",
+                    cycle_path=cycle_path,
+                )
+
+    def _find_cycle_path(self, dependency_map: dict[str, list[str]]) -> list[str]:
+        """
+        在依赖图中找到循环路径
+
+        使用 DFS 深度优先搜索检测循环并提取路径。
+
+        Args:
+            dependency_map: 节点依赖关系字典
+
+        Returns:
+            循环路径列表（如果找不到则返回空列表）
+        """
+        visited: set[str] = set()
+        rec_stack: set[str] = set()
+        path: list[str] = []
+
+        def dfs(node: str) -> list[str] | None:
+            visited.add(node)
+            rec_stack.add(node)
+            path.append(node)
+
+            for dep in dependency_map.get(node, []):
+                if dep not in visited:
+                    result = dfs(dep)
+                    if result:
+                        return result
+                elif dep in rec_stack:
+                    # 找到循环，提取循环部分
+                    cycle_start_idx = path.index(dep)
+                    return path[cycle_start_idx:] + [dep]
+
+            path.pop()
+            rec_stack.remove(node)
+            return None
+
+        # 从每个未访问的节点开始 DFS
+        for node in dependency_map:
+            if node not in visited:
+                result = dfs(node)
+                if result:
+                    return result
+
+        return []
+
+    def _trace_dependency_path(
+        self,
+        start_node: str,
+        target_node: str,
+        dependency_map: dict[str, list[str]],
+    ) -> list[str] | None:
+        """
+        追踪从 start_node 到 target_node 的依赖路径
+
+        Args:
+            start_node: 开始节点
+            target_node: 目标节点
+            dependency_map: 节点依赖关系字典
+
+        Returns:
+            路径列表（如果找不到则返回 None）
+        """
+        visited: set[str] = set()
+        path: list[str] = []
+
+        def dfs(node: str) -> list[str] | None:
+            visited.add(node)
+            path.append(node)
+
+            if node == target_node:
+                return list(path)
+
+            for dep in dependency_map.get(node, []):
+                if dep not in visited:
+                    result = dfs(dep)
+                    if result:
+                        return result
+
+            path.pop()
+            return None
+
+        return dfs(start_node)

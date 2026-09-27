@@ -13,6 +13,16 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+try:
+    from .observability.failure_reason import FailureReason, build_failure_payload
+except ImportError:
+    from hiveflow.observability.failure_reason import FailureReason, build_failure_payload
+
+_TIMEOUT_PAYLOAD = build_failure_payload(
+    FailureReason.TIMEOUT,
+    error="Intent execution timed out",
+)
+
 
 class EventBus(ABC):
     @abstractmethod
@@ -44,6 +54,14 @@ class EventBus(ABC):
     @abstractmethod
     async def close(self) -> None: ...
 
+    async def publish_batch(self, messages: list[tuple[str, ECM]]) -> None:
+        """
+        Default implementation: publish each message individually.
+        Override in subclasses for optimized batch publishing.
+        """
+        for topic, msg in messages:
+            await self.publish(topic, msg)
+
 
 class InProcessEventBus(EventBus):
     def __init__(self):
@@ -66,6 +84,39 @@ class InProcessEventBus(EventBus):
                 await handler(msg)
             except Exception:
                 logger.exception(f"Handler error on topic {topic}")
+
+    async def publish_batch(self, messages: list[tuple[str, ECM]]) -> None:
+        """
+        🔄 Optimized batch publishing: collect all handlers once, then dispatch.
+        
+        Reduces lock contention by acquiring lock only once for all messages,
+        then iterating through handlers without re-acquiring.
+        
+        Args:
+            messages: List of (topic, ECM) tuples to publish
+        """
+        if not messages:
+            return
+        
+        # 🔄 Single lock acquisition for all topics
+        async with self._lock:
+            # Collect all handlers for all topics
+            handlers_map: dict[str, list[tuple[Callable, set[str]]]] = defaultdict(list)
+            for topic, msg in messages:
+                subs = self._topics.get(topic, {})
+                for handler, tags in subs.values():
+                    # Pre-filter by skills to reduce iterations
+                    if tags and msg.required_skills and not tags.intersection(set(msg.required_skills)):
+                        continue
+                    handlers_map[msg.intent_id].append((handler, tags, msg))
+        
+        # 🔄 Dispatch without lock contention
+        for intent_id, handler_list in handlers_map.items():
+            for handler, tags, msg in handler_list:
+                try:
+                    await handler(msg)
+                except Exception:
+                    logger.exception(f"Handler error in batch for intent {intent_id}")
 
     async def subscribe(
         self, topic: str, handler: Callable[[ECM], Awaitable[None]], tags: set[str] | None = None
@@ -113,38 +164,96 @@ class InProcessEventBus(EventBus):
             task = self._intents.pop(intent_id, None)
         if task is not None:
             await self.publish(
-                "intent.timeout", ECM(trace_id=intent_id, intent="intent.timeout", intent_id=intent_id, emitter="bus")
+                "intent.timeout",
+                ECM(
+                    trace_id=intent_id,
+                    intent="intent.timeout",
+                    intent_id=intent_id,
+                    emitter="bus",
+                    payload=dict(_TIMEOUT_PAYLOAD),
+                ),
             )
 
     async def start(self) -> None:
         pass
 
     async def close(self) -> None:
+        """
+        🔄 P0 FIX: Clean up all resources (topics and intents) to prevent subscriber leakage.
+        
+        Clears:
+        - _topics: All subscription handlers
+        - _intents: All pending intent timeout tasks
+        """
         async with self._lock:
+            # 🔄 P0 FIX: Clear topics to release subscriber references
+            self._topics.clear()
+            # Cancel intent timeout tasks
             tasks = list(self._intents.values())
             self._intents.clear()
         for t in tasks:
             t.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        logger.info("InProcessEventBus closed: cleared all topics and intents")
 
 
 # ========== Redis Event Bus ==========
 
 try:
     import redis.asyncio as aioredis
+    from redis.asyncio import ConnectionPool
 
     _REDIS_AVAILABLE = True
 except ImportError:
     _REDIS_AVAILABLE = False
+    ConnectionPool = None  # type: ignore
 
 
 class RedisEventBus(EventBus):
-    def __init__(self, redis_url="redis://localhost", prefix="hiveflow", db=0, max_connections=10, socket_timeout=5.0):
+    """
+    Redis-backed event bus with connection pool management.
+    
+    🔧 Connection Pool Enhancement:
+    - Uses explicit ConnectionPool for better resource control
+    - Health check mechanism to detect stale connections
+    - Shared pool across all subscriptions to prevent exhaustion
+    
+    Args:
+        redis_url: Redis connection URL
+        prefix: Key prefix for all topics
+        db: Redis database number
+        max_connections: Maximum connections in pool (default 20)
+        socket_timeout: Socket timeout in seconds
+        health_check_interval: Interval for PING health checks (default 30s)
+    """
+    
+    def __init__(
+        self,
+        redis_url: str = "redis://localhost",
+        prefix: str = "hiveflow",
+        db: int = 0,
+        max_connections: int = 20,  # 🔄 Increased default from 10 to 20
+        socket_timeout: float = 5.0,
+        health_check_interval: float = 30.0,  # 🔄 New: health check interval
+    ):
         if not _REDIS_AVAILABLE:
             raise ImportError("redis required")
-        self.redis = aioredis.from_url(redis_url, db=db, max_connections=max_connections, socket_timeout=socket_timeout)
+        
+        # 🔄 Use explicit ConnectionPool for better control
+        self._pool: ConnectionPool = aioredis.ConnectionPool.from_url(
+            redis_url,
+            db=db,
+            max_connections=max_connections,
+            socket_timeout=socket_timeout,
+            decode_responses=False,  # Keep bytes for JSON encoding control
+        )
+        self.redis = aioredis.Redis(connection_pool=self._pool)
+        
         self.prefix = prefix
         self.db = db
+        self.max_connections = max_connections
+        self.health_check_interval = health_check_interval
+        
         self._lock = asyncio.Lock()
         self._sub_counter = 0
         self._listener_tasks: dict[str, asyncio.Task] = {}
@@ -154,11 +263,43 @@ class RedisEventBus(EventBus):
         self._use_local_intent_timeout: bool | None = None
         self._shutdown = False
         self._intent_mode_lock = asyncio.Lock()
+        self._health_check_task: asyncio.Task | None = None  # 🔄 New: health check task
+        self._last_health_check: float = 0.0  # 🔄 New: last health check timestamp
+
+    async def _health_check_loop(self) -> None:
+        """
+        🔄 Background health check loop.
+        
+        Sends periodic PING commands to ensure connections remain alive.
+        This prevents connection timeouts in idle scenarios.
+        """
+        while not self._shutdown:
+            try:
+                await asyncio.sleep(self.health_check_interval)
+                if self._shutdown:
+                    break
+                
+                # Send PING to verify connection health
+                start = time.monotonic()
+                await self.redis.ping()
+                elapsed = time.monotonic() - start
+                
+                self._last_health_check = time.monotonic()
+                logger.debug(f"Redis health check OK ({elapsed:.3f}s)")
+                
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.warning(f"Redis health check failed: {e}")
+                # Don't break on health check failure - allow reconnection logic to handle it
+                await asyncio.sleep(5.0)  # Backoff before retry
 
     async def _ensure_keyspace_notification(self) -> bool:
         try:
             config = await self.redis.config_get("notify-keyspace-events")
             val = config.get("notify-keyspace-events", "")
+            if isinstance(val, bytes):
+                val = val.decode()
             if "E" in val and "x" in val:
                 return True
         except Exception:
@@ -181,7 +322,13 @@ class RedisEventBus(EventBus):
                 logger.info("Intent timeout mode: local timers only.")
 
     async def start(self) -> None:
+        """Start the event bus, including health check loop."""
         await self._init_intent_mode()
+        
+        # 🔄 Start health check loop
+        if self._health_check_task is None:
+            self._health_check_task = asyncio.create_task(self._health_check_loop())
+            logger.info(f"Redis health check started (interval={self.health_check_interval}s)")
 
     async def publish(self, topic: str, msg: ECM) -> None:
         key = f"{self.prefix}:topic:{topic}"
@@ -203,7 +350,48 @@ class RedisEventBus(EventBus):
         )
         await self.redis.publish(key, data)
 
+    async def publish_batch(self, messages: list[tuple[str, ECM]]) -> None:
+        """
+        🔄 Optimized batch publishing for Redis: use pipeline to reduce network round-trips.
+        
+        Args:
+            messages: List of (topic, ECM) tuples to publish
+        """
+        if not messages:
+            return
+        
+        # Use Redis pipeline for batch publishing (single network round-trip)
+        async with self.redis.pipeline() as pipe:
+            for topic, msg in messages:
+                key = f"{self.prefix}:topic:{topic}"
+                data = json.dumps(
+                    {
+                        "trace_id": msg.trace_id,
+                        "intent": msg.intent,
+                        "intent_id": msg.intent_id,
+                        "emitter": msg.emitter,
+                        "expectation": msg.expectation.__dict__ if msg.expectation else None,
+                        "payload": msg.payload,
+                        "reply_to": msg.reply_to,
+                        "timestamp": msg.timestamp,
+                        "required_skills": msg.required_skills,
+                        "priority": msg.priority,
+                        "metadata": msg.metadata,
+                    },
+                    default=str,
+                )
+                pipe.publish(key, data)
+            await pipe.execute()
+
     async def subscribe(self, topic: str, handler, tags=None) -> str:
+        """
+        Subscribe to a topic.
+        
+        🔄 Connection Pool Note:
+        - Uses shared connection pool from self._pool
+        - Each subscription creates a pubsub context but shares the pool
+        - max_connections limit applies to total connections across all subscriptions
+        """
         tags = tags or set()
         async with self._lock:
             sub_id = f"sub_{self._sub_counter}"
@@ -217,6 +405,7 @@ class RedisEventBus(EventBus):
             backoff = 0.1
             while not self._shutdown:
                 try:
+                    # 🔄 Use connection pool for pubsub
                     async with self.redis.pubsub() as pubsub:
                         await pubsub.subscribe(key)
                         backoff = 0.1  # 重置退避
@@ -230,7 +419,8 @@ class RedisEventBus(EventBus):
                                 if sub_info is None:
                                     break
                                 _, current_handler, current_tags = sub_info
-                            data = json.loads(message["data"])
+                            data_bytes = message["data"]
+                            data = json.loads(data_bytes if isinstance(data_bytes, bytes) else data_bytes)
                             exp = data.get("expectation")
                             expectation = Expectation(**exp) if isinstance(exp, dict) else None
                             msg = ECM(
@@ -325,7 +515,8 @@ class RedisEventBus(EventBus):
                             break
                         if message["type"] != "pmessage":
                             continue
-                        expired = message["data"].decode() if isinstance(message["data"], bytes) else message["data"]
+                        expired_bytes = message["data"]
+                        expired = expired_bytes.decode() if isinstance(expired_bytes, bytes) else expired_bytes
                         if expired.startswith(f"{self.prefix}:intent:"):
                             intent_id = expired[len(f"{self.prefix}:intent:") :]
                             # 若本地意图缓存中已不存在该 intent_id，说明已在过期前被完成，忽略虚假超时
@@ -338,7 +529,13 @@ class RedisEventBus(EventBus):
                                     task.cancel()
                             await self.publish(
                                 "intent.timeout",
-                                ECM(trace_id=intent_id, intent="intent.timeout", intent_id=intent_id, emitter="bus"),
+                                ECM(
+                                    trace_id=intent_id,
+                                    intent="intent.timeout",
+                                    intent_id=intent_id,
+                                    emitter="bus",
+                                    payload=dict(_TIMEOUT_PAYLOAD),
+                                ),
                             )
             except Exception:
                 logger.exception("Keyspace monitor connection lost, reconnecting...")
@@ -353,24 +550,63 @@ class RedisEventBus(EventBus):
             task = self._local_intents.pop(intent_id, None)
         if task is not None:
             await self.publish(
-                "intent.timeout", ECM(trace_id=intent_id, intent="intent.timeout", intent_id=intent_id, emitter="bus")
+                "intent.timeout",
+                ECM(
+                    trace_id=intent_id,
+                    intent="intent.timeout",
+                    intent_id=intent_id,
+                    emitter="bus",
+                    payload=dict(_TIMEOUT_PAYLOAD),
+                ),
             )
 
     async def close(self):
+        """Close the event bus and release all resources."""
         self._shutdown = True
+        
+        # Stop health check loop
+        if self._health_check_task:
+            self._health_check_task.cancel()
+            try:
+                await self._health_check_task
+            except asyncio.CancelledError:
+                pass
+            self._health_check_task = None
+        
+        # Cancel all listener tasks
         for t in self._listener_tasks.values():
             t.cancel()
         await asyncio.gather(*self._listener_tasks.values(), return_exceptions=True)
+        self._listener_tasks.clear()
+        
+        # Stop intent monitor
         if self._intent_monitor_task:
             self._intent_monitor_task.cancel()
             try:
                 await self._intent_monitor_task
             except asyncio.CancelledError:
                 pass
+            self._intent_monitor_task = None
+        
+        # Cancel local intent tasks
         async with self._lock:
             local_tasks = list(self._local_intents.values())
             self._local_intents.clear()
         for t in local_tasks:
             t.cancel()
         await asyncio.gather(*local_tasks, return_exceptions=True)
+        
+        # Close Redis connection and pool
         await self.redis.aclose()
+        await self._pool.disconnect()  # 🔄 Explicitly disconnect pool
+        logger.info(f"Redis connection pool closed (max_connections={self.max_connections})")
+
+    def get_connection_stats(self) -> dict:
+        """Get connection pool statistics."""
+        return {
+            "max_connections": self.max_connections,
+            "pool_created": self._pool.connection_kwargs.get("connection_name", "unknown"),
+            "health_check_interval": self.health_check_interval,
+            "last_health_check": self._last_health_check,
+            "active_subscriptions": len(self._subscriptions),
+        }

@@ -1,17 +1,17 @@
-import aiohttp
-import json
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any
 from urllib.parse import urlencode
+
+import aiohttp
 
 
 class Tool(ABC):
     name: str = ""
     description: str = ""
-    parameters: Dict[str, Any] = {}
+    parameters: dict[str, Any] = {}
 
     @abstractmethod
-    async def run(self, input: Dict[str, Any], view) -> Any: ...
+    async def run(self, input: dict[str, Any], view) -> Any: ...
 
 
 class WebSearchTool(Tool):
@@ -54,7 +54,7 @@ class WebSearchTool(Tool):
                     results = self._parse_results(html, max_results)
                     return {"query": query, "results": results}
         except aiohttp.ClientError as e:
-            return {"error": f"Network error: {str(e)}"}
+            return {"error": f"Network error: {e!s}"}
 
     def _parse_results(self, html: str, max_results: int) -> list:
         """Simple regex-based extraction of search results from DuckDuckGo HTML."""

@@ -43,6 +43,18 @@ services:
       retries: 5
 
   # ==============================================
+  # Jaeger - OTLP trace backend (A3)
+  # ==============================================
+  jaeger:
+    image: jaegertracing/all-in-one:1.62
+    ports:
+      - "16686:16686"   # UI
+      - "4318:4318"     # OTLP HTTP
+      - "4317:4317"     # OTLP gRPC
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+
+  # ==============================================
   # HiveFlow Studio 后端
   # ==============================================
   studio:
@@ -57,6 +69,10 @@ services:
       - HIVEFLOW_RUNTIME=agent
       - HIVEFLOW_PLAN_HITL=true
       - HIVEFLOW_AGENT_ECHO_LLM=true
+      - HIVEFLOW_OTEL_ENABLED=${HIVEFLOW_OTEL_ENABLED:-0}
+      - OTEL_SERVICE_NAME=hiveflow-studio
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - HIVEFLOW_JAEGER_UI_URL=http://localhost:16686
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     depends_on:
@@ -64,6 +80,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      jaeger:
+        condition: service_started
     volumes:
       - ./packages/studio/backend:/app
       - ./packages/core:/packages/core

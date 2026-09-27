@@ -1,7 +1,8 @@
 import os
+
 import anthropic
+
 from .base import LLMClient
-from typing import List
 
 
 class AnthropicLLMClient(LLMClient):
@@ -48,5 +49,5 @@ class AnthropicLLMClient(LLMClient):
             async for text in stream.text_stream:
                 yield text
 
-    async def embed(self, texts: List[str]) -> List[List[float]]:
+    async def embed(self, texts: list[str]) -> list[list[float]]:
         raise NotImplementedError("Anthropic does not support embeddings")

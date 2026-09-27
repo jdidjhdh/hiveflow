@@ -16,11 +16,15 @@ class TestHiveFlowConfigValidation:
     def test_valid_config_defaults(self):
         """Test config with default values."""
         config = HiveFlowConfig()
-        assert config.blackboard_type == "memory"
+        # 🔄 P0 FIX: Default changed from "memory" to "ttl_memory"
+        assert config.blackboard_type == "ttl_memory"
         assert config.redis_db == 0
         assert config.max_audit_entries == 1000
         assert config.worker_max_queue_size == 100
         assert config.log_level == "INFO"
+        # 🔄 P0 FIX: New defaults added
+        assert config.default_ttl == 3600.0
+        assert config.ttl_cleanup_interval == 120.0
 
     def test_valid_config_custom_values(self):
         """Test config with custom values."""
@@ -112,7 +116,8 @@ class TestHiveFlowConfigFromEnv:
                 monkeypatch.delenv(key, raising=False)
 
         config = HiveFlowConfig.from_env()
-        assert config.blackboard_type == "memory"
+        # 🔄 P0 FIX: Default changed from "memory" to "ttl_memory"
+        assert config.blackboard_type == "ttl_memory"
 
     def test_from_env_with_custom_values(self, monkeypatch):
         """Test from_env with custom environment variables."""

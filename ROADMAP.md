@@ -32,6 +32,25 @@ Public roadmap for reaching production-ready open source. Timelines are approxim
 
 ---
 
+---
+
+## Phase 2.5 — Agent governance & observability (v0.1.x Alpha)
+
+| Item | Status |
+|------|--------|
+| **A1** Unified execution timeline (`GET /api/replay/timeline/{intent_id}`) | Done |
+| **A2** Standard `failure_reason` + `GET /api/analytics/failures` | Done |
+| **A3** OpenTelemetry (`HIVEFLOW_OTEL_ENABLED=1`) + Jaeger/Tempo + `/api/monitoring/tracing` | Done |
+| **A4** Per-intent analytics (`GET /api/analytics/intents/{id}`) + Studio drill-down | Done |
+| Tracer ↔ Analytics deep links (`?intent_id=`) | Done |
+| Docs: [observability.md](docs/en/observability.md) / [可观测性](docs/zh/observability.md) | Done |
+
+**Exit criteria:** Operators can trace a failed intent end-to-end (timeline → failure reason → Jaeger → token cost) without reading source.
+
+**Next:** Phase B — HITL governance (approval UI, audit feedback, rule-based suggestions).
+
+---
+
 ## Phase 2 — Developer experience (Q3 2026)
 
 | Item | Target |

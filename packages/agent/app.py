@@ -1,30 +1,31 @@
-import uuid
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Set, Callable
+import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 from hiveflow import HiveFlow, HiveFlowConfig
+
 try:
     from .core.secure_blackboard import SecureBlackboard
-    from .llm.base import LLMClient
-    from .memory.manager import MemoryManager
-    from .memory.vector_store import VectorStore
-    from .intent_parser import IntentParser
-    from .orchestrator.cognitive import CognitiveOrchestrator
     from .guardrails.input import InputGuard
     from .guardrails.output import OutputValidator
+    from .intent_parser import IntentParser
+    from .llm.base import LLMClient
     from .mcp_skills import register_mcp_plugin_as_skills
+    from .memory.manager import MemoryManager
+    from .memory.vector_store import VectorStore
+    from .orchestrator.cognitive import CognitiveOrchestrator
 except ImportError:
-    from core.secure_blackboard import SecureBlackboard
-    from llm.base import LLMClient
-    from memory.manager import MemoryManager
-    from memory.vector_store import VectorStore
-    from intent_parser import IntentParser
-    from orchestrator.cognitive import CognitiveOrchestrator
     from guardrails.input import InputGuard
     from guardrails.output import OutputValidator
+    from intent_parser import IntentParser
+    from llm.base import LLMClient
     from mcp_skills import register_mcp_plugin_as_skills
+    from memory.manager import MemoryManager
+    from memory.vector_store import VectorStore
+    from orchestrator.cognitive import CognitiveOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +58,8 @@ class SkillBinding:
     skill_name: str
     agent_id: str
     handler: Callable
-    read_keys: Set[str]
-    write_keys: Set[str]
+    read_keys: set[str]
+    write_keys: set[str]
 
 
 @dataclass
@@ -67,26 +68,26 @@ class HiveMindConfig:
     llm: LLMClient
     embedding_llm: LLMClient
     vector_store: VectorStore
-    skill_registry: Dict[str, str] = field(default_factory=dict)
+    skill_registry: dict[str, str] = field(default_factory=dict)
     system_prompt: str = "You are a helpful assistant."
     max_replan_attempts: int = 3
     short_term_limit: int = 10
     global_timeout: float = 300.0
     node_result_ttl: float = 600.0
-    input_guard: Optional[InputGuard] = None
-    output_validator: Optional[OutputValidator] = None
+    input_guard: InputGuard | None = None
+    output_validator: OutputValidator | None = None
     schedule_retries: int = 3
     schedule_backoff_base: float = 0.5
     enable_result_cleanup: bool = True
-    planning_llm: Optional[LLMClient] = None
-    execution_llm: Optional[LLMClient] = None
+    planning_llm: LLMClient | None = None
+    execution_llm: LLMClient | None = None
     enable_plan_hitl: bool = False
     hitl_manager: Any = None
-    mcp_plugin_ids: List[str] = field(default_factory=list)
+    mcp_plugin_ids: list[str] = field(default_factory=list)
 
 
 class HiveMindApp:
-    def __init__(self, config: HiveMindConfig, hiveflow: Optional[HiveFlow] = None):
+    def __init__(self, config: HiveMindConfig, hiveflow: HiveFlow | None = None):
         self.config = config
         self._owns_core = hiveflow is None
         self.core = hiveflow or HiveFlow(config.hiveflow_config)
@@ -94,13 +95,13 @@ class HiveMindApp:
         self.memory = MemoryManager(self.blackboard, config.vector_store, config.short_term_limit)
         planning_llm = config.planning_llm or config.llm
         self.intent_parser = IntentParser(planning_llm, config.skill_registry)
-        self.skill_bindings: Dict[str, SkillBinding] = {}
-        self.cognitive_orch: Optional[CognitiveOrchestrator] = None
-        self._bg_tasks: Set[asyncio.Task] = set()
+        self.skill_bindings: dict[str, SkillBinding] = {}
+        self.cognitive_orch: CognitiveOrchestrator | None = None
+        self._bg_tasks: set[asyncio.Task] = set()
         self._plugin_manager = None
 
     async def create_skill_agent(self, skill_name: str, agent_id: str, handler,
-                                 read_keys: Set[str], write_keys: Set[str],
+                                 read_keys: set[str], write_keys: set[str],
                                  max_queue_size: int = 10):
         if skill_name in self.skill_bindings:
             raise ValueError(f"Skill '{skill_name}' already registered")
@@ -117,12 +118,12 @@ class HiveMindApp:
         self,
         skill_name: str,
         agent_id: str,
-        tools: List,
+        tools: list,
         *,
-        llm: Optional[LLMClient] = None,
+        llm: LLMClient | None = None,
         system_prompt: str = "",
-        read_keys: Optional[Set[str]] = None,
-        write_keys: Optional[Set[str]] = None,
+        read_keys: set[str] | None = None,
+        write_keys: set[str] | None = None,
         max_steps: int = 10,
     ):
         """Register a ReAct-based skill that writes hivemind:result:{intent_id}."""
@@ -154,11 +155,11 @@ class HiveMindApp:
             self.config.skill_registry[skill_name] = f"ReAct skill: {skill_name}"
         return worker
 
-    async def register_mcp_skills(self, plugin_manager, plugin_ids: Optional[List[str]] = None) -> List[str]:
+    async def register_mcp_skills(self, plugin_manager, plugin_ids: list[str] | None = None) -> list[str]:
         """Expose MCP plugin tools as HiveMind skills."""
         self._plugin_manager = plugin_manager
         ids = plugin_ids if plugin_ids is not None else self.config.mcp_plugin_ids
-        registered: List[str] = []
+        registered: list[str] = []
         for plugin_id in ids:
             names = await register_mcp_plugin_as_skills(self, plugin_manager, plugin_id)
             registered.extend(names)
@@ -188,7 +189,7 @@ class HiveMindApp:
         if self._plugin_manager and self.config.mcp_plugin_ids:
             await self.register_mcp_skills(self._plugin_manager)
 
-    async def run_query(self, user_input: str, conversation_id: Optional[str] = None) -> dict:
+    async def run_query(self, user_input: str, conversation_id: str | None = None) -> dict:
         if self.config.input_guard:
             await self.config.input_guard.check(user_input)
         if not self.cognitive_orch:
@@ -227,7 +228,7 @@ class HiveMindApp:
 
         return {"answer": final_answer, "raw_results": results, "intent_id": intent_id, "status": "completed"}
 
-    async def plan_only(self, user_input: str, conversation_id: Optional[str] = None) -> dict:
+    async def plan_only(self, user_input: str, conversation_id: str | None = None) -> dict:
         if not self.cognitive_orch:
             raise RuntimeError("App not started")
         conv_id = conversation_id or str(uuid.uuid4())
@@ -235,9 +236,9 @@ class HiveMindApp:
 
     async def execute_plan(
         self,
-        graph_spec: Dict,
+        graph_spec: dict,
         user_input: str = "",
-        conversation_id: Optional[str] = None,
+        conversation_id: str | None = None,
     ) -> dict:
         if not self.cognitive_orch:
             raise RuntimeError("App not started")
