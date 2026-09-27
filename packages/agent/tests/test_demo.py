@@ -34,6 +34,9 @@ from core.secure_blackboard import SecureBlackboard
 
 class DemoLLMClient(LLMClient):
     """模拟 LLM 客户端。"""
+    async def _stream_impl(self, messages, **kwargs):
+        yield "ok"
+
     def __init__(self):
         self._json_responses = []
         self._json_idx = 0

@@ -38,6 +38,9 @@ class MockLLMClient(LLMClient):
         self._json_idx = 0
         self._text_idx = 0
 
+    async def _stream_impl(self, messages, **kwargs):
+        yield "done"
+
     def set_json_responses(self, responses):
         self._json_responses = responses
         self._json_idx = 0
@@ -176,6 +179,7 @@ async def test_ensure_error_writes_success_passes_through():
 async def test_memory_persistence_and_recall():
     """测试记忆持久化与召回。"""
     mm = create_memory_manager()
+    mm.set_context("conv-a")  # 安全隔离：必须先设置 conversation context
     # add_to_short_term 写入 short_term list
     mm.add_to_short_term("user", "What is AI?")
     mm.add_to_short_term("assistant", "AI is artificial intelligence.")
@@ -206,6 +210,7 @@ async def test_memory_summarize_and_remember():
     mm = create_memory_manager()
     llm = MockLLMClient()
 
+    mm.set_context("conv-1")  # 安全隔离：必须先设置 conversation context
     mm.add_to_short_term("user", "What is Python?")
     mm.add_to_short_term("assistant", "Python is a programming language.")
 

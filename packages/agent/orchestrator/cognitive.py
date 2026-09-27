@@ -287,8 +287,8 @@ class CognitiveOrchestrator:
         """
         executable = {}
         
-        # Create weak reference to partial_results to prevent circular reference
-        partial_ref = weakref.ref(partial_results)
+        # partial_results 是 dict，Python dict 不支持 weakref；改用直接引用（功能等价）
+        partial_ref = partial_results
         
         for node_name, node_data in graph_spec.items():
             skill_name = node_data["task"]
@@ -305,10 +305,10 @@ class CognitiveOrchestrator:
                                 _partial_ref=partial_ref,  # 🔄 weakref instead of direct reference
                                 _on_failure=on_failure,
                                 _payload=intent_payload, _exp_cfg=exp_cfg):
-                # 🔄 Get partial_results through weakref (may be None if GC'd)
-                _partial = _partial_ref()
+                # 读取 partial_results（直接引用，dict 不支持 weakref）
+                _partial = _partial_ref
                 if _partial is None:
-                    _partial = {}  # Fallback to empty dict if already GC'd
+                    _partial = {}  # Fallback to empty dict
                 
                 # 1. 缓存结果
                 cached = _partial.get(_name)
@@ -384,8 +384,8 @@ class CognitiveOrchestrator:
                         return MISSING
                     result = self._validate_expectation(result, _exp_cfg, _name)
                     
-                    # 🔄 Update through weakref (re-fetch to ensure valid reference)
-                    _partial = _partial_ref()
+                    # 更新 partial_results（直接引用，dict 不支持 weakref）
+                    _partial = _partial_ref
                     if _partial is not None:
                         _partial[_name] = result
                     

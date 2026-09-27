@@ -21,12 +21,20 @@ class DeepSeekLLMClient(LLMClient):
         self.model = model
 
     async def complete(self, messages, **kwargs):
+        kwargs.pop("trace_id", None)
+        kwargs.pop("max_retries", None)
+        kwargs.pop("jitter", None)
+        kwargs.pop("max_messages", None)
         resp = await self.client.chat.completions.create(
             model=self.model, messages=messages, **kwargs
         )
         return resp.choices[0].message.content
 
-    async def stream(self, messages, **kwargs):
+    async def _stream_impl(self, messages, **kwargs):
+        kwargs.pop("trace_id", None)
+        kwargs.pop("max_retries", None)
+        kwargs.pop("jitter", None)
+        kwargs.pop("max_messages", None)
         stream = await self.client.chat.completions.create(
             model=self.model, messages=messages, stream=True, **kwargs
         )

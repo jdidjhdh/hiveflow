@@ -206,6 +206,7 @@ class ReActWorker:
                 tool_name = resp.get("tool")
                 tool_input = resp.get("input", {})
                 obs = ""
+                matched_name = None  # FIX: 工具直接命中时 fuzzy 分支不执行，需先初始化
                 
                 # 🔧 PERFORMANCE FIX: Try fuzzy match if exact tool not found
                 tool = self.tools.get(tool_name)
@@ -479,6 +480,7 @@ class ReActWorker:
                 tool_name = resp.get("tool")
                 tool_input = resp.get("input", {})
                 obs = ""
+                matched_name = None  # FIX: 工具直接命中时 fuzzy 分支不执行，需先初始化
 
                 # 🔧 PERFORMANCE FIX: Try fuzzy match
                 tool = self.tools.get(tool_name)

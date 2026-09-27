@@ -23,7 +23,7 @@ class OllamaLLMClient(LLMClient):
             resp.raise_for_status()
             return resp.json()["message"]["content"]
 
-    async def stream(self, messages, **kwargs):
+    async def _stream_impl(self, messages, **kwargs):
         timeout = kwargs.pop("timeout", 120.0)
         payload = {
             "model": self.model,

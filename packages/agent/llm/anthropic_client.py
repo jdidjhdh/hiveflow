@@ -27,6 +27,10 @@ class AnthropicLLMClient(LLMClient):
         return system_content, anthropic_messages
 
     async def complete(self, messages, **kwargs):
+        kwargs.pop("trace_id", None)
+        kwargs.pop("max_retries", None)
+        kwargs.pop("jitter", None)
+        kwargs.pop("max_messages", None)
         system_content, anthropic_messages = self._convert_messages(messages)
         resp = await self.client.messages.create(
             model=self.model,
@@ -37,7 +41,11 @@ class AnthropicLLMClient(LLMClient):
         )
         return resp.content[0].text if resp.content else ""
 
-    async def stream(self, messages, **kwargs):
+    async def _stream_impl(self, messages, **kwargs):
+        kwargs.pop("trace_id", None)
+        kwargs.pop("max_retries", None)
+        kwargs.pop("jitter", None)
+        kwargs.pop("max_messages", None)
         system_content, anthropic_messages = self._convert_messages(messages)
         async with self.client.messages.stream(
             model=self.model,

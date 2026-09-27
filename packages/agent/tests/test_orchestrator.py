@@ -19,7 +19,7 @@ class MockLLM:
         self.json_call_count = 0
         self.text_call_count = 0
 
-    async def complete_json(self, messages):
+    async def complete_json(self, messages, **kwargs):
         resp = self.json_responses[self.json_call_count % len(self.json_responses)]
         self.json_call_count += 1
         return resp

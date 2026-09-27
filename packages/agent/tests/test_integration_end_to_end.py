@@ -29,6 +29,9 @@ from intent_parser import IntentParser
 
 class MockLLMClient(LLMClient):
     """可预设 JSON 和文本响应的 Mock LLM。"""
+    async def _stream_impl(self, messages, **kwargs):
+        yield "ok"
+
     def __init__(self):
         self._json_responses = []
         self._text_responses = []

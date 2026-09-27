@@ -378,50 +378,50 @@ class TestCodeExecTool:
 
     def test_blocked_import_os(self, code_tool):
         """Static check blocks os import."""
-        err = code_tool._check_safety("import os")
+        err = code_tool._check_safety_ast("import os")
         assert err is not None
         assert "os" in err
 
     def test_blocked_import_subprocess(self, code_tool):
         """Static check blocks subprocess import."""
-        err = code_tool._check_safety("import subprocess")
+        err = code_tool._check_safety_ast("import subprocess")
         assert err is not None
 
     def test_blocked_import_socket(self, code_tool):
-        err = code_tool._check_safety("import socket")
+        err = code_tool._check_safety_ast("import socket")
         assert err is not None
 
     def test_blocked_from_import(self, code_tool):
         """Static check blocks 'from X import Y'."""
-        err = code_tool._check_safety("from pathlib import Path")
+        err = code_tool._check_safety_ast("from pathlib import Path")
         assert err is not None
         assert "pathlib" in err
 
     def test_blocked_eval(self, code_tool):
         """Static check blocks eval()."""
-        err = code_tool._check_safety("eval('1+1')")
+        err = code_tool._check_safety_ast("eval('1+1')")
         assert err is not None
         assert "eval" in err
 
     def test_blocked_exec(self, code_tool):
-        err = code_tool._check_safety("exec('x=1')")
+        err = code_tool._check_safety_ast("exec('x=1')")
         assert err is not None
 
     def test_blocked_open(self, code_tool):
-        err = code_tool._check_safety("open('/etc/passwd')")
+        err = code_tool._check_safety_ast("open('/etc/passwd')")
         assert err is not None
 
     def test_blocked_import__import__(self, code_tool):
-        err = code_tool._check_safety("__import__('os')")
+        err = code_tool._check_safety_ast("__import__('os')")
         assert err is not None
 
     def test_safe_code_passes_check(self, code_tool):
         """Simple arithmetic passes the safety check."""
-        err = code_tool._check_safety("x = 1 + 2")
+        err = code_tool._check_safety_ast("x = 1 + 2")
         assert err is None
 
     def test_print_passes_check(self, code_tool):
-        err = code_tool._check_safety("print('hello')")
+        err = code_tool._check_safety_ast("print('hello')")
         assert err is None
 
     @pytest.mark.asyncio
@@ -452,9 +452,8 @@ class TestCodeExecTool:
         Note: the wrapper catches exceptions, so returncode may be 0
         but the error is captured in the output."""
         result = await code_tool.run({"code": "print('missing quote"}, None)
-        # The wrapper catches the SyntaxError so returncode can be 0,
-        # but there should be some indication of the error.
-        assert result["returncode"] == 0 or result.get("stderr") or result.get("stdout")
+        # 语法错误在 _check_safety_ast 阶段（AST 解析）即被拦截，返回 {"error": ...}
+        assert "error" in result
 
     @pytest.mark.asyncio
     async def test_execute_timeout(self, code_tool):
@@ -499,19 +498,19 @@ class TestCodeExecTool:
         assert result["returncode"] == 0 or result.get("stderr") or result.get("stdout")
 
     def test_blocked_import_shutil(self, code_tool):
-        err = code_tool._check_safety("import shutil")
+        err = code_tool._check_safety_ast("import shutil")
         assert err is not None
 
     def test_blocked_import_ctypes(self, code_tool):
-        err = code_tool._check_safety("import ctypes")
+        err = code_tool._check_safety_ast("import ctypes")
         assert err is not None
 
     def test_blocked_pickle(self, code_tool):
-        err = code_tool._check_safety("import pickle")
+        err = code_tool._check_safety_ast("import pickle")
         assert err is not None
 
     def test_safe_list_comprehension(self, code_tool):
-        err = code_tool._check_safety("result = [x**2 for x in range(10)]")
+        err = code_tool._check_safety_ast("result = [x**2 for x in range(10)]")
         assert err is None
 
 

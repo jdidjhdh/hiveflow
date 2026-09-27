@@ -342,6 +342,7 @@ async def test_e2e_short_term_memory_persistence(tmp_path):
     bb = SecureBlackboard(MemoryBlackboard())
     vs = InMemoryVectorStore(embedding_fn=dummy_embedding)
     memory = MemoryManager(bb, vs, short_term_limit=5)
+    memory.set_context("conv-1")  # 安全隔离：必须先设置 conversation context
 
     # Simulate adding conversation turns
     memory.add_to_short_term("user", "Hello")

@@ -18,7 +18,9 @@ async def simple_embedding_fn(texts):
 def mem_manager(tmp_path):
     bb = SecureBlackboard(MemoryBlackboard())
     vs = ChromaVectorStore(path=str(tmp_path / "chroma"), embedding_fn=simple_embedding_fn)
-    return MemoryManager(bb, vs, short_term_limit=5)
+    mm = MemoryManager(bb, vs, short_term_limit=5)
+    mm.set_context("default")  # 安全隔离：必须先设置 conversation context
+    return mm
 
 
 @pytest.mark.asyncio

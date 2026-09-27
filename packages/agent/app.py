@@ -196,6 +196,7 @@ class HiveMindApp:
             raise RuntimeError("App not started")
 
         conv_id = conversation_id or str(uuid.uuid4())
+        self.memory.set_context(conv_id)  # 修复：记忆安全隔离要求先设置 conversation context
         exec_result = await self.cognitive_orch.execute(user_input, conv_id)
         intent_id = exec_result["intent_id"]
         results = exec_result.get("results", {})

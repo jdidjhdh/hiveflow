@@ -11,6 +11,10 @@ from replay import ReplayDebugger
 
 
 class MockLLM(LLMClient):
+    async def _stream_impl(self, messages, **kwargs):
+        yield "ok"
+
+
     def __init__(self, json_responses=None):
         self._json = list(json_responses or [])
         self._idx = 0

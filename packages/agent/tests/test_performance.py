@@ -40,6 +40,9 @@ from core.secure_blackboard import SecureBlackboard, MemoryBlackboard
 
 class MockLLMClient(LLMClient):
     """可预设 JSON 和文本响应的 Mock LLM。"""
+    async def _stream_impl(self, messages, **kwargs):
+        yield "ok"
+
 
     def __init__(self):
         self._json_responses = []
@@ -306,6 +309,7 @@ async def test_memory_manager_under_load():
     bb = SecureBlackboard(MemoryBlackboard())
     short_term_limit = 10
     mem_manager = MemoryManager(bb, None, short_term_limit=short_term_limit)
+    mem_manager.set_context("load")  # 安全隔离：必须先设置 conversation context
 
     # --- 短期内存压力测试 ---
     num_adds = 100

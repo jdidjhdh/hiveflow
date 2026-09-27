@@ -50,13 +50,20 @@ async def test_type_check(pipeline):
 
 @pytest.mark.asyncio
 async def test_expression_validation(pipeline):
-    # Note: simpleeval not installed in this env, so expression validation is skipped
-    # This test just verifies no crash when expression is present
+    # 安全表达式求值：AST 白名单仅允许比较/算术/逻辑运算，下标访问（Subscript）被拦截
+    # 白名单支持的表达式正确求值
     expectation = Expectation(
+        state_key="test",
+        expected_schema={},
+        validation="value > 0"
+    )
+    assert await pipeline.validate(expectation, 25) is True
+    assert await pipeline.validate(expectation, -5) is False
+
+    # 下标访问不在白名单，被安全拦截返回 False（而非崩溃或执行）
+    expectation2 = Expectation(
         state_key="test",
         expected_schema={},
         validation="value['age'] > 0"
     )
-    # Returns True because simpleeval is not available (validation is skipped)
-    result = await pipeline.validate(expectation, {"age": 25})
-    assert result is True  # skipped validation returns True
+    assert await pipeline.validate(expectation2, {"age": 25}) is False

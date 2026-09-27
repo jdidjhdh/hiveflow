@@ -68,9 +68,7 @@ ALLOWED_NODES = {
     ast.BinOp,       # +, -, *, /, %, etc.
     ast.Compare,     # ==, !=, <, >, <=, >=
     ast.Name,        # variable names (only 'value' allowed)
-    ast.Constant,    # literals (numbers, strings, booleans)
-    ast.Num,         # legacy Python < 3.8
-    ast.Str,         # legacy Python < 3.8
+    ast.Constant,    # literals (numbers, strings, booleans) —— Python 3.8+ 统一为 Constant，不再用 Num/Str
     ast.Load,        # expression context (read mode)
     # Comparison operators (as children of Compare)
     ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE,
@@ -196,15 +194,9 @@ class SafeExpressionEvaluator:
         Returns:
             Evaluation result
         """
-        # Literals (Python 3.8+)
+        # Literals (Python 3.8+ 统一为 Constant；Num/Str 已于 3.8 移除，不再兼容)
         if isinstance(node, ast.Constant):
             return node.value
-        
-        # Legacy literals (Python < 3.8)
-        if isinstance(node, ast.Num):
-            return node.n
-        if isinstance(node, ast.Str):
-            return node.s
         
         # Variable reference
         if isinstance(node, ast.Name):
