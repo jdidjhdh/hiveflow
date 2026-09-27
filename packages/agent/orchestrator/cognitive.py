@@ -294,6 +294,32 @@ class CognitiveOrchestrator:
             skill_name = node_data["task"]
             binding = self.skill_bindings.get(skill_name)
             if not binding:
+                # 🔧 本地 LLM 容错：开源模型可能编造不在技能列表里的 skill 名。
+                # final_answer 优先回退到"汇总/输出"类技能；其他节点按名称子串匹配，
+                # 仍无匹配则回退到首个注册技能（记录 warning，不中断执行）。
+                fallback = None
+                if node_name == "final_answer":
+                    fallback = next((
+                        n for n in self.skill_bindings
+                        if any(k in n for k in ("summar", "final", "answer", "report", "output", "generate"))
+                    ), None)
+                if fallback is None:
+                    fallback = next((
+                        n for n in self.skill_bindings
+                        if skill_name in n or n in skill_name
+                    ), None)
+                if fallback is None:
+                    fallback = next(iter(self.skill_bindings), None)
+                if fallback:
+                    logger.warning(
+                        f"Unknown skill '{skill_name}' for node '{node_name}' → fallback to '{fallback}'"
+                    )
+                    binding = self.skill_bindings[fallback]
+                    # 关键：同步改写节点 task 与局部变量 skill_name，
+                    # 否则 node_task 闭包仍按原始 skill 名调度、匹配不到 agent
+                    node_data["task"] = fallback
+                    skill_name = fallback
+            if not binding:
                 raise ValueError(f"Unknown skill '{skill_name}'")
 
             on_failure = node_data.get("on_failure", "abort")
@@ -578,7 +604,28 @@ Generate corrected TaskGraph JSON."""}
                 },
             )
             graph = await self.llm.complete_json(messages, trace_id=ecm.trace_id)
-            return self._normalize_task_graph(graph)
+            try:
+                return self._normalize_task_graph(graph)
+            except ValueError as e2:
+                # 🔧 本地 LLM 容错：二次修正仍失败时，退化为基于已注册技能的链式回退图，
+                # 保证编排不因规划输出不稳定而中断。
+                logger.warning(
+                    f"[trace_id={ecm.trace_id}] replan retry also invalid ({e2}); "
+                    f"falling back to skill-chain plan"
+                )
+                skills = list(self.skill_bindings.keys())[:4]
+                if skills:
+                    nodes, prev = {}, None
+                    for i, s in enumerate(skills):
+                        name = f"step_{i + 1}_{s}"
+                        nodes[name] = {"task": s, "depends_on": [prev] if prev else []}
+                        prev = name
+                    sink = "summarize" if "summarize" in skills else skills[-1]
+                    nodes["final_answer"] = {
+                        "task": sink, "depends_on": [prev] if prev else [],
+                    }
+                    return nodes
+                raise
 
     async def _persist_partial_results(self, results, intent_id):
         for node_name, value in results.items():
